@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comps</title>
+    <link rel="stylesheet" href="static/css/style.css">
+</head>
+<body>
+    <h1>Comps</h1>
+    <div class="upload-area" id="dropZone">
+        <p>Drag and drop images here or click to select files</p>
+        <input type="file" id="fileInput" multiple accept="image/*" style="display: none;">
+        <div id="uploadProgress" style="display: none;"></div>
+    </div>
+    <div id="preview"></div>
+    <button id="uploadButton" style="display: none;">Compare Images</button>
+
+    <script src="static/js/upload.js"></script>
+</body>
+</html>
