@@ -1,8 +1,14 @@
 body {
-    padding-top: 70px;
     min-height: 100vh;
     display: flex;
     flex-direction: column;
+    background-color: #1a1a1a;
+    color: #e0e0e0;
+}
+
+/* Add padding only for pages with fixed-top navbar */
+body.has-fixed-nav {
+    padding-top: 70px;
 }
 
 .container {
@@ -27,6 +33,20 @@ body {
 
 .dropdown-toggle:hover {
     background-color: rgba(255,255,255,.1);
+}
+
+.dropdown-menu {
+    background-color: #2d2d2d;
+    border: 1px solid #404040;
+}
+
+.dropdown-item {
+    color: #e0e0e0;
+}
+
+.dropdown-item:hover {
+    background-color: #404040;
+    color: #fff;
 }
 
 .comparison-name {
@@ -56,10 +76,11 @@ body {
 .metadata-form {
     margin: 20px 0;
     padding: 20px;
-    background: #ffffff;
+    background: #2d2d2d;
+    color: #e0e0e0;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     border-radius: 8px;
-    border: 1px solid #e9ecef;
+    border: 1px solid #404040;
 }
 
 .form-group {
@@ -75,7 +96,9 @@ body {
 .form-group input {
     width: 100%;
     padding: 8px;
-    border: 1px solid #ddd;
+    border: 1px solid #404040;
+    background-color: #333333;
+    color: #e0e0e0;
     border-radius: 4px;
 }
 
@@ -89,19 +112,19 @@ body {
 }
 
 .upload-area {
-    border: 2px dashed #cccccc;
+    border: 2px dashed #404040;
     border-radius: 8px;
     padding: 40px;
     text-align: center;
-    background-color: #f8f9fa;
+    background-color: #2d2d2d;
     cursor: pointer;
     transition: all 0.3s ease;
     margin: 20px 0;
 }
 
 .upload-area:hover {
-    border-color: #999999;
-    background-color: #f0f1f2;
+    border-color: #666666;
+    background-color: #333333;
 }
 
 .upload-area.dragover {
@@ -111,7 +134,7 @@ body {
 }
 
 .upload-area p {
-    color: #666666;
+    color: #e0e0e0;
     font-size: 1.1em;
     margin: 0;
 }
@@ -142,9 +165,9 @@ body {
 .comparison-column {
     margin: 10px 0;
     padding: 15px;
-    background: #f8f9fa;
+    background: #2d2d2d;
     border-radius: 8px;
-    border: 1px solid #dee2e6;
+    border: 1px solid #404040;
     flex: 1;
     min-width: 200px;
 }
@@ -174,7 +197,7 @@ body {
     width: 100%;
     overflow: auto;
     position: relative;
-    background: #f0f0f0;
+    background: #1a1a1a;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -229,14 +252,20 @@ body {
 .upload-instructions {
     margin: 20px;
     padding: 15px;
-    background: #f5f5f5;
+    background: #2d2d2d;
     border-radius: 5px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    color: #e0e0e0;
 }
 
 .upload-instructions code {
-    background: #e0e0e0;
+    background: #404040;
     padding: 2px 5px;
     border-radius: 3px;
+    color: #00ff00;
 }
 
 .comparison-group {
@@ -291,4 +320,19 @@ body {
 
 .column-indicator.active {
     background-color: #717171;
+}
+
+/* Footer styling */
+.footer {
+    background-color: #2d2d2d !important;
+    border-top: 1px solid #404040;
+}
+
+.footer .text-muted,
+.footer .fab {
+    color: #e0e0e0 !important;
+}
+
+.footer a:hover .fab {
+    color: #fff !important;
 }
