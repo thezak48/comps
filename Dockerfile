@@ -6,6 +6,16 @@ RUN apt-get update && apt-get install -y \
     zlib1g-dev \
     && rm -rf /var/lib/apt/lists/*
 
+LABEL maintainer="thezak48" \
+    org.opencontainers.image.created=$BUILD_DATE \
+    org.opencontainers.image.url="https://github.com/thezak48/comps" \
+    org.opencontainers.image.source="https://github.com/thezak48/comps" \
+    org.opencontainers.image.version=$VERSION \
+    org.opencontainers.image.revision=$VCS_REF \
+    org.opencontainers.image.vendor="thezak48" \
+    org.opencontainers.image.title="comps" \
+    org.opencontainers.image.description="Comps is a open source self hostable version of Slowpoke Pics"
+
 # Create app user and group
 RUN groupadd -g 1000 appgroup && \
     useradd -u 1000 -g appgroup -s /bin/bash appuser
@@ -25,7 +35,7 @@ COPY . .
 VOLUME ["/config", "/data"]
 
 # Copy entrypoint script
-COPY docker/docker-entrypoint.sh /docker-entrypoint.sh
+COPY /docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh
 
 # Set default environment variables

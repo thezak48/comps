@@ -41,6 +41,11 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 app.mount("/uploads", StaticFiles(directory=UPLOADS_PATH), name="uploads")
 templates = Jinja2Templates(directory="templates")
 
+@app.get("/health")
+async def health_check():
+    """Health check endpoint for monitoring"""
+    return {"status": "healthy"}
+
 @app.get("/")
 async def home(request: Request):
     """Render the home page with upload form."""
