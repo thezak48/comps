@@ -42,7 +42,7 @@ fileInput.addEventListener('change', (e) => {
 function handleFiles(files) {
     if (!files || files.length === 0) return;
     preview.innerHTML = '';
-    document.getElementById('preview').innerHTML = '<div class="grid-preview"></div>';
+    // document.getElementById('preview').innerHTML = '<div class="grid-preview"></div>';
     const uploadButton = document.getElementById('uploadButton');
     groupFiles(Array.from(files));
 }
@@ -54,25 +54,34 @@ function groupFiles(files) {
 
     // Create a structured map to maintain column and row relationships
     const fileMatrix = new Map();
-    ['first', 'second', 'third'].forEach(prefix => {
-        fileMatrix.set(prefix, new Map());
-    });
+const filenameRegex = /^(.+?)(\d+)\.([^.]+)$/
 
-    // First pass: organize files into matrix by column and row
-    for (const file of files) {
-        const match = file.name.match(/^(first|second|third)(\d{4})\.([^.]+)$/i);
-        if (!match) {
-            showError(`Invalid filename format: ${file.name}`);
-            console.error(`Invalid filename format: ${file.name}`);
-            continue;
-        }
-        
-        const [, prefix, number] = match;
-        const columnKey = prefix.toLowerCase();
-        const rowNum = parseInt(number);
-        
-        fileMatrix.get(columnKey).set(rowNum, file);
+files.forEach(file => {
+    const match = file.name.match(filenameRegex)
+    if (!match){
+        showError(`Invalid filename format: ${file.name}`);
+        console.error(`Invalid filename format: ${file.name}`);
+        return;
     }
+    const [, prefix] = match;
+    fileMatrix.set(prefix, new Map());
+})
+
+// First pass: organize files into matrix by column and row
+for (const file of files) {
+    const match = file.name.match(filenameRegex)
+    if (!match) {
+        showError(`Invalid filename format: ${file.name}`);
+        console.error(`Invalid filename format: ${file.name}`);
+        continue;
+    }
+
+    const [, prefix, number] = match;
+    const columnKey = prefix.toLowerCase();
+    const rowNum = parseInt(number);
+
+    fileMatrix.get(columnKey).set(rowNum, file);
+}
 
     // Validate groups and create preview
     for (const [groupKey, group] of fileMatrix) {
@@ -86,12 +95,7 @@ function groupFiles(files) {
 function createGroupPreview(groupKey, group) {
     const groupDiv = document.createElement('div');
     groupDiv.className = 'comparison-column';
-    const columnNames = {
-        'first': 'Column 1',
-        'second': 'Column 2',
-        'third': 'Column 3'
-    };
-    groupDiv.innerHTML = `<h3>${columnNames[groupKey]}</h3>`;
+    groupDiv.innerHTML = `<h3>${groupKey}</h3>`;
 
     const filesDiv = document.createElement('div');
     filesDiv.className = 'column-files';
@@ -131,7 +135,7 @@ function showError(message) {
     const errorDiv = document.createElement('div');
     errorDiv.className = 'error-message';
     errorDiv.textContent = message;
-    preview.appendChild(errorDiv);
+    preview.insertAdjacentElement('beforebegin', errorDiv);
 }
 
 function validateMetadata() {
