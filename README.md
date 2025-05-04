@@ -11,13 +11,13 @@ Tots not vibe coded because lazy
 
 ## Features
 
-Upload multiple images for side-by-side comparison
-Navigate between images using keyboard shortcuts or UI controls
-Add metadata like comparison name, show name, and tags
-Fit-to-screen and original size viewing modes
-Border toggle for better image separation
-Responsive design for different screen sizes
-Docker support for easy deployment
+- Upload multiple images for side-by-side comparison
+- Navigate between images using keyboard shortcuts or UI controls
+- Add metadata like comparison name, show name, and tags
+- Fit-to-screen and original size viewing modes
+- Border toggle for better image separation
+- Responsive design for different screen sizes
+- Docker support for easy deployment
 
 ## Installation
 
