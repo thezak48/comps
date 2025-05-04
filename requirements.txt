@@ -4,5 +4,5 @@ uvicorn==0.24.0
 pillow==10.1.0
 python-jose==3.3.0
 sqlalchemy==2.0.40
-aiofiles==23.2.1
+aiofiles==24.1.0
 jinja2==3.1.6
