@@ -13,7 +13,6 @@ body.has-fixed-nav {
 
 .container {
     flex: 1;
-    max-width: 1200px;
     margin: 0 auto;
     padding: 20px;
 }
@@ -71,6 +70,8 @@ body.has-fixed-nav {
     margin: 0 auto;
     padding: 20px;
     text-align: center;
+    overflow-x: auto;
+    position: relative;
 }
 
 .metadata-form {
@@ -163,20 +164,49 @@ body.has-fixed-nav {
 }
 
 .comparison-column {
-    margin: 10px 0;
+    margin: 10px;
     padding: 15px;
     background: #2d2d2d;
-    border-radius: 8px;
     border: 1px solid #404040;
-    flex: 1;
-    min-width: 200px;
+    border-radius: 4px;
+    width: calc((100% - (var(--column-count, 2) - 1) * 20px) / var(--column-count, 2));
+    min-width: 150px;
+    display: flex;
+    flex-direction: column;
+    overflow: auto;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.column-controls {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 10px;
+}
+
+.column-controls button {
+    margin-left: 5px;
+}
+
+.column-controls button[disabled] {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.column-controls button[disabled]:hover {
+    background-color: #dc3545;
 }
 
 #preview {
     display: flex;
-    flex-direction: row;
+    flex-wrap: nowrap;
     gap: 15px;
-    justify-content: space-between;
+    overflow-x: hidden;
+    scrollbar-width: thin;
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+    padding: 15px;
+    background: #1a1a1a;
+    border-radius: 8px;
     margin: 20px 0;
 }
 
@@ -286,12 +316,18 @@ body.has-fixed-nav {
     margin-bottom: 15px;
     border-bottom: 1px solid #eee;
     padding-bottom: 10px;
+    max-width: 100%;
+    overflow: hidden;
 }
 
 .file-label {
     margin-top: 5px;
     font-size: 0.9em;
     color: #666666;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
 }
 
 .error-message {
@@ -320,6 +356,26 @@ body.has-fixed-nav {
 
 .column-indicator.active {
     background-color: #717171;
+}
+
+.column-management {
+    margin: 20px 0;
+    text-align: center;
+}
+
+.btn-sm {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+    border-radius: 0.2rem;
+}
+
+.btn-danger {
+    background-color: #dc3545;
+    color: white;
+}
+
+#addColumnBtn {
+    margin: 10px 0;
 }
 
 /* Footer styling */

@@ -24,7 +24,6 @@
             </div>
         </div>
     </nav>
-
     <div class="container">
         <div class="upload-instructions">
             <p>Select images to be uploaded. Files will be grouped into comparisons based on their names.</p>
@@ -46,11 +45,23 @@
                 <input type="text" id="tags" placeholder="Enter tags separated by commas">
             </div>
         </div>
-        <div class="upload-area" id="dropZone">
+        <div class="upload-area w-100" id="dropZone">
             <p>Drag and drop images here or click to select files</p>
             <input type="file" id="fileInput" multiple accept="image/*" style="display: none;">
         </div>
-        <div id="preview"></div>
+        <div class="column-management">
+            <button id="addColumnBtn" class="btn btn-secondary mb-3" onclick="addColumn()">
+                <i class="fas fa-plus"></i> Add Column (Min: 2)
+            </button>
+        </div>
+        <div id="preview">
+            <div class="comparison-column" style="--column-count: 2;">
+                <img src="/static/images/placeholder.png" alt="Placeholder Image">
+            </div>
+            <div class="comparison-column" style="--column-count: 2;">
+                <img src="/static/images/placeholder.png" alt="Placeholder Image">
+            </div>
+        </div>
         <button id="uploadButton" class="btn btn-primary">
             <i class="fa fa-compare"></i> Compare Images
         </button>

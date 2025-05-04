@@ -4,8 +4,18 @@ const preview = document.getElementById('preview');
 const comparisonNameInput = document.getElementById('comparison-name');
 const showNameInput = document.getElementById('show-name');
 const tagsInput = document.getElementById('tags');
-const groupedFiles = new Map();
+let groupedFiles = new Map(); // Maps column prefixes to files
 let selectedFiles = new Set();
+let columnPrefixes = [];
+let columnCount = 2; // Initialize with minimum columns
+let maxColumns = 10; // Maximum allowed columns
+let columnNamePrefix = 'column'; // New dynamic column naming
+let baseColumns = 0; // Track columns from uploaded files
+let addedColumns = 0; // Track manually added columns
+let columnIndexMap = new Map(); // Track column indices
+let detectedColumns = 2; // Track actual columns from uploaded files
+let minColumns = 2; // Define minimum required columns
+let columnTracker = new Map(); // Track column assignments
 let uploadInProgress = false;
 
 console.log('Upload.js initialized');
@@ -39,96 +49,251 @@ fileInput.addEventListener('change', (e) => {
     handleFiles(e.target.files);
 });
 
+// Add horizontal scroll handling
+preview.addEventListener('wheel', (e) => {
+    if (e.deltaY !== 0 && e.shiftKey) {
+        e.preventDefault();
+        preview.scrollLeft += e.deltaY;
+    }
+});
+
 function handleFiles(files) {
     if (!files || files.length === 0) return;
     preview.innerHTML = '';
-    // document.getElementById('preview').innerHTML = '<div class="grid-preview"></div>';
+    preview.style.width = '100%';
     const uploadButton = document.getElementById('uploadButton');
-    groupFiles(Array.from(files));
+    try {
+        groupFiles(Array.from(files));
+        uploadButton.style.display = 'block';
+    } catch (error) {
+        showError(error.message);
+        uploadButton.style.display = 'none';
+    }
 }
 
 function groupFiles(files) {
     groupedFiles.clear();
-    const fileGroups = new Map();
     selectedFiles.clear();
+    
+    // Validate file count
+    if (files.length > 30) {
+        throw new Error('Maximum 30 files allowed');
+    }
 
-    // Create a structured map to maintain column and row relationships
-    const fileMatrix = new Map();
-const filenameRegex = /^(.+?)(\d+)\.([^.]+)$/
+    // Parse filenames and group files
+    const filenameRegex = /^(.+?)(\d+)\.([^.]+)$/i;
+    const fileGroups = new Map();
 
-files.forEach(file => {
-    const match = file.name.match(filenameRegex)
-    if (!match){
-        showError(`Invalid filename format: ${file.name}`);
-        console.error(`Invalid filename format: ${file.name}`);
+    files.forEach(file => {
+        const match = file.name.match(filenameRegex);
+        if (!match) {
+            throw new Error(`Invalid filename format: ${file.name}. Expected: first0001.ext, second0001.ext, etc.`);
+        }
+
+        const [_, prefix, number, ext] = match;
+        const columnPrefix = prefix.toLowerCase();
+        const rowNumber = parseInt(number);
+
+        if (!fileGroups.has(columnPrefix)) {
+            fileGroups.set(columnPrefix, new Map());
+        }
+        fileGroups.get(columnPrefix).set(rowNumber, file);
+        selectedFiles.add(file);
+    });
+
+    // Validate column counts and consistency
+    const columnSizes = Array.from(fileGroups.values()).map(group => group.size);
+    if (columnSizes.length < 2) {
+        throw new Error('At least 2 columns (prefixes) required');
+    }
+    if (new Set(columnSizes).size !== 1) {
+        throw new Error('All columns must have the same number of files');
+    }
+
+    // Update column tracking
+    columnPrefixes = Array.from(fileGroups.keys());
+    detectedColumns = columnPrefixes.length;
+    baseColumns = detectedColumns;
+    columnCount = Math.max(minColumns, detectedColumns);
+
+    // Store grouped files
+    fileGroups.forEach((files, prefix) => {
+        groupedFiles.set(prefix, Array.from(files.values()));
+    });
+
+    updatePreview();
+}
+
+function detectColumnCount(files) {
+    const prefixSet = new Set();
+    const filenameRegex = /^(.+?)(\d+)\.([^.]+)$/;
+    
+    files.forEach(file => {
+        const match = file.name.match(filenameRegex);
+        if (match) {
+            prefixSet.add(match[1].toLowerCase());
+        }
+    });
+    
+    return Math.max(minColumns, prefixSet.size);
+}
+
+function updatePreview() {
+    preview.innerHTML = '';
+    
+    // Use full container width
+    const containerWidth = window.innerWidth - 40; // Account for margins
+    // Update CSS variable for column width
+    preview.style.setProperty('--column-width', `${containerWidth / columnCount}px`);
+
+    // Set CSS variable for column count
+    preview.style.setProperty('--column-count', columnCount);
+    
+    // Preserve existing column structure
+    for (let i = 0; i < columnCount; i++) {
+        // Skip if column prefix doesn't exist
+        if (!columnPrefixes[i]) continue;
+        const columnDiv = document.createElement('div');
+        columnDiv.className = 'comparison-column';
+        columnDiv.id = `column-${columnPrefixes[i]}`;
+        
+        const controlsDiv = document.createElement('div');
+        controlsDiv.className = 'column-controls';
+        controlsDiv.innerHTML = `
+            <button class="btn btn-sm btn-danger" onclick="removeColumn('${columnPrefixes[i]}')" 
+                ${isColumnRemovable(columnPrefixes[i]) ? '' : 'disabled'} title="${getColumnTooltip(columnPrefixes[i])}">Remove Column</button>
+        `;
+        
+        columnDiv.appendChild(controlsDiv);
+        
+        const filesDiv = document.createElement('div');
+        filesDiv.className = 'column-files';
+        columnDiv.appendChild(filesDiv);
+        
+        preview.appendChild(columnDiv);
+    }
+    
+    // Update files in columns
+    groupedFiles.forEach((files, prefix) => {
+        const columnDiv = document.getElementById(`column-${prefix}`);
+        if (columnDiv) {
+            const filesDiv = columnDiv.querySelector('.column-files');
+            files.forEach(file => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const fileDiv = document.createElement('div');
+                    fileDiv.className = 'file-preview';
+                    fileDiv.innerHTML = `
+                        <img src="${e.target.result}" style="max-height: 100px;">
+                        <div class="file-label">${file.name}</div>
+                    `;
+                    filesDiv.appendChild(fileDiv);
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+    });
+}
+
+function isColumnRemovable(columnPrefix) {
+    const isBaseColumn = columnPrefixes.indexOf(columnPrefix) < baseColumns;
+    const totalRemaining = columnCount - 1;
+    return !isBaseColumn || (isBaseColumn && baseColumns > minColumns);
+}
+
+function getColumnTooltip(columnPrefix) {
+    const isBaseColumn = columnPrefixes.indexOf(columnPrefix) < baseColumns;
+    if (isBaseColumn) {
+        if (baseColumns <= minColumns) {
+            return 'Cannot remove base columns below minimum';
+        }
+        return 'Remove base column';
+    }
+    return 'Remove added column';
+}
+
+function addColumn() {
+    if (columnCount >= maxColumns) {
+        showError(`Maximum ${maxColumns} columns allowed`);
         return;
     }
-    const [, prefix] = match;
-    fileMatrix.set(prefix, new Map());
-})
-
-// First pass: organize files into matrix by column and row
-for (const file of files) {
-    const match = file.name.match(filenameRegex)
-    if (!match) {
-        showError(`Invalid filename format: ${file.name}`);
-        console.error(`Invalid filename format: ${file.name}`);
-        continue;
-    }
-
-    const [, prefix, number] = match;
-    const columnKey = prefix.toLowerCase();
-    const rowNum = parseInt(number);
-
-    fileMatrix.get(columnKey).set(rowNum, file);
-}
-
-    // Validate groups and create preview
-    for (const [groupKey, group] of fileMatrix) {
-        createGroupPreview(groupKey, group);
-        selectedFiles = new Set([...selectedFiles, ...group.values()]);
-    }
-
-    document.getElementById('uploadButton').style.display = fileMatrix.size > 0 ? 'block' : 'none';
-}
-
-function createGroupPreview(groupKey, group) {
-    const groupDiv = document.createElement('div');
-    groupDiv.className = 'comparison-column';
-    groupDiv.innerHTML = `<h3>${groupKey}</h3>`;
-
-    const filesDiv = document.createElement('div');
-    filesDiv.className = 'column-files';
-
-    // Get all row numbers and sort them
-    const rowNumbers = Array.from(group.keys()).sort((a, b) => a - b);
     
-    // Create previews in order of sorted row numbers
-    for (const rowNum of rowNumbers) {
-        const file = group.get(rowNum);
-        if (!file) continue;
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            const fileDiv = document.createElement('div');
-            fileDiv.className = 'file-preview';
-            
-            const img = document.createElement('img');
-            img.src = e.target.result;
-            img.style.maxHeight = '100px';
-            
-            const label = document.createElement('div');
-            label.className = 'file-label';
-            label.textContent = rowNum.toString();
-            
-            fileDiv.appendChild(img);
-            fileDiv.appendChild(label);
-            filesDiv.appendChild(fileDiv);
-        };
-        reader.readAsDataURL(file);
-    }
+    // Update CSS variable for column count
+    preview.style.setProperty('--column-count', columnCount + 1);
+    
+    // Add resize observer to handle column width updates
+    const resizeObserver = new ResizeObserver(entries => {
+        preview.style.setProperty('--column-count', columnCount);
+    });
+    resizeObserver.observe(preview);
+    
+    columnCount++;
+    addedColumns++;
+    const newColumnName = `${columnNamePrefix}${columnCount}`;
+    columnPrefixes.push(newColumnName);
+    groupedFiles.set(newColumnName, new Map());
+    updatePreview();
+    updateColumnControls();
+}
 
-    groupDiv.appendChild(filesDiv);
-    preview.appendChild(groupDiv);
+function removeColumn(columnIndex) {
+    try {
+        // Validate minimum columns
+        if (columnCount <= minColumns) {
+            showError('Cannot remove column: Minimum 2 columns required');
+            return;
+        }
+
+        const index = columnPrefixes.indexOf(columnIndex);
+        if (index === -1 || !isColumnRemovable(columnIndex)) {
+            console.error('Column not found:', columnIndex);
+            showError('Invalid column');
+            return;
+        }
+        
+        // Update column counts
+        const isBaseColumn = index < baseColumns;
+        isBaseColumn ? baseColumns-- : addedColumns--;
+
+        // Remove the column from data structures
+        groupedFiles.delete(columnIndex);
+
+        // Update column tracking
+        columnCount--;
+
+        // Remove from column prefixes array
+        columnPrefixes.splice(index, 1);
+
+        // Reindex remaining columns
+        let newPrefixes = [];
+        columnPrefixes.forEach((prefix, i) => {
+            const newPrefix = `${columnNamePrefix}${i + 1}`;
+            if (prefix !== newPrefix) {
+                const files = groupedFiles.get(prefix);
+                if (files) {
+                    groupedFiles.set(newPrefix, files);
+                    groupedFiles.delete(prefix);
+                }
+            }
+            newPrefixes.push(newPrefix);
+        });
+        columnPrefixes = newPrefixes;
+
+        document.getElementById('uploadButton').style.display = selectedFiles.size > 0 ? 'block' : 'none';
+        updateColumnControls();
+        updatePreview();
+    } catch (error) {
+        console.error('Error removing column:', error);
+        showError('Failed to remove column');
+    }
+}
+
+function updateColumnControls() {
+    document.querySelectorAll('.column-controls button').forEach(button => {
+        const columnPrefix = button.closest('.comparison-column').id.split('-')[1];
+        button.disabled = !isColumnRemovable(columnPrefix);
+        button.title = getColumnTooltip(columnPrefix);
+    });
 }
 
 function showError(message) {
@@ -141,7 +306,11 @@ function showError(message) {
 function validateMetadata() {
     const comparisonName = comparisonNameInput.value.trim();
     if (!comparisonName) {
-        showError('Comparison name is required');
+        showError('Please enter a comparison name');
+        return false;
+    }
+    if (columnCount < minColumns) {
+        showError(`Minimum of ${minColumns} columns required`);
         return false;
     }
     return true;
@@ -181,6 +350,11 @@ document.getElementById('uploadButton').addEventListener('click', async () => {
 
     if (selectedFiles.size > 10) {
         alert('Maximum 10 files allowed');
+        return;
+    }
+
+    if (columnCount < minColumns) {
+        showError('Minimum number of columns required');
         return;
     }
 
