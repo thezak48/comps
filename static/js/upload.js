@@ -8,7 +8,9 @@ let groupedFiles = new Map(); // Maps column prefixes to files
 let selectedFiles = new Set();
 let columnPrefixes = [];
 let columnCount = 2; // Initialize with minimum columns
+let rowCount = 1;    // Initialize with one row
 let maxColumns = 10; // Maximum allowed columns
+let maxRows = 10;    // Maximum allowed rows
 let columnNamePrefix = 'column'; // New dynamic column naming
 let baseColumns = 0; // Track columns from uploaded files
 let addedColumns = 0; // Track manually added columns
@@ -17,14 +19,17 @@ let detectedColumns = 2; // Track actual columns from uploaded files
 let minColumns = 2; // Define minimum required columns
 let columnTracker = new Map(); // Track column assignments
 let uploadInProgress = false;
-// New variables for drag and drop column reordering
+// Variables for drag and drop column reordering
 let dragSrcColumn = null;
 let draggedColumnIndex = -1;
 let isDragging = false;
 
+// Add this new structure to organize files by row and column
+let fileMatrix = []; // 2D array to store files by [row][column]
+
 console.log('Upload.js initialized');
 
-// Add CSS styles for the drag and drop functionality
+// Update the CSS styles for column controls alignment
 function addDragDropStyles() {
     const styleElement = document.createElement('style');
     styleElement.textContent = `
@@ -57,12 +62,38 @@ function addDragDropStyles() {
             transition: transform 0.2s ease;
         }
         
-        .column-controls {
+        /* Improved column controls bar */
+        .column-controls-bar {
+            display: flex;
+            width: 100%;
+            margin-bottom: 10px;
+            gap: 15px; /* Match the gap of row-columns */
+            overflow-x: auto;
+            padding-bottom: 5px;
+        }
+        
+        /* Make column headers match column widths */
+        .column-header {
             display: flex;
             align-items: center;
-            padding: 5px;
-            background: #222;
+            padding: 8px;
+            background: #2d2d2d;
             border-radius: 4px 4px 0 0;
+            flex: 1;
+            min-width: 200px;
+            max-width: calc(100% / var(--column-count, 2));
+            justify-content: space-between;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .column-header.dragging {
+            opacity: 0.6;
+            background: #444;
+        }
+        
+        .column-header.drag-over {
+            border: 2px dashed #3498db;
+            padding: 6px;
         }
         
         .column-label {
@@ -72,11 +103,64 @@ function addDragDropStyles() {
             flex-grow: 1;
         }
         
+        .row-label {
+            font-weight: bold;
+            color: #ccc;
+            background: #222;
+            padding: 5px 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        
         .reordering-instructions {
             background-color: #2d2d2d;
             border-radius: 5px;
             padding: 10px;
             margin: 10px 0;
+        }
+        
+        /* Fix for row layout - make it a flex container with column direction */
+        #preview {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            width: 100%;
+            overflow-x: hidden;
+        }
+        
+        .row-container {
+            margin-bottom: 20px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #444;
+            width: 100%;
+        }
+        
+        .row-columns {
+            display: flex;
+            flex-wrap: nowrap;
+            gap: 15px;
+            overflow-x: auto;
+            padding-bottom: 10px;
+            width: 100%;
+        }
+        
+        .row-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            width: 100%;
+        }
+        
+        /* Make columns in a row have equal width */
+        .comparison-column {
+            flex: 1;
+            min-width: 200px;
+            max-width: calc(100% / var(--column-count, 2));
+            border: 1px solid #444;
+            border-radius: 0 0 4px 4px;
+            padding: 10px;
+            background: #2d2d2d;
         }
     `;
     document.head.appendChild(styleElement);
@@ -139,6 +223,15 @@ function handleFiles(files) {
 function groupFiles(files) {
     groupedFiles.clear();
     selectedFiles.clear();
+    fileMatrix = []; // Reset the file matrix
+    
+    // Initialize matrix with empty arrays for each row and column
+    for (let r = 0; r < rowCount; r++) {
+        fileMatrix[r] = [];
+        for (let c = 0; c < columnCount; c++) {
+            fileMatrix[r][c] = null;
+        }
+    }
     
     // Validate file count
     if (files.length > 30) {
@@ -174,43 +267,53 @@ function groupFiles(files) {
 
     // If all files match the pattern, use pattern grouping
     if (patternMatchCount === files.length) {
+        // Get unique row numbers
+        const rowNumbers = new Set();
+        fileGroups.forEach((rowMap) => {
+            rowMap.forEach((file, rowNum) => {
+                rowNumbers.add(rowNum);
+            });
+        });
+        
+        // Update row count based on detected rows
+        rowCount = Math.max(1, rowNumbers.size);
+        
+        // Initialize file matrix with proper size
+        fileMatrix = [];
+        for (let r = 0; r < rowCount; r++) {
+            fileMatrix[r] = [];
+            for (let c = 0; c < columnCount; c++) {
+                fileMatrix[r][c] = null;
+            }
+        }
+        
         // Validate column counts and consistency
         const columnSizes = Array.from(fileGroups.values()).map(group => group.size);
-        if (columnSizes.length < 2) {
-            // We need at least 2 columns for comparison
-            columnPrefixes = Array.from(fileGroups.keys());
-            detectedColumns = columnPrefixes.length;
-            baseColumns = detectedColumns;
-            columnCount = Math.max(minColumns, detectedColumns);
+        columnPrefixes = Array.from(fileGroups.keys());
+        detectedColumns = columnPrefixes.length;
+        baseColumns = detectedColumns;
+        columnCount = Math.max(minColumns, detectedColumns);
 
-            // Store grouped files
-            fileGroups.forEach((files, prefix) => {
-                groupedFiles.set(prefix, Array.from(files.values()));
+        // Place files in the matrix based on pattern
+        fileGroups.forEach((rowMap, columnPrefix) => {
+            const columnIndex = columnPrefixes.indexOf(columnPrefix);
+            rowMap.forEach((file, rowNum) => {
+                // Adjust row number to 0-indexed
+                const rowIndex = rowNum - 1;
+                if (rowIndex >= 0 && rowIndex < rowCount) {
+                    // Ensure the row exists
+                    if (!fileMatrix[rowIndex]) {
+                        fileMatrix[rowIndex] = [];
+                    }
+                    fileMatrix[rowIndex][columnIndex] = file;
+                }
             });
-        } else if (new Set(columnSizes).size !== 1) {
-            // Show warning about inconsistent rows, but still process
-            console.warn('Columns have different numbers of files - results may be unexpected');
-            columnPrefixes = Array.from(fileGroups.keys());
-            detectedColumns = columnPrefixes.length;
-            baseColumns = detectedColumns;
-            columnCount = Math.max(minColumns, detectedColumns);
-
-            // Store grouped files
-            fileGroups.forEach((files, prefix) => {
-                groupedFiles.set(prefix, Array.from(files.values()));
-            });
-        } else {
-            // Standard pattern matching worked perfectly
-            columnPrefixes = Array.from(fileGroups.keys());
-            detectedColumns = columnPrefixes.length;
-            baseColumns = detectedColumns;
-            columnCount = Math.max(minColumns, detectedColumns);
-
-            // Store grouped files
-            fileGroups.forEach((files, prefix) => {
-                groupedFiles.set(prefix, Array.from(files.values()));
-            });
-        }
+        });
+        
+        // Store grouped files for backwards compatibility
+        fileGroups.forEach((files, prefix) => {
+            groupedFiles.set(prefix, Array.from(files.values()));
+        });
     } else {
         // For arbitrary filenames, create columns based on file order
         columnCount = Math.min(Math.max(minColumns, files.length), maxColumns);
@@ -224,11 +327,34 @@ function groupFiles(files) {
             groupedFiles.set(`column${i+1}`, []);
         }
         
-        // Distribute files across columns
+        // Initialize row count to 1 for arbitrary filenames
+        rowCount = Math.ceil(files.length / columnCount);
+        
+        // Initialize file matrix with proper size
+        fileMatrix = [];
+        for (let r = 0; r < rowCount; r++) {
+            fileMatrix[r] = [];
+            for (let c = 0; c < columnCount; c++) {
+                fileMatrix[r][c] = null;
+            }
+        }
+        
+        // Distribute files across rows and columns
         files.forEach((file, index) => {
+            const rowIndex = Math.floor(index / columnCount);
             const columnIndex = index % columnCount;
-            const columnPrefix = columnPrefixes[columnIndex];
-            groupedFiles.get(columnPrefix).push(file);
+            
+            // Ensure we don't exceed matrix dimensions
+            if (rowIndex < rowCount && columnIndex < columnCount) {
+                fileMatrix[rowIndex][columnIndex] = file;
+                
+                // Also add to groupedFiles for backward compatibility
+                const columnPrefix = columnPrefixes[columnIndex];
+                if (!groupedFiles.has(columnPrefix)) {
+                    groupedFiles.set(columnPrefix, []);
+                }
+                groupedFiles.get(columnPrefix).push(file);
+            }
         });
         
         // Add a note about reordering for arbitrary filenames
@@ -237,8 +363,9 @@ function groupFiles(files) {
         instructionEl.innerHTML = `
             <div class="alert alert-info mt-2">
                 <i class="fas fa-info-circle"></i> 
-                Files have been arranged in columns based on upload order. 
-                <strong>Drag the column handles <i class="fas fa-grip-lines"></i> to reorder columns</strong> before uploading.
+                Files have been arranged based on upload order. 
+                <strong>Drag the column handles <i class="fas fa-grip-lines"></i> to reorder columns</strong> and 
+                <strong>use the Add Row button to add new rows</strong> before uploading.
             </div>
         `;
         
@@ -266,106 +393,151 @@ function detectColumnCount(files) {
 function updatePreview() {
     preview.innerHTML = '';
     
-    // Use full container width
-    const containerWidth = window.innerWidth - 40; // Account for margins
-    // Update CSS variable for column width
-    preview.style.setProperty('--column-width', `${containerWidth / columnCount}px`);
-
-    // Set CSS variable for column count
-    preview.style.setProperty('--column-count', columnCount);
+    // Create top-level column controls
+    const columnControlsBar = document.createElement('div');
+    columnControlsBar.className = 'column-controls-bar';
     
-    // Preserve existing column structure
-    for (let i = 0; i < columnCount; i++) {
-        // Skip if column prefix doesn't exist
-        if (!columnPrefixes[i]) continue;
-        const columnDiv = document.createElement('div');
-        columnDiv.className = 'comparison-column';
-        columnDiv.id = `column-${columnPrefixes[i]}`;
-        columnDiv.dataset.columnIndex = i;
+    // Add column headers with drag handles
+    for (let colIndex = 0; colIndex < columnCount; colIndex++) {
+        const columnHeader = document.createElement('div');
+        columnHeader.className = 'column-header';
+        columnHeader.dataset.columnIndex = colIndex;
+        columnHeader.style.width = `calc(100% / ${columnCount})`;
         
-        const controlsDiv = document.createElement('div');
-        controlsDiv.className = 'column-controls';
-        
-        // Add drag handle
         const dragHandle = document.createElement('div');
         dragHandle.className = 'drag-handle';
         dragHandle.innerHTML = '<i class="fas fa-grip-lines"></i>';
-        dragHandle.title = 'Drag to reorder column';
+        dragHandle.title = 'Drag to reorder this column in all rows';
         dragHandle.draggable = true;
         
-        // Add column label
         const columnLabel = document.createElement('div');
         columnLabel.className = 'column-label';
-        columnLabel.textContent = `Column ${i+1}`;
+        columnLabel.textContent = `Column ${colIndex+1}`;
         
-        // Add remove button
         const removeButton = document.createElement('button');
         removeButton.className = 'btn btn-sm btn-danger';
-        removeButton.onclick = () => removeColumn(columnPrefixes[i]);
-        removeButton.disabled = !isColumnRemovable(columnPrefixes[i]);
-        removeButton.title = getColumnTooltip(columnPrefixes[i]);
-        removeButton.textContent = 'Remove Column';
+        removeButton.innerHTML = '<i class="fas fa-times"></i>';
+        removeButton.title = 'Remove this column from all rows';
+        removeButton.onclick = () => removeColumn(colIndex);
+        removeButton.disabled = columnCount <= minColumns;
         
-        controlsDiv.appendChild(dragHandle);
-        controlsDiv.appendChild(columnLabel);
-        controlsDiv.appendChild(removeButton);
+        columnHeader.appendChild(dragHandle);
+        columnHeader.appendChild(columnLabel);
         
-        columnDiv.appendChild(controlsDiv);
+        // Only add remove button if we have more than minimum columns
+        if (columnCount > minColumns) {
+            columnHeader.appendChild(removeButton);
+        }
         
-        const filesDiv = document.createElement('div');
-        filesDiv.className = 'column-files';
-        columnDiv.appendChild(filesDiv);
-        
-        preview.appendChild(columnDiv);
+        columnControlsBar.appendChild(columnHeader);
     }
     
-    // Update files in columns
-    groupedFiles.forEach((files, prefix) => {
-        const columnDiv = document.getElementById(`column-${prefix}`);
-        if (columnDiv) {
-            const filesDiv = columnDiv.querySelector('.column-files');
-            files.forEach(file => {
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    const fileDiv = document.createElement('div');
-                    fileDiv.className = 'file-preview';
-                    fileDiv.innerHTML = `
-                        <img src="${e.target.result}" style="max-height: 100px;">
-                        <div class="file-label">${file.name}</div>
-                    `;
-                    filesDiv.appendChild(fileDiv);
-                };
-                reader.readAsDataURL(file);
-            });
-        }
-    });
+    preview.appendChild(columnControlsBar);
     
-    // Add drag-and-drop column reordering
+    // Create rows
+    for (let rowIndex = 0; rowIndex < rowCount; rowIndex++) {
+        const rowContainer = document.createElement('div');
+        rowContainer.className = 'row-container';
+        rowContainer.dataset.rowIndex = rowIndex;
+        
+        // Add row header with controls
+        const rowControls = document.createElement('div');
+        rowControls.className = 'row-controls';
+        
+        const rowLabel = document.createElement('div');
+        rowLabel.className = 'row-label';
+        rowLabel.textContent = `Row ${rowIndex + 1}`;
+        
+        const removeRowBtn = document.createElement('button');
+        removeRowBtn.className = 'btn btn-sm btn-danger';
+        removeRowBtn.innerHTML = '<i class="fas fa-trash"></i> Remove Row';
+        removeRowBtn.onclick = () => removeRow(rowIndex);
+        removeRowBtn.disabled = rowCount <= 1; // Disable if only one row
+        
+        rowControls.appendChild(rowLabel);
+        rowControls.appendChild(removeRowBtn);
+        rowContainer.appendChild(rowControls);
+        
+        // Create row content container
+        const rowColumnsContainer = document.createElement('div');
+        rowColumnsContainer.className = 'row-columns';
+        
+        // Add columns to this row
+        for (let colIndex = 0; colIndex < columnCount; colIndex++) {
+            const columnDiv = createColumnElement(rowIndex, colIndex);
+            rowColumnsContainer.appendChild(columnDiv);
+        }
+        
+        rowContainer.appendChild(rowColumnsContainer);
+        preview.appendChild(rowContainer);
+    }
+    
+    // Add drag-and-drop column reordering to the column headers
     enableColumnReordering();
+}
+
+// Helper function to create a column element
+function createColumnElement(rowIndex, colIndex) {
+    const columnPrefix = columnPrefixes[colIndex] || `column${colIndex+1}`;
+    const columnDiv = document.createElement('div');
+    columnDiv.className = 'comparison-column';
+    columnDiv.id = `column-${rowIndex}-${colIndex}`; // Simplified ID format
+    columnDiv.dataset.columnIndex = colIndex;
+    columnDiv.dataset.rowIndex = rowIndex;
+    
+    // No controls in the column div anymore - they've moved to the top level
+    
+    const filesDiv = document.createElement('div');
+    filesDiv.className = 'column-files';
+    columnDiv.appendChild(filesDiv);
+    
+    // If we have a file in this position, display it
+    if (fileMatrix && fileMatrix[rowIndex] && fileMatrix[rowIndex][colIndex]) {
+        displayFilePreview(fileMatrix[rowIndex][colIndex], filesDiv);
+    }
+    
+    return columnDiv;
+}
+
+// Helper function to display a file preview
+function displayFilePreview(file, container) {
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        const fileDiv = document.createElement('div');
+        fileDiv.className = 'file-preview';
+        fileDiv.innerHTML = `
+            <img src="${e.target.result}" style="max-height: 100px;">
+            <div class="file-label">${file.name}</div>
+        `;
+        container.appendChild(fileDiv);
+    };
+    reader.readAsDataURL(file);
 }
 
 // Function to enable column reordering via drag and drop
 function enableColumnReordering() {
-    const columns = document.querySelectorAll('.comparison-column');
+    const columnHeaders = document.querySelectorAll('.column-header');
     
-    columns.forEach(column => {
-        const dragHandle = column.querySelector('.drag-handle');
+    columnHeaders.forEach(header => {
+        const dragHandle = header.querySelector('.drag-handle');
         if (!dragHandle) return;
         
         // Drag start event
         dragHandle.addEventListener('dragstart', (e) => {
-            dragSrcColumn = column;
-            draggedColumnIndex = parseInt(column.dataset.columnIndex);
-            column.classList.add('dragging');
+            dragSrcColumn = header;
+            draggedColumnIndex = parseInt(header.dataset.columnIndex);
+            header.classList.add('dragging');
             e.dataTransfer.effectAllowed = 'move';
             // Required for Firefox
-            e.dataTransfer.setData('text/plain', column.id);
+            e.dataTransfer.setData('text/plain', header.dataset.columnIndex);
             preview.classList.add('reordering');
         });
         
         // Drag end event
         dragHandle.addEventListener('dragend', (e) => {
-            column.classList.remove('dragging');
+            header.classList.remove('dragging');
             dragSrcColumn = null;
             draggedColumnIndex = -1;
             preview.classList.remove('reordering');
@@ -376,24 +548,24 @@ function enableColumnReordering() {
             });
         });
         
-        // Make the entire column a drop target
-        column.addEventListener('dragover', (e) => {
+        // Make the entire header a drop target
+        header.addEventListener('dragover', (e) => {
             e.preventDefault();
-            if (!dragSrcColumn || column === dragSrcColumn) return;
-            column.classList.add('drag-over');
+            if (!dragSrcColumn || header === dragSrcColumn) return;
+            header.classList.add('drag-over');
         });
         
-        column.addEventListener('dragleave', (e) => {
-            column.classList.remove('drag-over');
+        header.addEventListener('dragleave', (e) => {
+            header.classList.remove('drag-over');
         });
         
-        column.addEventListener('drop', (e) => {
+        header.addEventListener('drop', (e) => {
             e.preventDefault();
-            column.classList.remove('drag-over');
+            header.classList.remove('drag-over');
             
-            if (!dragSrcColumn || column === dragSrcColumn) return;
+            if (!dragSrcColumn || header === dragSrcColumn) return;
             
-            const targetIndex = parseInt(column.dataset.columnIndex);
+            const targetIndex = parseInt(header.dataset.columnIndex);
             
             // Perform the column reordering
             reorderColumns(draggedColumnIndex, targetIndex);
@@ -401,23 +573,88 @@ function enableColumnReordering() {
     });
 }
 
-// Function to reorder columns
 function reorderColumns(fromIndex, toIndex) {
     if (fromIndex === toIndex) return;
     
-    // Get column prefix that was moved
-    const movedPrefix = columnPrefixes[fromIndex];
+    console.log(`Reordering column from ${fromIndex} to ${toIndex}`);
     
-    // Remove from original position and insert at new position
+    // Save the column prefixes change
+    const movedPrefix = columnPrefixes[fromIndex];
     columnPrefixes.splice(fromIndex, 1);
     columnPrefixes.splice(toIndex, 0, movedPrefix);
     
-    // Log the reordering for debugging
-    console.log(`Reordered column from position ${fromIndex} to ${toIndex}`);
+    // Reorder files in the file matrix for ALL rows
+    for (let r = 0; r < fileMatrix.length; r++) {
+        if (!fileMatrix[r]) continue;
+        
+        // Save the column of files we're moving
+        const filesInMovedColumn = fileMatrix[r][fromIndex];
+        
+        // Remove the column
+        fileMatrix[r].splice(fromIndex, 1);
+        
+        // Insert at the new position
+        fileMatrix[r].splice(toIndex, 0, filesInMovedColumn);
+    }
+    
+    // Also update the legacy groupedFiles for backwards compatibility
+    if (groupedFiles.size > 0) {
+        const entries = Array.from(groupedFiles.entries());
+        const sortedEntries = [];
+        
+        // Reorder the entries according to the new column order
+        for (let i = 0; i < columnPrefixes.length; i++) {
+            const prefix = columnPrefixes[i];
+            const entry = entries.find(([key]) => key === prefix);
+            if (entry) {
+                sortedEntries.push(entry);
+            }
+        }
+        
+        // Recreate groupedFiles with the new order
+        groupedFiles = new Map(sortedEntries);
+    }
+    
     console.log('New column order:', columnPrefixes);
     
-    // Update the UI to reflect the new order
+    // Update the UI
     updatePreview();
+}
+
+// Function to add a new row
+function addRow() {
+    if (rowCount >= maxRows) {
+        showError(`Maximum ${maxRows} rows allowed`);
+        return;
+    }
+    
+    // Add a new row to our data structure
+    fileMatrix[rowCount] = [];
+    for (let c = 0; c < columnCount; c++) {
+        fileMatrix[rowCount][c] = null;
+    }
+    
+    rowCount++;
+    
+    // Update the UI to show the new row
+    updatePreview();
+    console.log(`Added row, now have ${rowCount} rows`);
+}
+
+// Function to remove a row
+function removeRow(rowIndex) {
+    if (rowCount <= 1) {
+        showError('Cannot remove the last row');
+        return;
+    }
+    
+    // Remove the row from our data structure
+    fileMatrix.splice(rowIndex, 1);
+    rowCount--;
+    
+    // Update the UI
+    updatePreview();
+    console.log(`Removed row ${rowIndex + 1}, now have ${rowCount} rows`);
 }
 
 function isColumnRemovable(columnPrefix) {
@@ -437,80 +674,95 @@ function getColumnTooltip(columnPrefix) {
     return 'Remove added column';
 }
 
+// Update the column addition function for consistency
 function addColumn() {
     if (columnCount >= maxColumns) {
         showError(`Maximum ${maxColumns} columns allowed`);
         return;
     }
     
-    // Update CSS variable for column count
-    preview.style.setProperty('--column-count', columnCount + 1);
+    // Add a new column prefix
+    columnPrefixes.push(`column${columnCount+1}`);
     
-    // Add resize observer to handle column width updates
-    const resizeObserver = new ResizeObserver(entries => {
-        preview.style.setProperty('--column-count', columnCount);
-    });
-    resizeObserver.observe(preview);
+    // Add a new column to each row in the file matrix
+    for (let r = 0; r < rowCount; r++) {
+        if (!fileMatrix[r]) {
+            fileMatrix[r] = [];
+        }
+        fileMatrix[r].push(null);
+    }
     
+    // Add an empty array for new column in groupedFiles
+    if (groupedFiles.size > 0) {
+        groupedFiles.set(`column${columnCount+1}`, []);
+    }
+    
+    // Update column count
     columnCount++;
-    addedColumns++;
-    const newColumnName = `${columnNamePrefix}${columnCount}`;
-    columnPrefixes.push(newColumnName);
-    groupedFiles.set(newColumnName, []);
+    
+    // Update the UI
     updatePreview();
-    updateColumnControls();
 }
 
+// Update the removeColumn function to work with column index
 function removeColumn(columnIndex) {
-    try {
-        // Validate minimum columns
-        if (columnCount <= minColumns) {
-            showError('Cannot remove column: Minimum 2 columns required');
-            return;
-        }
-
-        const index = columnPrefixes.indexOf(columnIndex);
-        if (index === -1 || !isColumnRemovable(columnIndex)) {
-            console.error('Column not found:', columnIndex);
-            showError('Invalid column');
-            return;
-        }
-        
-        // Update column counts
-        const isBaseColumn = index < baseColumns;
-        isBaseColumn ? baseColumns-- : addedColumns--;
-
-        // Remove the column from data structures
-        groupedFiles.delete(columnIndex);
-
-        // Update column tracking
-        columnCount--;
-
-        // Remove from column prefixes array
-        columnPrefixes.splice(index, 1);
-
-        // Reindex remaining columns
-        let newPrefixes = [];
-        columnPrefixes.forEach((prefix, i) => {
-            const newPrefix = `${columnNamePrefix}${i + 1}`;
-            if (prefix !== newPrefix) {
-                const files = groupedFiles.get(prefix);
-                if (files) {
-                    groupedFiles.set(newPrefix, files);
-                    groupedFiles.delete(prefix);
-                }
-            }
-            newPrefixes.push(newPrefix);
-        });
-        columnPrefixes = newPrefixes;
-
-        document.getElementById('uploadButton').style.display = selectedFiles.size > 0 ? 'block' : 'none';
-        updateColumnControls();
-        updatePreview();
-    } catch (error) {
-        console.error('Error removing column:', error);
-        showError('Failed to remove column');
+    console.log(`Attempting to remove column at index: ${columnIndex}`);
+    
+    // Check minimum column requirements
+    if (columnCount <= minColumns) {
+        showError(`Cannot remove column: Minimum ${minColumns} columns required`);
+        return;
     }
+    
+    // Validate column index
+    if (columnIndex < 0 || columnIndex >= columnCount) {
+        console.error('Invalid column index:', columnIndex);
+        showError('Invalid column');
+        return;
+    }
+    
+    // Remove the column from prefixes array
+    columnPrefixes.splice(columnIndex, 1);
+    
+    // Update column count
+    columnCount--;
+    
+    // Remove the column from each row in the file matrix
+    for (let r = 0; r < fileMatrix.length; r++) {
+        if (fileMatrix[r]) {
+            fileMatrix[r].splice(columnIndex, 1);
+        }
+    }
+    
+    // Update groupedFiles if it's being used
+    if (groupedFiles.size > 0) {
+        // Remove the deleted column
+        groupedFiles.delete(`column${columnIndex+1}`);
+        
+        // Rename remaining columns to maintain sequential numbering
+        const newGroupedFiles = new Map();
+        for (let i = 0; i < columnCount; i++) {
+            const oldKey = `column${i >= columnIndex ? i+2 : i+1}`;
+            const newKey = `column${i+1}`;
+            
+            if (groupedFiles.has(oldKey)) {
+                newGroupedFiles.set(newKey, groupedFiles.get(oldKey));
+            }
+        }
+        groupedFiles = newGroupedFiles;
+    }
+    
+    // Regenerate column prefixes with correct numbering
+    columnPrefixes = [];
+    for (let i = 0; i < columnCount; i++) {
+        columnPrefixes.push(`column${i+1}`);
+    }
+    
+    console.log(`Column removed. New column count: ${columnCount}`);
+    console.log('New column prefixes:', columnPrefixes);
+    
+    // Update the UI
+    updatePreview();
 }
 
 function updateColumnControls() {
@@ -620,4 +872,33 @@ document.getElementById('uploadButton').addEventListener('click', async () => {
         uploadButton.disabled = false;
         uploadButton.textContent = 'Compare Images';
     }
+});
+
+// Add the row button in the UI
+function addRowButton() {
+    const rowButtonContainer = document.createElement('div');
+    rowButtonContainer.className = 'row-button-container mb-3';
+    
+    const addRowBtn = document.createElement('button');
+    addRowBtn.id = 'addRowBtn';
+    addRowBtn.className = 'btn btn-secondary mb-3 me-2';
+    addRowBtn.innerHTML = '<i class="fas fa-plus"></i> Add Row';
+    addRowBtn.onclick = addRow;
+    
+    rowButtonContainer.appendChild(addRowBtn);
+    
+    // Insert before the preview element
+    preview.parentNode.insertBefore(rowButtonContainer, preview);
+}
+
+// Call this after the page loads
+window.addEventListener('DOMContentLoaded', function() {
+    // Initialize the first row in the file matrix
+    fileMatrix[0] = [];
+    for (let c = 0; c < columnCount; c++) {
+        fileMatrix[0][c] = null;
+    }
+    
+    // Add the row button to the UI
+    addRowButton();
 });
