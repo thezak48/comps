@@ -58,7 +58,9 @@ async def upload_images(
     name: str = Form(None),
     show_name: str = Form(None),
     tags: str = Form(None),
-    column_order: str = Form(None)  # Parameter to receive column order
+    column_order: str = Form(None),  # Parameter to receive column order
+    row_count: int = Form(1),  # Parameter to receive row count
+    file_positions: str = Form(None)  # Parameter to receive file positions
 ):
     """
     Handle image upload requests.
@@ -75,9 +77,18 @@ async def upload_images(
         logger.error("Empty files list received")
         return {"error": "Please upload at least one image"}
     
+    # Parse file positions if provided
+    file_position_data = None
+    if file_positions:
+        try:
+            file_position_data = json.loads(file_positions)
+            logger.info("Received file position data for %d files", len(file_position_data))
+        except json.JSONDecodeError:
+            logger.error("Failed to parse file positions JSON: %s", file_positions)
+    
     # Default column count is based on number of files, min 2
     total_columns = min(max(2, len(files)), 10)  # Limit to 10 columns
-    total_rows = 1  # Default to one row initially
+    total_rows = max(1, row_count)  # Use provided row count or default to 1
     
     # Parse column order if provided
     column_prefixes = None
@@ -85,6 +96,7 @@ async def upload_images(
         try:
             column_prefixes = json.loads(column_order)
             logger.info("Received custom column order: %s", column_prefixes)
+            total_columns = len(column_prefixes)
         except json.JSONDecodeError:
             logger.error("Failed to parse column order JSON: %s", column_order)
     
@@ -95,8 +107,8 @@ async def upload_images(
         if match:
             pattern_files.append(file)
     
-    # If all files follow the pattern and no custom order is provided, use the old grouping logic
-    if pattern_files and len(pattern_files) == len(files) and not column_prefixes:
+    # If all files follow the pattern and no custom positions, use the old grouping logic
+    if pattern_files and len(pattern_files) == len(files) and not file_position_data:
         # Group files by prefix to calculate rows
         file_groups = {}
         for file in files:
@@ -112,18 +124,8 @@ async def upload_images(
         # Calculate total rows and images per row
         total_columns = len(set(col for group in file_groups.values() for col, _ in group))
         total_rows = len(file_groups)
-    else:
-        # For arbitrary filenames or custom column order, create a mapping
-        file_mapping = {}
-        for i, file in enumerate(files):
-            file_mapping[file.filename] = file
-            
-        # If we have a custom column order, use it to organize files
-        if column_prefixes:
-            # Custom column arrangement
-            total_columns = len(column_prefixes)
     
-    # Store actual column count in metadata
+    # Store actual column count and row count in metadata
     comparison_metadata = {"total_columns": total_columns, "total_rows": total_rows}
 
     comparison_dir = Path(UPLOADS_PATH) / comparison_id
@@ -132,22 +134,11 @@ async def upload_images(
     
     uploaded_files = []
     
-    # Create a mapping between files and their intended column positions
-    file_column_mapping = {}
-    
-    # Using custom column order when available
-    if column_prefixes:
-        # Process files in upload order but assign column positions based on column_prefixes
-        for i, file in enumerate(files):
-            file_ext = Path(file.filename).suffix
-            save_path = comparison_dir / f"{uuid.uuid4()}{file_ext}"
-            
-            # Determine which column this file should be in based on upload order
-            column_index = i % total_columns
-            
-            # Store the file's intended column position using the reordered columns
-            # This is the key fix: we map the original column index to the reordered index
-            file_column_mapping[file.filename] = column_index
+    # Create a lookup for file positions
+    file_positions_lookup = {}
+    if file_position_data:
+        for pos in file_position_data:
+            file_positions_lookup[pos['filename']] = (pos['row'], pos['column'])
     
     # Process and save all files
     for file_index, file in enumerate(files):
@@ -165,8 +156,11 @@ async def upload_images(
                 shutil.copyfileobj(file.file, buffer)
             logger.info("Successfully saved file to: %s", save_path)
             
-            # Determine column position based on the file naming pattern or custom order
-            if pattern_files and not column_prefixes:
+            # Determine row and column position
+            if original_filename in file_positions_lookup:
+                # Use provided position from file_positions
+                row_position, column_index = file_positions_lookup[original_filename]
+            elif pattern_files and not file_position_data:
                 # Pattern-based positioning logic (original)
                 match = re.match(r'^(first|second|third)(\d{4})\.', original_filename, re.IGNORECASE)
                 if match:
@@ -180,9 +174,9 @@ async def upload_images(
             elif column_prefixes:
                 # Use custom ordering from column_prefixes
                 original_column = file_index % total_columns
+                row_position = file_index // total_columns
                 
                 # Look up the new column index in column_prefixes based on original order
-                # This maps the sequential column to the reordered column
                 column_name = f"column{original_column+1}"
                 try:
                     # Find where this column is in the reordered list
@@ -191,8 +185,6 @@ async def upload_images(
                 except ValueError:
                     # Fallback if column name not found
                     column_index = original_column
-                
-                row_position = file_index // total_columns
             else:
                 # Default sequential positioning
                 column_index = file_index % total_columns
