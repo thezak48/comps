@@ -17,8 +17,73 @@ let detectedColumns = 2; // Track actual columns from uploaded files
 let minColumns = 2; // Define minimum required columns
 let columnTracker = new Map(); // Track column assignments
 let uploadInProgress = false;
+// New variables for drag and drop column reordering
+let dragSrcColumn = null;
+let draggedColumnIndex = -1;
+let isDragging = false;
 
 console.log('Upload.js initialized');
+
+// Add CSS styles for the drag and drop functionality
+function addDragDropStyles() {
+    const styleElement = document.createElement('style');
+    styleElement.textContent = `
+        .drag-handle {
+            cursor: grab;
+            padding: 5px;
+            margin-right: 5px;
+            color: #aaa;
+            background: #333;
+            border-radius: 4px;
+            display: inline-flex;
+            align-items: center;
+        }
+        
+        .drag-handle:hover {
+            color: white;
+            background: #444;
+        }
+        
+        .comparison-column.dragging {
+            opacity: 0.5;
+            border: 2px dashed #666;
+        }
+        
+        .comparison-column.drag-over {
+            border: 2px dashed #3498db;
+        }
+        
+        #preview.reordering .comparison-column {
+            transition: transform 0.2s ease;
+        }
+        
+        .column-controls {
+            display: flex;
+            align-items: center;
+            padding: 5px;
+            background: #222;
+            border-radius: 4px 4px 0 0;
+        }
+        
+        .column-label {
+            margin-left: 5px;
+            font-weight: bold;
+            color: #ccc;
+            flex-grow: 1;
+        }
+        
+        .reordering-instructions {
+            background-color: #2d2d2d;
+            border-radius: 5px;
+            padding: 10px;
+            margin: 10px 0;
+        }
+    `;
+    document.head.appendChild(styleElement);
+}
+
+// Call this function during initialization
+addDragDropStyles();
 
 dropZone.addEventListener('click', () => fileInput.click());
 
@@ -80,46 +145,106 @@ function groupFiles(files) {
         throw new Error('Maximum 30 files allowed');
     }
 
-    // Parse filenames and group files
+    // Remove any existing reordering instructions
+    const existingInstructions = document.querySelector('.reordering-instructions');
+    if (existingInstructions) {
+        existingInstructions.remove();
+    }
+
+    // Parse filenames and check if they follow the pattern
     const filenameRegex = /^(.+?)(\d+)\.([^.]+)$/i;
     const fileGroups = new Map();
+    let patternMatchCount = 0;
 
     files.forEach(file => {
         const match = file.name.match(filenameRegex);
-        if (!match) {
-            throw new Error(`Invalid filename format: ${file.name}. Expected: first0001.ext, second0001.ext, etc.`);
-        }
+        if (match) {
+            patternMatchCount++;
+            const [_, prefix, number, ext] = match;
+            const columnPrefix = prefix.toLowerCase();
+            const rowNumber = parseInt(number);
 
-        const [_, prefix, number, ext] = match;
-        const columnPrefix = prefix.toLowerCase();
-        const rowNumber = parseInt(number);
-
-        if (!fileGroups.has(columnPrefix)) {
-            fileGroups.set(columnPrefix, new Map());
+            if (!fileGroups.has(columnPrefix)) {
+                fileGroups.set(columnPrefix, new Map());
+            }
+            fileGroups.get(columnPrefix).set(rowNumber, file);
         }
-        fileGroups.get(columnPrefix).set(rowNumber, file);
         selectedFiles.add(file);
     });
 
-    // Validate column counts and consistency
-    const columnSizes = Array.from(fileGroups.values()).map(group => group.size);
-    if (columnSizes.length < 2) {
-        throw new Error('At least 2 columns (prefixes) required');
-    }
-    if (new Set(columnSizes).size !== 1) {
-        throw new Error('All columns must have the same number of files');
-    }
+    // If all files match the pattern, use pattern grouping
+    if (patternMatchCount === files.length) {
+        // Validate column counts and consistency
+        const columnSizes = Array.from(fileGroups.values()).map(group => group.size);
+        if (columnSizes.length < 2) {
+            // We need at least 2 columns for comparison
+            columnPrefixes = Array.from(fileGroups.keys());
+            detectedColumns = columnPrefixes.length;
+            baseColumns = detectedColumns;
+            columnCount = Math.max(minColumns, detectedColumns);
 
-    // Update column tracking
-    columnPrefixes = Array.from(fileGroups.keys());
-    detectedColumns = columnPrefixes.length;
-    baseColumns = detectedColumns;
-    columnCount = Math.max(minColumns, detectedColumns);
+            // Store grouped files
+            fileGroups.forEach((files, prefix) => {
+                groupedFiles.set(prefix, Array.from(files.values()));
+            });
+        } else if (new Set(columnSizes).size !== 1) {
+            // Show warning about inconsistent rows, but still process
+            console.warn('Columns have different numbers of files - results may be unexpected');
+            columnPrefixes = Array.from(fileGroups.keys());
+            detectedColumns = columnPrefixes.length;
+            baseColumns = detectedColumns;
+            columnCount = Math.max(minColumns, detectedColumns);
 
-    // Store grouped files
-    fileGroups.forEach((files, prefix) => {
-        groupedFiles.set(prefix, Array.from(files.values()));
-    });
+            // Store grouped files
+            fileGroups.forEach((files, prefix) => {
+                groupedFiles.set(prefix, Array.from(files.values()));
+            });
+        } else {
+            // Standard pattern matching worked perfectly
+            columnPrefixes = Array.from(fileGroups.keys());
+            detectedColumns = columnPrefixes.length;
+            baseColumns = detectedColumns;
+            columnCount = Math.max(minColumns, detectedColumns);
+
+            // Store grouped files
+            fileGroups.forEach((files, prefix) => {
+                groupedFiles.set(prefix, Array.from(files.values()));
+            });
+        }
+    } else {
+        // For arbitrary filenames, create columns based on file order
+        columnCount = Math.min(Math.max(minColumns, files.length), maxColumns);
+        baseColumns = 0;
+        detectedColumns = columnCount;
+        
+        // Create column prefixes
+        columnPrefixes = [];
+        for (let i = 0; i < columnCount; i++) {
+            columnPrefixes.push(`column${i+1}`);
+            groupedFiles.set(`column${i+1}`, []);
+        }
+        
+        // Distribute files across columns
+        files.forEach((file, index) => {
+            const columnIndex = index % columnCount;
+            const columnPrefix = columnPrefixes[columnIndex];
+            groupedFiles.get(columnPrefix).push(file);
+        });
+        
+        // Add a note about reordering for arbitrary filenames
+        const instructionEl = document.createElement('div');
+        instructionEl.className = 'reordering-instructions';
+        instructionEl.innerHTML = `
+            <div class="alert alert-info mt-2">
+                <i class="fas fa-info-circle"></i> 
+                Files have been arranged in columns based on upload order. 
+                <strong>Drag the column handles <i class="fas fa-grip-lines"></i> to reorder columns</strong> before uploading.
+            </div>
+        `;
+        
+        // Insert the instructions above the preview
+        preview.parentNode.insertBefore(instructionEl, preview);
+    }
 
     updatePreview();
 }
@@ -156,13 +281,34 @@ function updatePreview() {
         const columnDiv = document.createElement('div');
         columnDiv.className = 'comparison-column';
         columnDiv.id = `column-${columnPrefixes[i]}`;
+        columnDiv.dataset.columnIndex = i;
         
         const controlsDiv = document.createElement('div');
         controlsDiv.className = 'column-controls';
-        controlsDiv.innerHTML = `
-            <button class="btn btn-sm btn-danger" onclick="removeColumn('${columnPrefixes[i]}')" 
-                ${isColumnRemovable(columnPrefixes[i]) ? '' : 'disabled'} title="${getColumnTooltip(columnPrefixes[i])}">Remove Column</button>
-        `;
+        
+        // Add drag handle
+        const dragHandle = document.createElement('div');
+        dragHandle.className = 'drag-handle';
+        dragHandle.innerHTML = '<i class="fas fa-grip-lines"></i>';
+        dragHandle.title = 'Drag to reorder column';
+        dragHandle.draggable = true;
+        
+        // Add column label
+        const columnLabel = document.createElement('div');
+        columnLabel.className = 'column-label';
+        columnLabel.textContent = `Column ${i+1}`;
+        
+        // Add remove button
+        const removeButton = document.createElement('button');
+        removeButton.className = 'btn btn-sm btn-danger';
+        removeButton.onclick = () => removeColumn(columnPrefixes[i]);
+        removeButton.disabled = !isColumnRemovable(columnPrefixes[i]);
+        removeButton.title = getColumnTooltip(columnPrefixes[i]);
+        removeButton.textContent = 'Remove Column';
+        
+        controlsDiv.appendChild(dragHandle);
+        controlsDiv.appendChild(columnLabel);
+        controlsDiv.appendChild(removeButton);
         
         columnDiv.appendChild(controlsDiv);
         
@@ -193,6 +339,85 @@ function updatePreview() {
             });
         }
     });
+    
+    // Add drag-and-drop column reordering
+    enableColumnReordering();
+}
+
+// Function to enable column reordering via drag and drop
+function enableColumnReordering() {
+    const columns = document.querySelectorAll('.comparison-column');
+    
+    columns.forEach(column => {
+        const dragHandle = column.querySelector('.drag-handle');
+        if (!dragHandle) return;
+        
+        // Drag start event
+        dragHandle.addEventListener('dragstart', (e) => {
+            dragSrcColumn = column;
+            draggedColumnIndex = parseInt(column.dataset.columnIndex);
+            column.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+            // Required for Firefox
+            e.dataTransfer.setData('text/plain', column.id);
+            preview.classList.add('reordering');
+        });
+        
+        // Drag end event
+        dragHandle.addEventListener('dragend', (e) => {
+            column.classList.remove('dragging');
+            dragSrcColumn = null;
+            draggedColumnIndex = -1;
+            preview.classList.remove('reordering');
+            
+            // Remove all drag-over classes
+            document.querySelectorAll('.drag-over').forEach(el => {
+                el.classList.remove('drag-over');
+            });
+        });
+        
+        // Make the entire column a drop target
+        column.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            if (!dragSrcColumn || column === dragSrcColumn) return;
+            column.classList.add('drag-over');
+        });
+        
+        column.addEventListener('dragleave', (e) => {
+            column.classList.remove('drag-over');
+        });
+        
+        column.addEventListener('drop', (e) => {
+            e.preventDefault();
+            column.classList.remove('drag-over');
+            
+            if (!dragSrcColumn || column === dragSrcColumn) return;
+            
+            const targetIndex = parseInt(column.dataset.columnIndex);
+            
+            // Perform the column reordering
+            reorderColumns(draggedColumnIndex, targetIndex);
+        });
+    });
+}
+
+// Function to reorder columns
+function reorderColumns(fromIndex, toIndex) {
+    if (fromIndex === toIndex) return;
+    
+    // Get column prefix that was moved
+    const movedPrefix = columnPrefixes[fromIndex];
+    
+    // Remove from original position and insert at new position
+    columnPrefixes.splice(fromIndex, 1);
+    columnPrefixes.splice(toIndex, 0, movedPrefix);
+    
+    // Log the reordering for debugging
+    console.log(`Reordered column from position ${fromIndex} to ${toIndex}`);
+    console.log('New column order:', columnPrefixes);
+    
+    // Update the UI to reflect the new order
+    updatePreview();
 }
 
 function isColumnRemovable(columnPrefix) {
@@ -231,7 +456,7 @@ function addColumn() {
     addedColumns++;
     const newColumnName = `${columnNamePrefix}${columnCount}`;
     columnPrefixes.push(newColumnName);
-    groupedFiles.set(newColumnName, new Map());
+    groupedFiles.set(newColumnName, []);
     updatePreview();
     updateColumnControls();
 }
@@ -366,6 +591,9 @@ document.getElementById('uploadButton').addEventListener('click', async () => {
     for (const file of selectedFiles) {
         formData.append('files', file);
     }
+
+    // Add column order information to the form data
+    formData.append('column_order', JSON.stringify(columnPrefixes));
 
     formData.append('name', metadata.name);
     formData.append('show_name', metadata.show_name);
