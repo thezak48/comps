@@ -64,3 +64,54 @@ def store_image_position(comparison_id: str, filename: str, row_number: int, col
     
     conn.commit()
     conn.close()
+
+def store_image_metadata(comparison_id: str, filename: str, original_filename: str, image_size: str):
+    """
+    Store metadata for an uploaded image
+    
+    Args:
+        comparison_id: The UUID of the comparison
+        filename: The UUID-based filename in the filesystem
+        original_filename: The original filename as uploaded by the user
+        image_size: The size of the image (formatted string)
+    """
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    
+    # Check if the table exists (should be created by migrations)
+    c.execute('''
+        SELECT name FROM sqlite_master WHERE type='table' AND name='image_metadata'
+    ''')
+    if not c.fetchone():
+        # Create table if it doesn't exist (fallback)
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS image_metadata (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                comparison_id TEXT NOT NULL,
+                filename TEXT NOT NULL,
+                original_filename TEXT,
+                image_size TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (comparison_id) REFERENCES comparisons (id)
+            )
+        ''')
+        
+        # Create indices for performance
+        c.execute('''
+            CREATE INDEX IF NOT EXISTS idx_image_metadata_comparison 
+            ON image_metadata(comparison_id)
+        ''')
+        
+        c.execute('''
+            CREATE INDEX IF NOT EXISTS idx_image_metadata_filename 
+            ON image_metadata(filename)
+        ''')
+    
+    # Store the metadata
+    c.execute(
+        'INSERT OR REPLACE INTO image_metadata (comparison_id, filename, original_filename, image_size) VALUES (?, ?, ?, ?)',
+        (comparison_id, filename, original_filename, image_size)
+    )
+    
+    conn.commit()
+    conn.close()

@@ -9,6 +9,7 @@ import re
 import shutil
 import sqlite3
 import uuid
+import json
 from pathlib import Path
 
 # Third-party imports
@@ -17,7 +18,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 # Local imports
-from database import init_db, create_comparison, get_comparison, store_image_position
+from database import init_db, create_comparison, get_comparison, store_image_position, store_image_metadata
 
 app = FastAPI(title="Comps")
 
@@ -56,7 +57,8 @@ async def upload_images(
     files: list[UploadFile] = File(...),
     name: str = Form(None),
     show_name: str = Form(None),
-    tags: str = Form(None)
+    tags: str = Form(None),
+    column_order: str = Form(None)  # Parameter to receive column order
 ):
     """
     Handle image upload requests.
@@ -73,24 +75,53 @@ async def upload_images(
         logger.error("Empty files list received")
         return {"error": "Please upload at least one image"}
     
-    # Group files by prefix to calculate rows
-    file_groups = {}
+    # Default column count is based on number of files, min 2
+    total_columns = min(max(2, len(files)), 10)  # Limit to 10 columns
+    total_rows = 1  # Default to one row initially
+    
+    # Parse column order if provided
+    column_prefixes = None
+    if column_order:
+        try:
+            column_prefixes = json.loads(column_order)
+            logger.info("Received custom column order: %s", column_prefixes)
+        except json.JSONDecodeError:
+            logger.error("Failed to parse column order JSON: %s", column_order)
+    
+    # Check if files follow the old naming pattern
+    pattern_files = []
     for file in files:
-        logger.info("Processing file for grouping: %s", file.filename)
         match = re.match(r'^(first|second|third)(\d{4})\.', file.filename, re.IGNORECASE)
         if match:
-            prefix, number = match.groups()
-            row_num = int(number)
-            if row_num not in file_groups:
-                file_groups[row_num] = []
-            file_groups[row_num].append((prefix.lower(), file))
-        else:
-            logger.error(f"Invalid filename format: {file.filename}")
-            return {"error": f"Invalid filename format. Expected: first0001.ext, second0001.ext, third0001.ext"}
+            pattern_files.append(file)
     
-    # Calculate total rows and images per row
-    total_columns = len(set(col for group in file_groups.values() for col, _ in group))
-    total_rows = len(file_groups)
+    # If all files follow the pattern and no custom order is provided, use the old grouping logic
+    if pattern_files and len(pattern_files) == len(files) and not column_prefixes:
+        # Group files by prefix to calculate rows
+        file_groups = {}
+        for file in files:
+            logger.info("Processing file for grouping: %s", file.filename)
+            match = re.match(r'^(first|second|third)(\d{4})\.', file.filename, re.IGNORECASE)
+            if match:
+                prefix, number = match.groups()
+                row_num = int(number)
+                if row_num not in file_groups:
+                    file_groups[row_num] = []
+                file_groups[row_num].append((prefix.lower(), file))
+        
+        # Calculate total rows and images per row
+        total_columns = len(set(col for group in file_groups.values() for col, _ in group))
+        total_rows = len(file_groups)
+    else:
+        # For arbitrary filenames or custom column order, create a mapping
+        file_mapping = {}
+        for i, file in enumerate(files):
+            file_mapping[file.filename] = file
+            
+        # If we have a custom column order, use it to organize files
+        if column_prefixes:
+            # Custom column arrangement
+            total_columns = len(column_prefixes)
     
     # Store actual column count in metadata
     comparison_metadata = {"total_columns": total_columns, "total_rows": total_rows}
@@ -100,13 +131,32 @@ async def upload_images(
     comparison_dir.mkdir(exist_ok=True)
     
     uploaded_files = []
-    for file in files:
+    
+    # Create a mapping between files and their intended column positions
+    file_column_mapping = {}
+    
+    # Using custom column order when available
+    if column_prefixes:
+        # Process files in upload order but assign column positions based on column_prefixes
+        for i, file in enumerate(files):
+            file_ext = Path(file.filename).suffix
+            save_path = comparison_dir / f"{uuid.uuid4()}{file_ext}"
+            
+            # Determine which column this file should be in based on upload order
+            column_index = i % total_columns
+            
+            # Store the file's intended column position using the reordered columns
+            # This is the key fix: we map the original column index to the reordered index
+            file_column_mapping[file.filename] = column_index
+    
+    # Process and save all files
+    for file_index, file in enumerate(files):
         logger.info("Processing file: %s", file.filename)
         original_filename = file.filename
         file_ext = Path(file.filename).suffix
         save_path = comparison_dir / f"{uuid.uuid4()}{file_ext}"
         
-        if not file_ext.lower() in ['.jpg', '.jpeg', '.png', '.bmp', '.gif']:
+        if not file_ext.lower() in ['.jpg', '.jpeg', '.png', '.bmp', '.webp']:
             logger.error("Invalid file type received: %s", file_ext)
             return {"error": f"Unsupported file type: {file_ext}"}
         
@@ -115,17 +165,44 @@ async def upload_images(
                 shutil.copyfileobj(file.file, buffer)
             logger.info("Successfully saved file to: %s", save_path)
             
-            # Store position information
-            match = re.match(r'^(first|second|third)(\d{4})\.', original_filename, re.IGNORECASE)
-            if match:
-                prefix, number = match.groups()
-                column_index = ['first', 'second', 'third'].index(prefix.lower())
-                row_position = int(number) - 1
-                store_image_position(comparison_id, save_path.name, row_position, column_index)
+            # Determine column position based on the file naming pattern or custom order
+            if pattern_files and not column_prefixes:
+                # Pattern-based positioning logic (original)
+                match = re.match(r'^(first|second|third)(\d{4})\.', original_filename, re.IGNORECASE)
+                if match:
+                    prefix, number = match.groups()
+                    column_index = ['first', 'second', 'third'].index(prefix.lower())
+                    row_position = int(number) - 1
+                else:
+                    # Sequential positioning for non-pattern files
+                    column_index = file_index % total_columns
+                    row_position = file_index // total_columns
+            elif column_prefixes:
+                # Use custom ordering from column_prefixes
+                original_column = file_index % total_columns
                 
-                # Store image metadata
-                image_size = f"{file.size} bytes"
-                store_image_metadata(comparison_id, save_path.name, original_filename, image_size)
+                # Look up the new column index in column_prefixes based on original order
+                # This maps the sequential column to the reordered column
+                column_name = f"column{original_column+1}"
+                try:
+                    # Find where this column is in the reordered list
+                    new_column_index = column_prefixes.index(column_name)
+                    column_index = new_column_index
+                except ValueError:
+                    # Fallback if column name not found
+                    column_index = original_column
+                
+                row_position = file_index // total_columns
+            else:
+                # Default sequential positioning
+                column_index = file_index % total_columns
+                row_position = file_index // total_columns
+            
+            store_image_position(comparison_id, save_path.name, row_position, column_index)
+            
+            # Store image metadata
+            image_size = f"{file.size} bytes"
+            store_image_metadata(comparison_id, save_path.name, original_filename, image_size)
         except Exception as e:
             logger.error("Error saving file: %s", str(e))
             return {"error": f"Failed to save file: {str(e)}"}
@@ -143,16 +220,6 @@ async def upload_images(
     )
     logger.info("Upload completed successfully with %d files", len(uploaded_files))
     return {"comparison_id": comparison_id, "files": uploaded_files, "metadata": comparison_metadata}
-
-def store_image_metadata(comparison_id, filename, original_filename, image_size):
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute('''
-        INSERT INTO image_metadata (comparison_id, filename, original_filename, image_size)
-        VALUES (?, ?, ?, ?)
-    ''', (comparison_id, filename, original_filename, image_size))
-    conn.commit()
-    conn.close()
 
 @app.get("/compare/{comparison_id}")
 async def compare_images(request: Request, comparison_id: str):
