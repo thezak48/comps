@@ -379,10 +379,7 @@ function createColumnElement(rowIndex, colIndex) {
     cellDropZone.className = 'cell-drop-zone';
     cellDropZone.innerHTML = `
         <div class="drop-instructions">
-            <i class="fas fa-upload"></i>
-            <p>Drop image here</p>
-            <p>or</p>
-            <button class="btn btn-sm btn-outline-secondary cell-upload-btn">Select file</button>
+            Drop image here or <button class="btn btn-sm btn-outline-secondary cell-upload-btn">Select file</button>
         </div>
     `;
     filesDiv.appendChild(cellDropZone);
@@ -886,7 +883,7 @@ function addColumn() {
     updatePreview();
 }
 
-// Update the removeColumn function to work with column index
+// Function to remove a column
 function removeColumn(columnIndex) {
     console.log(`Attempting to remove column at index: ${columnIndex}`);
     
@@ -1087,23 +1084,6 @@ document.getElementById('uploadButton').addEventListener('click', async () => {
     }
 });
 
-// Add the row button in the UI
-function addRowButton() {
-    const rowButtonContainer = document.createElement('div');
-    rowButtonContainer.className = 'row-button-container mb-3';
-    
-    const addRowBtn = document.createElement('button');
-    addRowBtn.id = 'addRowBtn';
-    addRowBtn.className = 'btn btn-secondary mb-3 me-2';
-    addRowBtn.innerHTML = '<i class="fas fa-plus"></i> Add Row';
-    addRowBtn.onclick = addRow;
-    
-    rowButtonContainer.appendChild(addRowBtn);
-    
-    // Insert before the preview element
-    preview.parentNode.insertBefore(rowButtonContainer, preview);
-}
-
 // Call this after the page loads
 window.addEventListener('DOMContentLoaded', function() {
     document.getElementById('uploadButton').style.display = 'block';
@@ -1112,10 +1092,7 @@ window.addEventListener('DOMContentLoaded', function() {
     for (let i = 0; i < columnCount; i++) {
         fileMatrix[0][i] = null;
     }
-    
-    // Add the row button to the UI
-    addRowButton();
-    
+        
     // Initialize with empty columns
     for (let i = 0; i < columnCount; i++) {
         columnPrefixes.push(`column${i+1}`);
