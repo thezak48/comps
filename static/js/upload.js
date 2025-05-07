@@ -1,6 +1,8 @@
 const dropZone = document.getElementById('dropZone');
 const fileInput = document.getElementById('fileInput');
 const preview = document.getElementById('preview');
+const showNameToggle = document.getElementById('show-name-toggle');
+const tagsToggle = document.getElementById('tags-toggle');
 const comparisonNameInput = document.getElementById('comparison-name');
 const showNameInput = document.getElementById('show-name');
 const tagsInput = document.getElementById('tags');
@@ -28,6 +30,24 @@ let isDragging = false;
 let fileMatrix = []; // 2D array to store files by [row][column]
 
 console.log('Upload.js initialized');
+
+// Toggle visibility of show name field
+showNameToggle.addEventListener('change', function() {
+    const showNameContainer = document.getElementById('show-name-container');
+    showNameContainer.style.display = this.checked ? 'block' : 'none';
+    if (!this.checked) {
+        showNameInput.value = '';
+    }
+});
+
+// Toggle visibility of tags field
+tagsToggle.addEventListener('change', function() {
+    const tagsContainer = document.getElementById('tags-container');
+    tagsContainer.style.display = this.checked ? 'block' : 'none';
+    if (!this.checked) {
+        tagsInput.value = '';
+    }
+});
 
 dropZone.addEventListener('click', () => fileInput.click());
 
