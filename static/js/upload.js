@@ -7,7 +7,7 @@ const tagsInput = document.getElementById('tags');
 let groupedFiles = new Map(); // Maps column prefixes to files
 let selectedFiles = new Set();
 let columnPrefixes = [];
-let columnCount = 2; // Initialize with minimum columns
+let columnCount = 2; // Initialize with minimum columns (2 empty columns by default)
 let rowCount = 1;    // Initialize with one row
 let maxColumns = 10; // Maximum allowed columns
 let maxRows = 10;    // Maximum allowed rows
@@ -85,7 +85,8 @@ function groupFiles(files) {
     selectedFiles.clear();
     fileMatrix = []; // Reset the file matrix
     
-    // Initialize matrix with empty arrays for each row and column
+    // Initialize matrix with proper size
+    fileMatrix = [];
     for (let r = 0; r < rowCount; r++) {
         fileMatrix[r] = [];
         for (let c = 0; c < columnCount; c++) {
@@ -164,6 +165,9 @@ function groupFiles(files) {
                     // Ensure the row exists
                     if (!fileMatrix[rowIndex]) {
                         fileMatrix[rowIndex] = [];
+                        for (let c = 0; c < columnCount; c++) {
+                            fileMatrix[rowIndex][c] = null;
+                        }
                     }
                     fileMatrix[rowIndex][columnIndex] = file;
                 }
@@ -345,16 +349,54 @@ function createColumnElement(rowIndex, colIndex) {
     columnDiv.dataset.columnIndex = colIndex;
     columnDiv.dataset.rowIndex = rowIndex;
     
-    // No controls in the column div anymore - they've moved to the top level
-    
+    // Create a container for files in this column
     const filesDiv = document.createElement('div');
     filesDiv.className = 'column-files';
     columnDiv.appendChild(filesDiv);
+    
+    // Create a drop zone for this specific cell
+    const cellDropZone = document.createElement('div');
+    cellDropZone.className = 'cell-drop-zone';
+    cellDropZone.innerHTML = `
+        <div class="drop-instructions">
+            <i class="fas fa-upload"></i>
+            <p>Drop image here</p>
+            <p>or</p>
+            <button class="btn btn-sm btn-outline-secondary cell-upload-btn">Select file</button>
+        </div>
+    `;
+    filesDiv.appendChild(cellDropZone);
+
+    // Add file input for this cell
+    const cellFileInput = document.createElement('input');
+    cellFileInput.type = 'file';
+    cellFileInput.accept = 'image/*';
+    cellFileInput.className = 'cell-file-input';
+    cellFileInput.style.display = 'none';
+    filesDiv.appendChild(cellFileInput);
+
+    // Handle click on the cell upload button
+    const cellUploadBtn = cellDropZone.querySelector('.cell-upload-btn');
+    cellUploadBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        cellFileInput.click();
+    });
+
+    // Handle file selection for this specific cell
+    cellFileInput.addEventListener('change', (e) => {
+        if (e.target.files && e.target.files.length > 0) {
+            const file = e.target.files[0];
+            handleCellFileUpload(file, rowIndex, colIndex);
+        }
+    });
     
     // If we have a file in this position, display it
     if (fileMatrix && fileMatrix[rowIndex] && fileMatrix[rowIndex][colIndex]) {
         displayFilePreview(fileMatrix[rowIndex][colIndex], filesDiv);
     }
+
+    // Add drag and drop event listeners for this cell
+    setupCellDragAndDrop(cellDropZone, rowIndex, colIndex);
     
     return columnDiv;
 }
@@ -363,6 +405,14 @@ function createColumnElement(rowIndex, colIndex) {
 function displayFilePreview(file, container) {
     if (!file) return;
     
+    // Clear any existing content in the container
+    container.innerHTML = '';
+    
+    // Create a drop zone for this cell (will be replaced with the file preview)
+    const cellDropZone = document.createElement('div');
+    cellDropZone.className = 'cell-drop-zone';
+    container.appendChild(cellDropZone);
+    
     const reader = new FileReader();
     reader.onload = (e) => {
         const fileDiv = document.createElement('div');
@@ -370,10 +420,260 @@ function displayFilePreview(file, container) {
         fileDiv.innerHTML = `
             <img src="${e.target.result}" style="max-height: 100px;">
             <div class="file-label">${file.name}</div>
+            <div class="replace-overlay"><i class="fas fa-exchange-alt"></i> Replace</div>
+            <button class="btn btn-sm btn-primary replace-file-btn" title="Replace this image"><i class="fas fa-exchange-alt"></i></button>
+            <button class="btn btn-sm btn-secondary edit-name-btn" title="Edit image name"><i class="fas fa-edit"></i></button>
         `;
         container.appendChild(fileDiv);
+        container.removeChild(cellDropZone); // Remove the drop zone now that we have a file preview
+        
+        // Add remove button
+        const removeBtn = document.createElement('button');
+        removeBtn.className = 'btn btn-sm btn-danger remove-file-btn';
+        removeBtn.innerHTML = '<i class="fas fa-times"></i>';
+        removeBtn.title = 'Remove this file';
+        fileDiv.appendChild(removeBtn);
+        
+        // Add event listener for replace button
+        const replaceBtn = fileDiv.querySelector('.replace-file-btn');
+        replaceBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const rowIndex = parseInt(container.closest('.comparison-column').dataset.rowIndex);
+            const colIndex = parseInt(container.closest('.comparison-column').dataset.columnIndex);
+            // Create and trigger a file input for replacement
+            triggerFileInputForReplacement(rowIndex, colIndex);
+        });
+        
+        // Add event listener for edit name button
+        const editNameBtn = fileDiv.querySelector('.edit-name-btn');
+        editNameBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const rowIndex = parseInt(container.closest('.comparison-column').dataset.rowIndex);
+            const colIndex = parseInt(container.closest('.comparison-column').dataset.columnIndex);
+            const fileLabel = fileDiv.querySelector('.file-label');
+            const currentName = fileLabel.textContent;
+            
+            // Replace label with input field
+            fileLabel.innerHTML = `
+                <input type="text" class="name-edit-input" value="${currentName}">
+                <div class="edit-actions">
+                    <button class="btn btn-sm btn-success save-name-btn"><i class="fas fa-check"></i></button>
+                    <button class="btn btn-sm btn-danger cancel-name-btn"><i class="fas fa-times"></i></button>
+                </div>
+            `;
+            
+            // Focus the input field
+            const input = fileLabel.querySelector('.name-edit-input');
+            input.focus();
+            input.select();
+            
+            setupNameEditHandlers(fileLabel, rowIndex, colIndex, currentName);
+        });
+        
+        // Handle remove button click
+        removeBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const rowIndex = parseInt(container.closest('.comparison-column').dataset.rowIndex);
+            const colIndex = parseInt(container.closest('.comparison-column').dataset.columnIndex);
+            removeFileFromCell(rowIndex, colIndex);
+        });
+        
+        // Setup drag and drop for the newly created file preview
+        setupImageCellDragAndDrop(fileDiv, rowIndex, colIndex);
     };
     reader.readAsDataURL(file);
+}
+
+// Function to trigger file input for replacement
+function triggerFileInputForReplacement(rowIndex, colIndex) {
+    // Create a temporary file input
+    const tempFileInput = document.createElement('input');
+    tempFileInput.type = 'file';
+    tempFileInput.accept = 'image/*';
+    tempFileInput.style.display = 'none';
+    document.body.appendChild(tempFileInput);
+    
+    // Add event listener for file selection
+    tempFileInput.addEventListener('change', (e) => {
+        if (e.target.files && e.target.files.length > 0) {
+            const file = e.target.files[0];
+            // Remove the old file first
+            removeFileFromCell(rowIndex, colIndex);
+            // Then add the new file
+            handleCellFileUpload(file, rowIndex, colIndex);
+        }
+        // Remove the temporary input
+        document.body.removeChild(tempFileInput);
+    });
+    
+    // Trigger the file input
+    tempFileInput.click();
+}
+
+// Function to set up event handlers for name editing
+function setupNameEditHandlers(fileLabel, rowIndex, colIndex, originalName) {
+    const input = fileLabel.querySelector('.name-edit-input');
+    const saveBtn = fileLabel.querySelector('.save-name-btn');
+    const cancelBtn = fileLabel.querySelector('.cancel-name-btn');
+    
+    // Save button handler
+    saveBtn.addEventListener('click', () => {
+        const newName = input.value.trim();
+        if (newName) {
+            // Update the file matrix with custom name
+            if (fileMatrix[rowIndex] && fileMatrix[rowIndex][colIndex]) {
+                // Store the custom name in the file object
+                fileMatrix[rowIndex][colIndex].customName = newName;
+            }
+            
+            // Update the UI
+            fileLabel.innerHTML = newName;
+        } else {
+            // If empty, revert to original
+            fileLabel.innerHTML = originalName;
+        }
+    });
+    
+    // Cancel button handler
+    cancelBtn.addEventListener('click', () => {
+        fileLabel.innerHTML = originalName;
+    });
+    
+    // Handle Enter key press
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            saveBtn.click();
+        } else if (e.key === 'Escape') {
+            e.preventDefault();
+            cancelBtn.click();
+        }
+    });
+}
+
+// Function to handle file upload to a specific cell
+function handleCellFileUpload(file, rowIndex, colIndex) {
+    // Update the file matrix
+    if (!fileMatrix[rowIndex]) {
+        fileMatrix[rowIndex] = [];
+        for (let c = 0; c < columnCount; c++) {
+            fileMatrix[rowIndex][c] = null;
+        }
+    }
+    fileMatrix[rowIndex][colIndex] = file;
+    
+    // Add to selected files set
+    selectedFiles.add(file);
+    
+    // Update the UI
+    const cellDropZone = document.querySelector(`.comparison-column[data-row-index="${rowIndex}"][data-column-index="${colIndex}"] .column-files`);
+    if (cellDropZone) {
+        displayFilePreview(file, cellDropZone);
+        
+        // Setup drag and drop for the newly created file preview
+        const fileDiv = cellDropZone.querySelector('.file-preview');
+        if (fileDiv) {
+            setupImageCellDragAndDrop(fileDiv, rowIndex, colIndex);
+        }
+    }
+}
+
+// Function to remove a file from a cell
+function removeFileFromCell(rowIndex, colIndex) {
+    if (fileMatrix[rowIndex] && fileMatrix[rowIndex][colIndex]) {
+        const file = fileMatrix[rowIndex][colIndex];
+        
+        // Remove from selected files if it's not used elsewhere
+        let fileUsedElsewhere = false;
+        for (let r = 0; r < fileMatrix.length; r++) {
+            for (let c = 0; c < fileMatrix[r].length; c++) {
+                if ((r !== rowIndex || c !== colIndex) && fileMatrix[r][c] === file) {
+                    fileUsedElsewhere = true;
+                    break;
+                }
+            }
+        }
+        if (!fileUsedElsewhere) {
+            selectedFiles.delete(file);
+        }
+        
+        // Clear the cell
+        fileMatrix[rowIndex][colIndex] = null;
+        
+        // Update the UI
+        updatePreview();
+    }
+}
+
+// Setup drag and drop for a specific cell
+function setupCellDragAndDrop(cellDropZone, rowIndex, colIndex) {
+    cellDropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        cellDropZone.classList.add('cell-dragover');
+    });
+
+    cellDropZone.addEventListener('dragleave', () => {
+        cellDropZone.classList.remove('cell-dragover');
+    });
+
+    cellDropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        cellDropZone.classList.remove('cell-dragover');
+        
+        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+            const file = e.dataTransfer.files[0]; // Take only the first file
+            handleCellFileUpload(file, rowIndex, colIndex);
+        }
+    });
+    
+    // Make the entire cell clickable to trigger file upload
+    cellDropZone.addEventListener('click', (e) => {
+        e.preventDefault();
+        const cellFileInput = document.querySelector(`.comparison-column[data-row-index="${rowIndex}"][data-column-index="${colIndex}"] .cell-file-input`);
+        if (cellFileInput) {
+            cellFileInput.click();
+        }
+    });
+}
+
+// Setup drag and drop for a cell that already has an image
+function setupImageCellDragAndDrop(fileDiv, rowIndex, colIndex) {
+    fileDiv.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        e.dataTransfer.dropEffect = 'copy';
+        fileDiv.classList.add('file-dragover');
+    });
+
+    fileDiv.addEventListener('dragleave', () => {
+        fileDiv.classList.remove('file-dragover');
+    });
+
+    fileDiv.addEventListener('drop', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        fileDiv.classList.remove('file-dragover');
+        
+        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+            const file = e.dataTransfer.files[0]; // Take only the first file
+            // Remove the old file first
+            removeFileFromCell(rowIndex, colIndex);
+            // Then add the new file
+            handleCellFileUpload(file, rowIndex, colIndex);
+        }
+    });
+    
+    // Make the image clickable to trigger file replacement
+    const img = fileDiv.querySelector('img');
+    if (img) {
+        img.title = "Click to replace this image";
+        img.addEventListener('click', (e) => {
+            e.stopPropagation();
+            triggerFileInputForReplacement(rowIndex, colIndex);
+        });
+    }
 }
 
 // Function to enable column reordering via drag and drop
@@ -493,7 +793,6 @@ function addRow() {
     for (let c = 0; c < columnCount; c++) {
         fileMatrix[rowCount][c] = null;
     }
-    
     rowCount++;
     
     // Update the UI to show the new row
@@ -548,6 +847,9 @@ function addColumn() {
     for (let r = 0; r < rowCount; r++) {
         if (!fileMatrix[r]) {
             fileMatrix[r] = [];
+            for (let c = 0; c < columnCount; c++) {
+                fileMatrix[r][c] = null;
+            }
         }
         fileMatrix[r].push(null);
     }
@@ -704,8 +1006,38 @@ document.getElementById('uploadButton').addEventListener('click', async () => {
         formData.append('files', file);
     }
 
+    // Add custom names to form data
+    const customNames = {};
+    fileMatrix.forEach((row, rowIndex) => {
+        row.forEach((file, colIndex) => {
+            if (file && file.customName) customNames[file.name] = file.customName;
+        });
+    });
+    formData.append('custom_names', JSON.stringify(customNames));
+
     // Add column order information to the form data
     formData.append('column_order', JSON.stringify(columnPrefixes));
+
+    // Add row count to the form data
+    formData.append('row_count', rowCount);
+
+    // Create file position data
+    const filePositions = [];
+    for (let r = 0; r < fileMatrix.length; r++) {
+        if (!fileMatrix[r]) continue;
+        
+        for (let c = 0; c < fileMatrix[r].length; c++) {
+            const file = fileMatrix[r][c];
+            if (file) {
+                filePositions.push({
+                    filename: file.name,
+                    row: r,
+                    column: c
+                });
+            }
+        }
+    }
+    formData.append('file_positions', JSON.stringify(filePositions));
 
     formData.append('name', metadata.name);
     formData.append('show_name', metadata.show_name);
@@ -731,6 +1063,7 @@ document.getElementById('uploadButton').addEventListener('click', async () => {
         uploadInProgress = false;
         uploadButton.disabled = false;
         uploadButton.textContent = 'Compare Images';
+        uploadButton.style.display = 'block';
     }
 });
 
@@ -753,12 +1086,19 @@ function addRowButton() {
 
 // Call this after the page loads
 window.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('uploadButton').style.display = 'block';
     // Initialize the first row in the file matrix
     fileMatrix[0] = [];
-    for (let c = 0; c < columnCount; c++) {
-        fileMatrix[0][c] = null;
+    for (let i = 0; i < columnCount; i++) {
+        fileMatrix[0][i] = null;
     }
     
     // Add the row button to the UI
     addRowButton();
+    
+    // Initialize with empty columns
+    for (let i = 0; i < columnCount; i++) {
+        columnPrefixes.push(`column${i+1}`);
+    }
+    updatePreview(); // Initialize with empty cells
 });

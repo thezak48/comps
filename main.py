@@ -18,7 +18,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 # Local imports
-from database import init_db, create_comparison, get_comparison, store_image_position, store_image_metadata
+from database import init_db, create_comparison, get_comparison, store_image_position, store_image_metadata, update_image_custom_name
 
 app = FastAPI(title="Comps")
 
@@ -58,6 +58,7 @@ async def upload_images(
     name: str = Form(None),
     show_name: str = Form(None),
     tags: str = Form(None),
+    custom_names: str = Form(None),  # Parameter to receive custom image names
     column_order: str = Form(None),  # Parameter to receive column order
     row_count: int = Form(1),  # Parameter to receive row count
     file_positions: str = Form(None)  # Parameter to receive file positions
@@ -76,6 +77,15 @@ async def upload_images(
     if len(files) < 1:
         logger.error("Empty files list received")
         return {"error": "Please upload at least one image"}
+    
+    # Parse custom names if provided
+    custom_names_data = {}
+    if custom_names:
+        try:
+            custom_names_data = json.loads(custom_names)
+            logger.info("Received custom names for %d files", len(custom_names_data))
+        except json.JSONDecodeError:
+            logger.error("Failed to parse custom names JSON: %s", custom_names)
     
     # Parse file positions if provided
     file_position_data = None
@@ -195,6 +205,12 @@ async def upload_images(
             # Store image metadata
             image_size = f"{file.size} bytes"
             store_image_metadata(comparison_id, save_path.name, original_filename, image_size)
+            
+            # Check if this file has a custom name
+            if original_filename in custom_names_data:
+                custom_name = custom_names_data[original_filename]
+                update_image_custom_name(comparison_id, save_path.name, custom_name)
+                logger.info("Updated custom name for %s to %s", original_filename, custom_name)
         except Exception as e:
             logger.error("Error saving file: %s", str(e))
             return {"error": f"Failed to save file: {str(e)}"}
@@ -232,21 +248,26 @@ async def compare_images(request: Request, comparison_id: str):
     ordered_images = []
     image_names = []
     image_sizes = []
+    custom_names = []
     for filename, column, row in c.fetchall():
         # Get original filename and size from the database
         c.execute('''
-            SELECT original_filename, image_size 
+            SELECT original_filename, image_size, custom_name 
             FROM image_metadata 
             WHERE comparison_id = ? AND filename = ?
         ''', (comparison_id, filename))
         metadata = c.fetchone()
         if metadata:
-            original_name, size = metadata
+            original_name, size, custom_name = metadata
+            # Use custom name if available, otherwise use original filename
+            display_name = custom_name if custom_name else original_name
             image_names.append(original_name)
             image_sizes.append(size)
+            custom_names.append(custom_name)
         else:
             image_names.append(filename)
             image_sizes.append('')
+            custom_names.append(None)
         ordered_images.append(f"{comparison_id}/{filename}")
     
     conn.close()
@@ -264,6 +285,7 @@ async def compare_images(request: Request, comparison_id: str):
          "metadata": comparison_data,
          "image_names": image_names,
          "image_sizes": image_sizes,
+         "custom_names": custom_names,
          "total_columns": total_columns,
          "total_rows": total_rows}
     )
