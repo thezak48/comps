@@ -91,6 +91,7 @@ def store_image_metadata(comparison_id: str, filename: str, original_filename: s
                 filename TEXT NOT NULL,
                 original_filename TEXT,
                 image_size TEXT,
+                custom_name TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (comparison_id) REFERENCES comparisons (id)
             )
@@ -111,6 +112,26 @@ def store_image_metadata(comparison_id: str, filename: str, original_filename: s
     c.execute(
         'INSERT OR REPLACE INTO image_metadata (comparison_id, filename, original_filename, image_size) VALUES (?, ?, ?, ?)',
         (comparison_id, filename, original_filename, image_size)
+    )
+    
+    conn.commit()
+    conn.close()
+
+def update_image_custom_name(comparison_id: str, filename: str, custom_name: str):
+    """
+    Update the custom name for an image
+    
+    Args:
+        comparison_id: The UUID of the comparison
+        filename: The UUID-based filename in the filesystem
+        custom_name: The custom name provided by the user
+    """
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    
+    c.execute(
+        'UPDATE image_metadata SET custom_name = ? WHERE comparison_id = ? AND filename = ?',
+        (custom_name, comparison_id, filename)
     )
     
     conn.commit()
