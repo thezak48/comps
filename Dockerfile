@@ -43,6 +43,7 @@ ENV PUID=1000
 ENV PGID=1000
 ENV DB_PATH=/config/comparisons.db
 ENV UPLOADS_PATH=/data/uploads
+ENV RETENTION_DAYS=7
 
 # Expose port
 EXPOSE 8000

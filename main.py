@@ -3,13 +3,16 @@ FastAPI application for Comps.
 Handles file uploads, comparison viewing, and database operations.
 """
 # Standard library imports
+import asyncio
 import logging
 import os
 import re
 import shutil
 import sqlite3
 import uuid
+import time
 import json
+from datetime import datetime, timedelta
 from pathlib import Path
 
 # Third-party imports
@@ -18,7 +21,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 # Local imports
-from database import init_db, create_comparison, get_comparison, store_image_position, store_image_metadata, update_image_custom_name
+from database import init_db, create_comparison, get_comparison, store_image_position, store_image_metadata, update_image_custom_name, update_last_accessed, get_expired_comparisons, delete_comparison
 
 app = FastAPI(title="Comps")
 
@@ -29,6 +32,7 @@ logger = logging.getLogger(__name__)
 # Get configuration from environment
 DB_PATH = os.getenv('DB_PATH', 'comparisons.db')
 UPLOADS_PATH = os.getenv('UPLOADS_PATH', 'uploads')
+RETENTION_DAYS = int(os.getenv('RETENTION_DAYS', '7'))
 
 # Ensure directories exist
 Path(UPLOADS_PATH).mkdir(parents=True, exist_ok=True)
@@ -41,6 +45,77 @@ init_db()
 app.mount("/static", StaticFiles(directory="static"), name="static")
 app.mount("/uploads", StaticFiles(directory=UPLOADS_PATH), name="uploads")
 templates = Jinja2Templates(directory="templates")
+
+# Background task for cleanup
+async def cleanup_old_comparisons():
+    """
+    Periodically check for and delete comparisons that haven't been accessed 
+    in more than RETENTION_DAYS days
+    """
+    while True:
+        try:
+            # Check if last_accessed column exists
+            conn = sqlite3.connect(DB_PATH)
+            c = conn.cursor()
+            c.execute("PRAGMA table_info(comparisons)")
+            columns = [col[1] for col in c.fetchall()]
+            conn.close()
+
+            if 'last_accessed' in columns:
+                logger.info(f"Starting cleanup of comparisons older than {RETENTION_DAYS} days")
+                try:
+                    expired_ids = get_expired_comparisons(RETENTION_DAYS)
+                    
+                    if expired_ids:
+                        logger.info(f"Found {len(expired_ids)} expired comparisons to delete")
+                        for comparison_id in expired_ids:
+                            try:
+                                logger.info(f"Deleting comparison {comparison_id}")
+                                delete_comparison(comparison_id, UPLOADS_PATH)
+                            except Exception as e:
+                                logger.error(f"Error deleting comparison {comparison_id}: {str(e)}")
+                    else:
+                        logger.info("No expired comparisons found")
+                except sqlite3.OperationalError as e:
+                    if "no such column" in str(e):
+                        logger.warning(f"Skipping cleanup: {str(e)}. Migrations may not be complete.")
+                    else:
+                        logger.error(f"Error in cleanup task: {str(e)}")
+            else:
+                logger.info("Skipping cleanup: last_accessed column not found in database")
+                
+            # Run once a day
+            await asyncio.sleep(86400)  # 24 hours in seconds
+        except Exception as e:
+            logger.error(f"Error in cleanup task: {str(e)}")
+            # If there's an error, wait a bit before trying again
+            await asyncio.sleep(3600)  # 1 hour in seconds
+
+@app.on_event("startup")
+async def start_cleanup_task():
+    """Start the background cleanup task when the application starts"""
+    asyncio.create_task(cleanup_old_comparisons())
+    
+    # Check if database migrations are complete
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        
+        # Check if the migrations table exists and has entries
+        c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='migrations'")
+        if not c.fetchone():
+            logger.warning("Migrations table does not exist. Database may not be properly initialized.")
+        else:
+            # Check if last_accessed column exists in comparisons table
+            c.execute("PRAGMA table_info(comparisons)")
+            columns = [col[1] for col in c.fetchall()]
+            if 'last_accessed' not in columns:
+                logger.warning("Database schema is missing expected columns. Migrations may not be complete.")
+                logger.warning("The application may not function correctly until migrations are completed.")
+        
+        conn.close()
+    except Exception as e:
+        logger.error(f"Error checking database state: {str(e)}")
 
 @app.get("/health")
 async def health_check():
@@ -235,6 +310,9 @@ async def compare_images(request: Request, comparison_id: str):
     if not comparison_dir.exists():
         return {"error": "Comparison not found"}
 
+    # Update last accessed timestamp
+    update_last_accessed(comparison_id)
+
     # Get image positions from database
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
@@ -289,3 +367,19 @@ async def compare_images(request: Request, comparison_id: str):
          "total_columns": total_columns,
          "total_rows": total_rows}
     )
+
+@app.post("/admin/cleanup")
+async def manual_cleanup(retention_days: int = None):
+    """
+    Admin endpoint to manually trigger cleanup of old comparisons
+    """
+    days = retention_days if retention_days is not None else RETENTION_DAYS
+    expired_ids = get_expired_comparisons(days)
+    
+    for comparison_id in expired_ids:
+        try:
+            delete_comparison(comparison_id, UPLOADS_PATH)
+        except Exception as e:
+            logger.error(f"Error deleting comparison {comparison_id}: {str(e)}")
+    
+    return {"message": f"Cleanup completed. Deleted {len(expired_ids)} comparisons older than {days} days."}

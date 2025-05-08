@@ -2,6 +2,8 @@ const dropZone = document.getElementById('dropZone');
 const fileInput = document.getElementById('fileInput');
 const preview = document.getElementById('preview');
 const showNameToggle = document.getElementById('show-name-toggle');
+const expirationToggle = document.getElementById('expiration-toggle');
+const expirationToggleLabel = document.querySelector('label[for="expiration-toggle"]');
 const tagsToggle = document.getElementById('tags-toggle');
 const comparisonNameInput = document.getElementById('comparison-name');
 const showNameInput = document.getElementById('show-name');
@@ -37,6 +39,17 @@ showNameToggle.addEventListener('change', function() {
     showNameContainer.style.display = this.checked ? 'block' : 'none';
     if (!this.checked) {
         showNameInput.value = '';
+    }
+});
+
+// Toggle visibility of expiration settings
+expirationToggle.addEventListener('change', function() {
+    const expirationContainer = document.getElementById('expiration-container');
+    expirationContainer.style.display = this.checked ? 'block' : 'none';
+    if (!this.checked) {
+        // Reset to defaults when unchecked
+        document.getElementById('expiration-last-access').checked = true;
+        document.getElementById('expiration-days').value = '7';
     }
 });
 
@@ -976,13 +989,32 @@ function getMetadata() {
     return {
         name: comparisonNameInput.value.trim(),
         show_name: showNameInput.value.trim(),
+        expiration_type: expirationToggle.checked ? getSelectedExpirationType() : 'from_last_access',
+        expiration_days: expirationToggle.checked ? getSelectedExpirationDays() : 7,
         tags: tagsInput.value.trim()
     };
+}
+
+function getSelectedExpirationType() {
+    const expirationTypeRadios = document.querySelectorAll('input[name="expiration-type"]');
+    for (const radio of expirationTypeRadios) {
+        if (radio.checked) {
+            return radio.value;
+        }
+    }
+    return 'from_last_access'; // Default to 'from_last_access'
+}
+
+function getSelectedExpirationDays() {
+    const expirationDaysSelect = document.getElementById('expiration-days');
+    return parseInt(expirationDaysSelect.value) || 7; // Default to 7 if parsing fails
 }
 
 function clearMetadata() {
     comparisonNameInput.value = '';
     showNameInput.value = '';
+    document.getElementById('expiration-last-access').checked = true;
+    document.getElementById('expiration-days').value = '7';
     tagsInput.value = '';
 }
 
@@ -1058,6 +1090,8 @@ document.getElementById('uploadButton').addEventListener('click', async () => {
 
     formData.append('name', metadata.name);
     formData.append('show_name', metadata.show_name);
+    formData.append('expiration_type', metadata.expiration_type);
+    formData.append('expiration_days', metadata.expiration_days);
     formData.append('tags', metadata.tags);
 
     try {
@@ -1098,4 +1132,10 @@ window.addEventListener('DOMContentLoaded', function() {
         columnPrefixes.push(`column${i+1}`);
     }
     updatePreview(); // Initialize with empty cells
+    
+    // Initialize tooltips
+    if (typeof bootstrap !== 'undefined') {
+        const tooltips = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+        tooltips.forEach(tooltip => new bootstrap.Tooltip(tooltip));
+    }
 });
