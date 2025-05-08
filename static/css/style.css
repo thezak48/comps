@@ -144,6 +144,16 @@ body.has-fixed-nav {
     cursor: pointer;
 }
 
+.form-check-input[type="radio"] {
+    border-radius: 50% !important;
+    width: 18px;
+    height: 18px;
+}
+
+.form-check-input[type="radio"]:checked {
+    background-size: 12px;
+}
+
 .form-check-label {
     cursor: pointer;
     user-select: none;
@@ -716,4 +726,34 @@ body.has-fixed-nav {
 .file-dragover .replace-overlay {
     opacity: 1 !important;
     background-color: rgba(33, 150, 243, 0.8);
+}
+
+.expiration-options {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 15px;
+    margin-top: 5px;
+}
+
+.expiration-days-container {
+    display: flex;
+    align-items: center;
+}
+
+.form-select {
+    padding: 8px;
+    border: 1px solid #404040;
+    background-color: #333333;
+    color: #e0e0e0;
+    border-radius: 4px;
+}
+
+.expiration-info {
+    margin-left: 10px;
+    display: inline-block;
+}
+
+.expiration-info .badge {
+    background-color: #17a2b8;
 }

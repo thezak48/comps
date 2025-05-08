@@ -42,6 +42,12 @@
                             <span class="badge bg-secondary">{{ tag }}</span>
                         {% endfor %}
                     </div>
+                    <div class="expiration-info">
+                        <span class="badge bg-info">
+                            Expires: {{ expiration_date }} 
+                            ({{ expiration_days }} days {{ "from last access" if expiration_type == "from_last_access" else "from creation" }})
+                        </span>
+                    </div>
                 {% endif %}
             </div>
             <div class="btn-group">
