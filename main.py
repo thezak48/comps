@@ -130,7 +130,9 @@ async def home(request: Request):
 @app.post("/upload/")
 async def upload_images(
     files: list[UploadFile] = File(...),
-    name: str = Form(None),
+    name: str = Form(None), 
+    expiration_type: str = Form("from_last_access"),
+    expiration_days: int = Form(7),
     show_name: str = Form(None),
     tags: str = Form(None),
     custom_names: str = Form(None),  # Parameter to receive custom image names
@@ -211,7 +213,7 @@ async def upload_images(
         total_rows = len(file_groups)
     
     # Store actual column count and row count in metadata
-    comparison_metadata = {"total_columns": total_columns, "total_rows": total_rows}
+    comparison_metadata = {"total_columns": total_columns, "total_rows": total_rows, "created_at": datetime.now().strftime('%Y-%m-%d %H:%M:%S'), "expiration_type": expiration_type, "expiration_days": expiration_days}
 
     comparison_dir = Path(UPLOADS_PATH) / comparison_id
     logger.info("Creating comparison directory: %s", comparison_dir)
@@ -356,6 +358,22 @@ async def compare_images(request: Request, comparison_id: str):
     # Set default values for total_columns and total_rows if not in metadata
     total_columns = comparison_data.get('total_columns', 2) if comparison_data else 2
     total_rows = comparison_data.get('total_rows', 1) if comparison_data else 1
+
+    # Calculate expiration information
+    expiration_date = "Unknown"
+    expiration_days = comparison_data.get('expiration_days', 7) if comparison_data else 7
+    expiration_type = comparison_data.get('expiration_type', 'from_last_access') if comparison_data else 'from_last_access'
+    
+    # Format the expiration date based on expiration type
+    if comparison_data: 
+        if expiration_type == 'from_creation' and 'created_at' in comparison_data:
+            created_date = datetime.strptime(comparison_data['created_at'], '%Y-%m-%d %H:%M:%S')
+            expiration_date = (created_date + timedelta(days=expiration_days)).strftime('%Y-%m-%d')
+        elif expiration_type == 'from_last_access' and 'last_accessed' in comparison_data:
+            last_access_date = datetime.strptime(comparison_data['last_accessed'], '%Y-%m-%d %H:%M:%S')
+            expiration_date = (last_access_date + timedelta(days=expiration_days)).strftime('%Y-%m-%d')
+        else:
+            expiration_date = "Not set"
     
     return templates.TemplateResponse(
         "compare.html",
@@ -364,6 +382,9 @@ async def compare_images(request: Request, comparison_id: str):
          "image_names": image_names,
          "image_sizes": image_sizes,
          "custom_names": custom_names,
+         "expiration_date": expiration_date,
+         "expiration_days": expiration_days,
+         "expiration_type": expiration_type,
          "total_columns": total_columns,
          "total_rows": total_rows}
     )
