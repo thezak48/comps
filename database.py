@@ -53,7 +53,7 @@ def get_comparison(comparison_id: str):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     
-    c.execute('SELECT id, name, show_name, total_rows, total_columns, expiration_type, expiration_days FROM comparisons WHERE id = ?', (comparison_id,))
+    c.execute('SELECT id, name, show_name, total_rows, total_columns, expiration_type, expiration_days, created_at, last_accessed FROM comparisons WHERE id = ?', (comparison_id,))
     comparison = c.fetchone()
     
     if comparison:
@@ -67,8 +67,10 @@ def get_comparison(comparison_id: str):
             'tags': tags,
             'total_rows': comparison[3],
             'total_columns': comparison[4],
-            'expiration_type': comparison[5],
-            'expiration_days': comparison[6]
+            'expiration_type': comparison[5] or 'from_last_access',
+            'expiration_days': comparison[6] or 7,
+            'created_at': comparison[7],
+            'last_accessed': comparison[8]
         }
     
     return None
