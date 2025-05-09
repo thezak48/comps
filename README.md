@@ -29,4 +29,4 @@ Tots not vibe coded because lazy
 
 Comps provides a RESTful API for programmatic access:
 
-For more details, see the [API Documentation](docs/API.md).
+For more details, see the [API Documentation](https://thezak48.github.io/comps/).
