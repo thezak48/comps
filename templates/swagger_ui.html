@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <link type="text/css" rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css">
+    <link rel="shortcut icon" href="/static/images/favicon.ico">
+    <title>Comps API Documentation</title>
+    <style>
+        /* Dark mode overrides for Swagger UI */
+        body {
+            background-color: #1a1a1a;
+            color: #e0e0e0;
+        }
+        .swagger-ui {
+            background-color: #1a1a1a;
+            color: #e0e0e0;
+        }
+        .swagger-ui .info .title,
+        .swagger-ui .info h1, 
+        .swagger-ui .info h2, 
+        .swagger-ui .info h3, 
+        .swagger-ui .info h4, 
+        .swagger-ui .info h5, 
+        .swagger-ui .info li, 
+        .swagger-ui .info p, 
+        .swagger-ui .info table {
+            color: #e0e0e0;
+        }
+        .swagger-ui .opblock .opblock-summary-operation-id, 
+        .swagger-ui .opblock .opblock-summary-path, 
+        .swagger-ui .opblock .opblock-summary-path__deprecated {
+            color: #e0e0e0;
+        }
+        .swagger-ui .opblock .opblock-summary-description {
+            color: #aaaaaa;
+        }
+        .swagger-ui .opblock-tag {
+            color: #e0e0e0;
+            background-color: #2d2d2d;
+            border-bottom: 1px solid #404040;
+        }
+        .swagger-ui .opblock {
+            background-color: #2d2d2d;
+            border: 1px solid #404040;
+        }
+        .swagger-ui .opblock .opblock-section-header {
+            background-color: #333333;
+        }
+        .swagger-ui .opblock .opblock-section-header h4 {
+            color: #e0e0e0;
+        }
+        .swagger-ui .opblock-description-wrapper p, 
+        .swagger-ui .opblock-external-docs-wrapper p, 
+        .swagger-ui .opblock-title_normal p {
+            color: #e0e0e0;
+        }
+        .swagger-ui .opblock .opblock-summary {
+            border-bottom: 1px solid #404040;
+        }
+        .swagger-ui .btn {
+            background-color: #333333;
+            color: #e0e0e0;
+            border: 1px solid #404040;
+        }
+        .swagger-ui select {
+            background-color: #333333;
+            color: #e0e0e0;
+            border: 1px solid #404040;
+        }
+        .swagger-ui .parameter__name, 
+        .swagger-ui .parameter__type, 
+        .swagger-ui .parameter__deprecated, 
+        .swagger-ui .parameter__in {
+            color: #e0e0e0;
+        }
+        .swagger-ui input[type=text], 
+        .swagger-ui textarea {
+            background-color: #333333;
+            color: #e0e0e0;
+            border: 1px solid #404040;
+        }
+        .swagger-ui .topbar {
+            background-color: #2d2d2d;
+        }
+        .swagger-ui .topbar .download-url-wrapper .select-label {
+            color: #e0e0e0;
+        }
+        .swagger-ui .topbar .download-url-wrapper input[type=text] {
+            background-color: #333333;
+            color: #e0e0e0;
+            border: 1px solid #404040;
+        }
+        .swagger-ui .scheme-container {
+            background-color: #2d2d2d;
+            box-shadow: 0 1px 2px 0 rgba(0,0,0,.15);
+        }
+        .swagger-ui .auth-wrapper .authorize {
+            color: #e0e0e0;
+        }
+        .swagger-ui .model-box {
+            background-color: #2d2d2d;
+        }
+        .swagger-ui .model {
+            color: #e0e0e0;
+        }
+        .swagger-ui .model-title {
+            color: #e0e0e0;
+        }
+        .swagger-ui .responses-table .response-col_status {
+            color: #e0e0e0;
+        }
+        .swagger-ui .responses-table .response-col_description {
+            color: #e0e0e0;
+        }
+        .swagger-ui .response-col_links {
+            color: #e0e0e0;
+        }
+        .swagger-ui table thead tr td, 
+        .swagger-ui table thead tr th {
+            color: #e0e0e0;
+        }
+        .swagger-ui .response-control-media-type__accept-message, 
+        .swagger-ui .response-control-media-type__controls, 
+        .swagger-ui .opblock-body pre.microlight, 
+        .swagger-ui .opblock-body pre {
+            color: #e0e0e0;
+            background-color: #333333;
+        }
+        .swagger-ui .tab li {
+            color: #e0e0e0;
+        }
+        .swagger-ui section.models {
+            border: 1px solid #404040;
+        }
+        .swagger-ui section.models.is-open h4 {
+            border-bottom: 1px solid #404040;
+        }
+        .swagger-ui section.models .model-container {
+            background-color: #2d2d2d;
+        }
+        .swagger-ui .model-box {
+            background-color: #333333;
+        }
+        .swagger-ui .prop-type {
+            color: #9cdcfe;
+        }
+        .swagger-ui .prop-name {
+            color: #4fc1ff;
+        }
+        .swagger-ui .renderedMarkdown code {
+            color: #ce9178;
+            background-color: #333333;
+        }
+        .swagger-ui .markdown code, .swagger-ui .renderedMarkdown code {
+            background-color: #333333;
+        }
+    </style>
+</head>
+<body>
+    <div id="swagger-ui"></div>
+    <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+    <script>
+        const ui = SwaggerUIBundle({
+            url: '/openapi.json',
+            dom_id: '#swagger-ui',
+            presets: [
+                SwaggerUIBundle.presets.apis,
+                SwaggerUIBundle.SwaggerUIStandalonePreset
+            ],
+            layout: "BaseLayout",
+            deepLinking: true,
+            syntaxHighlight: {
+                activate: true,
+                theme: "monokai"
+            }
+        });
+    </script>
+</body>
+</html>
