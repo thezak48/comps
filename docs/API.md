@@ -6,11 +6,11 @@ Comps provides a RESTful API that allows you to programmatically create comparis
 
 Comps provides interactive API documentation using Swagger UI. You can access it at:
 
-**/api/docs**
+The online documentation is automatically updated whenever changes are made to the API.
 
 ## Base URL
 
-All API endpoints are prefixed with `/api/v1`.
+All API endpoints are prefixed with /api/v1.
 
 ## Endpoints
 

@@ -24,3 +24,9 @@ Tots not vibe coded because lazy
 ### Using Docker (Recommended)
 
 1. Clone the repository:
+
+## API Documentation
+
+Comps provides a RESTful API for programmatic access:
+
+For more details, see the [API Documentation](docs/API.md).
