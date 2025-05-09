@@ -16,7 +16,11 @@ let showBorder = false;
 
 // Initialize scroll behavior with proper overflow handling
 const imageViewer = document.querySelector('.image-viewer');
-imageViewer.style.overflow = 'auto';
+
+// Set initial state for image viewer
+if (isImageFit) {
+    imageViewer.classList.add('fit-mode');
+}
 
 function isInSameColumn(currentIndex, newIndex) {
     // Check if indices are valid
@@ -190,19 +194,45 @@ currentImage.addEventListener('click', () => {
 
 toggleFitBtn.addEventListener('click', () => {
     isImageFit = !isImageFit;
+    
+    // Toggle fit class on image
     currentImage.classList.toggle('fit', isImageFit);
     
-    // Always keep overflow auto to prevent cutoff
-    imageViewer.style.overflow = 'auto';
+    // Toggle fit-mode class on image viewer
+    imageViewer.classList.toggle('fit-mode', isImageFit);
     
-    // Reset scroll position when switching to fit mode
+    // Update button text
+    toggleFitBtn.textContent = isImageFit ? 'Original Size' : 'Fit to Screen';
+    
+    // Handle cursor and scroll behavior
     if (isImageFit) {
+        // Reset scroll position when switching to fit mode
         imageViewer.scrollTo(0, 0);
         currentImage.style.cursor = 'pointer';
     } else {
+        // First reset scroll position
+        imageViewer.scrollTo(0, 0);
+        
+        // Create a wrapper if it doesn't exist
+        let imageContainer = document.querySelector('.image-container');
+        if (!imageContainer) {
+            imageContainer = document.createElement('div');
+            imageContainer.className = 'image-container';
+            
+            // Move the image into the container
+            const parent = currentImage.parentNode;
+            parent.appendChild(imageContainer);
+            imageContainer.appendChild(currentImage);
+        }
+        
+        // Use a timeout to ensure the DOM has updated
+        setTimeout(() => {
+            // Ensure we're at the top of the image
+            imageViewer.scrollTo(0, 0);
+        }, 50);
+        
         currentImage.style.cursor = 'move';
     }
-    toggleFitBtn.textContent = isImageFit ? 'Original Size' : 'Fit to Screen';
 });
 
 toggleBorderBtn.addEventListener('click', () => {

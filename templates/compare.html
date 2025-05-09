@@ -61,8 +61,10 @@
         </div>
     </nav>
     <div class="comparison-container">
-        <div class="image-viewer">
-            <img id="currentImage" src="{{ url_for('uploads', path=images[0]) }}" alt="Comparison image" class="comparison-image">
+        <div class="image-viewer fit-mode" id="imageViewer">
+            <div class="image-container">
+                <img id="currentImage" src="{{ url_for('uploads', path=images[0]) }}" alt="Comparison image" class="comparison-image">
+            </div>
         </div>
     </div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>

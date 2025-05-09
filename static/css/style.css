@@ -285,29 +285,36 @@ body.has-fixed-nav {
 }
 
 .image-viewer {
-    height: calc(100vh - 76px);
-    padding-top: 20px;
     width: 100%;
     overflow: auto;
     position: relative;
     background: #1a1a1a;
-    display: flex;
     align-items: center;
     justify-content: center;
+    box-sizing: border-box;
+    margin-top: 0;
+    padding-bottom: 20px;
+    scroll-padding-top: 76px;
 }
 
 .comparison-image {
     position: relative;
     transition: object-fit 0.3s ease;
     cursor: move;
+    transform-origin: center center;
+    margin-top: 0;
 }
 
 .comparison-image.fit {
-    position: relative;
     max-width: 100% !important;
     max-height: calc(100vh - 76px) !important;
+    margin-top: 0 !important;
+    transform: none !important;
     cursor: pointer;
     object-fit: contain;
+    position: relative;
+    top: 0;
+    left: 0;
     margin: 0 auto;
 }
 
