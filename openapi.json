@@ -1,0 +1,782 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Comps API",
+    "description": "API for creating and managing image comparisons",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/api/v1/comparisons": {
+      "get": {
+        "tags": [
+          "api"
+        ],
+        "summary": "List Comparisons",
+        "description": "List all available comparisons.\n\nReturns a list of all comparisons with their basic metadata including:\n- ID, name, and show name\n- Tags\n- Grid dimensions (rows and columns)\n- Expiration settings\n- Creation and last accessed timestamps",
+        "operationId": "list_comparisons_api_v1_comparisons_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ComparisonResponse"
+                  },
+                  "type": "array",
+                  "title": "Response List Comparisons Api V1 Comparisons Get"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "api"
+        ],
+        "summary": "Create New Comparison",
+        "description": "Create a new comparison.\n\nCreates a new comparison with the specified parameters:\n- Name and show name (optional)\n- Tags for categorization (optional)\n- Grid dimensions (rows and columns)\n- Expiration settings\n\nReturns the created comparison with its assigned ID and timestamps.\n\nThe comparison will be empty initially and images can be added later.",
+        "operationId": "create_new_comparison_api_v1_comparisons_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ComparisonCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ComparisonResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/comparisons/{comparison_id}": {
+      "get": {
+        "tags": [
+          "api"
+        ],
+        "summary": "Get Comparison Detail",
+        "description": "Get detailed information about a specific comparison.\n\nReturns comprehensive information about the comparison including:\n- Basic metadata (ID, name, show name, tags)\n- Grid dimensions (rows and columns)\n- Expiration settings\n- Creation and last accessed timestamps\n- Complete list of images with their positions and metadata\n\nThis endpoint also updates the last_accessed timestamp for the comparison.",
+        "operationId": "get_comparison_detail_api_v1_comparisons__comparison_id__get",
+        "parameters": [
+          {
+            "name": "comparison_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Comparison Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ComparisonDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/comparisons/{comparison_id}/images": {
+      "post": {
+        "tags": [
+          "api"
+        ],
+        "summary": "Upload Images",
+        "description": "Upload images to an existing comparison.\n\nUpload one or more image files to a comparison and specify their positions in the grid.\n\n- Files should be image files (jpg, jpeg, png, bmp, webp)\n- Positions can be specified as a JSON string mapping filenames to grid positions\n\nExample positions JSON:\n```json\n{\n    \"image1.jpg\": {\"row\": 0, \"column\": 0},\n    \"image2.jpg\": {\"row\": 0, \"column\": 1}\n}\n```",
+        "operationId": "upload_images_api_v1_comparisons__comparison_id__images_post",
+        "parameters": [
+          {
+            "name": "comparison_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Comparison Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_images_api_v1_comparisons__comparison_id__images_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/comparisons/{comparison_id}/images/{filename}": {
+      "put": {
+        "tags": [
+          "api"
+        ],
+        "summary": "Update Image Metadata",
+        "description": "Update image metadata.\n\nCurrently supports updating:\n- Custom name for the image\n\nThe custom name can be used to provide a more descriptive label for the image\nthat will be displayed in the UI.",
+        "operationId": "update_image_metadata_api_v1_comparisons__comparison_id__images__filename__put",
+        "parameters": [
+          {
+            "name": "comparison_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Comparison Id"
+            }
+          },
+          {
+            "name": "filename",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Filename"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomNameUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "summary": "Health Check",
+        "description": "Health check endpoint for monitoring",
+        "operationId": "health_check_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/": {
+      "get": {
+        "summary": "Home",
+        "description": "Render the home page with upload form.",
+        "operationId": "home__get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Body_upload_images_api_v1_comparisons__comparison_id__images_post": {
+        "properties": {
+          "files": {
+            "items": {
+              "type": "string",
+              "format": "binary"
+            },
+            "type": "array",
+            "title": "Files"
+          },
+          "positions": {
+            "type": "string",
+            "title": "Positions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "files"
+        ],
+        "title": "Body_upload_images_api_v1_comparisons__comparison_id__images_post"
+      },
+      "ComparisonCreate": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "Internal name for the comparison",
+            "examples": [
+              "Example Comparison"
+            ]
+          },
+          "show_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Show Name",
+            "description": "Display name shown in the UI",
+            "examples": [
+              "Example"
+            ]
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags",
+            "description": "List of tags for categorizing the comparison",
+            "examples": [
+              [
+                "example",
+                "test",
+                "api"
+              ]
+            ]
+          },
+          "total_rows": {
+            "type": "integer",
+            "title": "Total Rows",
+            "description": "Number of rows in the comparison grid",
+            "default": 1,
+            "examples": [
+              1
+            ]
+          },
+          "total_columns": {
+            "type": "integer",
+            "title": "Total Columns",
+            "description": "Number of columns in the comparison grid",
+            "default": 2,
+            "examples": [
+              2
+            ]
+          },
+          "expiration_type": {
+            "type": "string",
+            "title": "Expiration Type",
+            "description": "When to expire the comparison: 'from_creation' or 'from_last_access'",
+            "default": "from_last_access",
+            "examples": [
+              "from_last_access"
+            ]
+          },
+          "expiration_days": {
+            "type": "integer",
+            "title": "Expiration Days",
+            "description": "Number of days until the comparison expires",
+            "default": 7,
+            "examples": [
+              7
+            ]
+          }
+        },
+        "type": "object",
+        "title": "ComparisonCreate"
+      },
+      "ComparisonDetail": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "Internal name for the comparison",
+            "examples": [
+              "Example Comparison"
+            ]
+          },
+          "show_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Show Name",
+            "description": "Display name shown in the UI",
+            "examples": [
+              "Example"
+            ]
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags",
+            "description": "List of tags for categorizing the comparison",
+            "examples": [
+              [
+                "example",
+                "test",
+                "api"
+              ]
+            ]
+          },
+          "total_rows": {
+            "type": "integer",
+            "title": "Total Rows",
+            "description": "Number of rows in the comparison grid",
+            "default": 1,
+            "examples": [
+              1
+            ]
+          },
+          "total_columns": {
+            "type": "integer",
+            "title": "Total Columns",
+            "description": "Number of columns in the comparison grid",
+            "default": 2,
+            "examples": [
+              2
+            ]
+          },
+          "expiration_type": {
+            "type": "string",
+            "title": "Expiration Type",
+            "description": "When to expire the comparison: 'from_creation' or 'from_last_access'",
+            "default": "from_last_access",
+            "examples": [
+              "from_last_access"
+            ]
+          },
+          "expiration_days": {
+            "type": "integer",
+            "title": "Expiration Days",
+            "description": "Number of days until the comparison expires",
+            "default": 7,
+            "examples": [
+              7
+            ]
+          },
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Unique identifier for the comparison",
+            "examples": [
+              "11256486-6607-4ba9-88f1-ac7cb0105e17"
+            ]
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At",
+            "description": "Timestamp when the comparison was created",
+            "examples": [
+              "2023-05-01 12:34:56"
+            ]
+          },
+          "last_accessed": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Accessed",
+            "description": "Timestamp when the comparison was last accessed",
+            "examples": [
+              "2023-05-02 10:11:12"
+            ]
+          },
+          "images": {
+            "items": {
+              "$ref": "#/components/schemas/ImageDetail"
+            },
+            "type": "array",
+            "title": "Images"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "title": "ComparisonDetail"
+      },
+      "ComparisonResponse": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "Internal name for the comparison",
+            "examples": [
+              "Example Comparison"
+            ]
+          },
+          "show_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Show Name",
+            "description": "Display name shown in the UI",
+            "examples": [
+              "Example"
+            ]
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags",
+            "description": "List of tags for categorizing the comparison",
+            "examples": [
+              [
+                "example",
+                "test",
+                "api"
+              ]
+            ]
+          },
+          "total_rows": {
+            "type": "integer",
+            "title": "Total Rows",
+            "description": "Number of rows in the comparison grid",
+            "default": 1,
+            "examples": [
+              1
+            ]
+          },
+          "total_columns": {
+            "type": "integer",
+            "title": "Total Columns",
+            "description": "Number of columns in the comparison grid",
+            "default": 2,
+            "examples": [
+              2
+            ]
+          },
+          "expiration_type": {
+            "type": "string",
+            "title": "Expiration Type",
+            "description": "When to expire the comparison: 'from_creation' or 'from_last_access'",
+            "default": "from_last_access",
+            "examples": [
+              "from_last_access"
+            ]
+          },
+          "expiration_days": {
+            "type": "integer",
+            "title": "Expiration Days",
+            "description": "Number of days until the comparison expires",
+            "default": 7,
+            "examples": [
+              7
+            ]
+          },
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Unique identifier for the comparison",
+            "examples": [
+              "11256486-6607-4ba9-88f1-ac7cb0105e17"
+            ]
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At",
+            "description": "Timestamp when the comparison was created",
+            "examples": [
+              "2023-05-01 12:34:56"
+            ]
+          },
+          "last_accessed": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Accessed",
+            "description": "Timestamp when the comparison was last accessed",
+            "examples": [
+              "2023-05-02 10:11:12"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "title": "ComparisonResponse"
+      },
+      "CustomNameUpdate": {
+        "properties": {
+          "custom_name": {
+            "type": "string",
+            "title": "Custom Name",
+            "description": "New custom name for the image",
+            "examples": [
+              "Updated Image Name"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "custom_name"
+        ],
+        "title": "CustomNameUpdate"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "ImageDetail": {
+        "properties": {
+          "filename": {
+            "type": "string",
+            "title": "Filename",
+            "description": "System filename of the image",
+            "examples": [
+              "55c501a7-86a7-44b7-9aaa-333c96d38f11.jpg"
+            ]
+          },
+          "original_filename": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Original Filename",
+            "description": "Original filename of the image",
+            "examples": [
+              "image1.jpg"
+            ]
+          },
+          "custom_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Custom Name",
+            "description": "Custom name for the image",
+            "examples": [
+              "Left Image"
+            ]
+          },
+          "image_size": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Size",
+            "description": "Size of the image",
+            "examples": [
+              "1024 bytes"
+            ]
+          },
+          "row": {
+            "type": "integer",
+            "title": "Row",
+            "description": "Row position in the comparison grid",
+            "examples": [
+              0
+            ]
+          },
+          "column": {
+            "type": "integer",
+            "title": "Column",
+            "description": "Column position in the comparison grid",
+            "examples": [
+              0
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "filename",
+          "row",
+          "column"
+        ],
+        "title": "ImageDetail"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  }
+}
