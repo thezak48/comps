@@ -764,3 +764,96 @@ body.has-fixed-nav {
 .expiration-info .badge {
     background-color: #17a2b8;
 }
+
+/* General Styles */
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    margin: 0;
+}
+
+/* Toast Notification System */
+.toast-container {
+    position: fixed;
+    display: block !important;
+    top: 20px;
+    right: 20px;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-width: 350px;
+}
+
+.toast {
+    background-color: #fff;
+    display: flex !important;
+    color: #333;
+    padding: 15px 20px !important;
+    border-radius: 4px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    display: flex;
+    align-items: flex-start;
+    animation: toast-in 0.3s ease-out forwards;
+    overflow: hidden;
+    margin-bottom: 10px;
+}
+
+.toast-content {
+    flex: 1;
+    display: flex;
+    align-items: center;
+}
+
+.toast.error {
+    border-left: 4px solid #f44336 !important;
+    background-color: #fff0f0 !important;
+    animation: toast-in-error 0.3s ease-out forwards, toast-pulse-error 2s infinite;
+}
+
+.toast.success {
+    border-left: 4px solid #4caf50 !important;
+    background-color: #f0fff0 !important;
+    animation: toast-in 0.3s ease-out forwards;
+}
+
+.toast.warning {
+    border-left: 4px solid #ff9800 !important;
+    background-color: #fffaf0 !important;
+    animation: toast-in 0.3s ease-out forwards, toast-pulse-warning 2s infinite;
+}
+
+.toast-icon {
+    margin-right: 10px;
+    font-size: 18px;
+}
+
+.toast-message {
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.toast .toast-close {
+    margin-left: 10px;
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 18px;
+    color: #999;
+}
+
+@keyframes toast-in {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes toast-out {
+    from { transform: translateX(0); opacity: 1; }
+    to { transform: translateX(100%); opacity: 0; }
+}
+
+@keyframes toast-pulse-error {
+    0%, 100% { box-shadow: 0 4px 12px rgba(244, 67, 54, 0.15); }
+    50% { box-shadow: 0 4px 20px rgba(244, 67, 54, 0.3); }
+}
+
+/* Navbar Styles */
+.navbar {
