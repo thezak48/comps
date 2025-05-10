@@ -21,6 +21,20 @@
                     <li class="nav-item">
                         <a class="nav-link" href="/"><i class="fa fa-upload"></i> Upload</a>
                     </li>
+                    {% if user %}
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fa fa-user"></i> {{ user.username }}
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
+                            <li><a class="dropdown-item" href="/account"><i class="fa fa-cog"></i> My Account</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="/logout"><i class="fa fa-sign-out-alt"></i> Logout</a></li>
+                        </ul>
+                    </li>
+                    {% else %}
+                    <li class="nav-item"><a class="nav-link" href="/login"><i class="fa fa-sign-in-alt"></i> Login</a></li>
+                    {% endif %}
                 </ul>
             </div>
         </div>
@@ -43,7 +57,7 @@
                     </div>
                     <div class="form-check">
                         <input type="checkbox" id="expiration-toggle" class="form-check-input">
-                        <label for="expiration-toggle" class="form-check-label" data-bs-toggle="tooltip" data-bs-placement="top" title="If unchecked, files will be deleted after 7 days of inactivity">Set Expiration<i class="fa fa-question-circle ms-1 fa-xs"></i></label>
+                        <label for="expiration-toggle" class="form-check-label" data-bs-toggle="tooltip" data-bs-placement="top" title="{% if user %}By default, your comparisons never expire. Check this to set an expiration.{% else %}If unchecked, files will be deleted after 7 days of inactivity{% endif %}">Set Expiration<i class="fa fa-question-circle ms-1 fa-xs"></i></label>
                     </div>
                 </div>
             </div>

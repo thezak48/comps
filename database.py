@@ -1,6 +1,6 @@
 import sqlite3
 import os
-import shutil
+import shutil 
 from datetime import datetime, timedelta
 from typing import List, Optional
 from migrations.manager import MigrationManager
@@ -12,15 +12,31 @@ def init_db():
     migration_manager = MigrationManager()
     migration_manager.migrate(DB_PATH)
 
-def create_comparison(comparison_id: str, name: Optional[str], show_name: Optional[str], tags: Optional[List[str]], metadata: dict):
+def create_comparison(comparison_id: str, name: Optional[str], show_name: Optional[str], tags: Optional[List[str]], metadata: dict, user_id: Optional[int] = None):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     
     c.execute(
-        'INSERT INTO comparisons (id, name, show_name, total_rows, total_columns, expiration_type, expiration_days) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        (comparison_id, name, show_name, metadata.get('total_rows', 1), metadata.get('total_columns', 2), metadata.get('expiration_type', 'from_last_access'), int(metadata.get('expiration_days', 7)))
+        'INSERT INTO comparisons (id, name, show_name, total_rows, total_columns, expiration_type, expiration_days, never_expire) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        (comparison_id, name, show_name, metadata.get('total_rows', 1), metadata.get('total_columns', 2), 
+         metadata.get('expiration_type', 'from_last_access'), int(metadata.get('expiration_days', 7)), 0)
     )
-    c.execute('CREATE INDEX IF NOT EXISTS idx_image_positions ON image_positions(comparison_id, row_number, column_position)')
+
+    # Set default expiration based on metadata
+    if metadata.get('never_expire') is not None:
+        c.execute('UPDATE comparisons SET never_expire = ? WHERE id = ?', 
+                 (1 if metadata.get('never_expire') else 0, comparison_id))
+    
+    # If user is authenticated, associate the comparison with them and set never_expire if applicable
+    if user_id is not None:
+        c.execute('UPDATE comparisons SET user_id = ? WHERE id = ?', (user_id, comparison_id))
+        c.execute('SELECT never_expire_comparisons FROM users WHERE id = ?', (user_id,))
+        never_expire = c.fetchone()[0]
+        if never_expire:
+            # Only set never_expire if the user didn't explicitly choose to have it expire
+            if metadata.get('never_expire') is None:
+                c.execute('UPDATE comparisons SET never_expire = 1 WHERE id = ?', (comparison_id,))
+
 
     if tags:
         for tag in tags:
@@ -60,6 +76,11 @@ def get_comparison(comparison_id: str):
         c.execute('SELECT tag FROM tags WHERE comparison_id = ?', (comparison_id,))
         tags = [row[0] for row in c.fetchall()] 
         
+        # Get user information if available
+        c.execute('SELECT user_id, never_expire FROM comparisons WHERE id = ?', (comparison_id,))
+        user_info = c.fetchone()
+        user_id, never_expire = user_info if user_info else (None, 0)
+        
         return {
             'id': comparison[0],
             'name': comparison[1],
@@ -70,7 +91,9 @@ def get_comparison(comparison_id: str):
             'expiration_type': comparison[5] or 'from_last_access',
             'expiration_days': comparison[6] or 7,
             'created_at': comparison[7],
-            'last_accessed': comparison[8]
+            'last_accessed': comparison[8],
+            'user_id': user_id,
+            'never_expire': bool(never_expire)
         }
     
     return None
@@ -180,16 +203,21 @@ def get_expired_comparisons(retention_days: int):
         
         if 'last_accessed' in columns and 'expiration_type' in columns and 'expiration_days' in columns:
             # Get all comparisons with their expiration settings
-            c.execute('SELECT id, expiration_type, expiration_days, created_at, last_accessed FROM comparisons')
+            c.execute('SELECT id, expiration_type, expiration_days, created_at, last_accessed, never_expire FROM comparisons')
             comparisons = c.fetchall()
-            
+
             print(f"Checking for expired comparisons with retention_days={retention_days}")
             print(f"Found {len(comparisons)} comparisons to check for expiration")
             current_time = datetime.now()
-            for comp_id, exp_type, exp_days, created_at, last_accessed in comparisons:
+            for comp_id, exp_type, exp_days, created_at, last_accessed, never_expire in comparisons:
                 # Use comparison's own expiration days if available, otherwise use default
                 days = exp_days if exp_days is not None else retention_days
                 print(f"Checking comparison {comp_id}: type={exp_type}, days={days}, created={created_at}, last_accessed={last_accessed}")
+
+                # Check if this comparison is marked as never expire
+                if never_expire:
+                    print(f"  Comparison {comp_id} is marked as never expire, skipping")
+                    continue
                 
                 if exp_type == 'from_creation' and created_at:
                     cutoff_date = datetime.strptime(created_at, '%Y-%m-%d %H:%M:%S') + timedelta(days=days)

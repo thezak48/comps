@@ -17,7 +17,7 @@ from typing import List, Optional
 from datetime import datetime, timedelta
 from pathlib import Path
 from fastapi.openapi.docs import get_swagger_ui_html
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 
 # Third-party imports
 from fastapi import FastAPI, UploadFile, File, Request, Form
@@ -25,10 +25,14 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.openapi.utils import get_openapi
 from fastapi.responses import JSONResponse
 from fastapi.templating import Jinja2Templates
+from fastapi.security import APIKeyCookie
 
 # Local imports
-from database import init_db, create_comparison, get_comparison, store_image_position, store_image_metadata, update_image_custom_name, update_last_accessed, get_expired_comparisons, delete_comparison
+from database import (init_db, create_comparison, get_comparison, store_image_position, 
+                     store_image_metadata, update_image_custom_name, update_last_accessed, 
+                     get_expired_comparisons, delete_comparison)
 from api.router import router as api_router
+import auth
 
 # Random name generator for comparisons
 def generate_random_name():
@@ -67,6 +71,7 @@ app = FastAPI(
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+cookie_sec = APIKeyCookie(name="session")
 
 # Get configuration from environment
 DB_PATH = os.getenv('DB_PATH', 'comparisons.db')
@@ -180,6 +185,8 @@ async def start_cleanup_task():
                 logger.warning("Database schema is missing expected columns. Migrations may not be complete.")
                 logger.warning("The application may not function correctly until migrations are completed.")
         
+        logger.info("Database initialized successfully")
+        
         conn.close()
     except Exception as e:
         logger.error(f"Error checking database state: {str(e)}")
@@ -189,6 +196,152 @@ async def health_check():
     """Health check endpoint for monitoring"""
     return {"status": "healthy"}
 
+@app.get("/login")
+async def login_page(request: Request):
+    """Render the login page"""
+    # Check if user is already logged in
+    user = await auth.get_optional_user(request)
+    if user:
+        return RedirectResponse(url="/")
+    
+    return templates.TemplateResponse("login.html", {"request": request})
+
+@app.post("/login")
+async def login(request: Request):
+    """Handle login form submission"""
+    form_data = await request.form()
+    username = form_data.get("username")
+    invitation_code = form_data.get("invitation_code")
+    
+    if not username or not invitation_code:
+        return templates.TemplateResponse(
+            "login.html", 
+            {"request": request, "error": "Username and invitation code are required"}
+        )
+    
+    # Try to authenticate
+    user = auth.authenticate_user(username, invitation_code)
+    
+    if not user:
+        # If authentication fails, try to register (if the invitation code is valid)
+        user = auth.register_user(username, invitation_code)
+        if not user:
+            return templates.TemplateResponse(
+                "login.html", 
+                {"request": request, "error": "Invalid username or invitation code"}
+            )
+    
+    # Create access token
+    access_token = auth.create_access_token({"sub": str(user["id"])})
+    
+    # Create response with cookie
+    response = RedirectResponse(url="/", status_code=303)
+    response.set_cookie(
+        key="session",
+        value=access_token,
+        httponly=True,
+        max_age=60 * 60 * 24 * 7,  # 1 week
+        samesite="lax"
+    )
+    
+    return response
+
+@app.get("/logout")
+async def logout():
+    """Log out the current user"""
+    response = RedirectResponse(url="/")
+    response.delete_cookie(key="session")
+    return response
+
+@app.get("/admin")
+async def admin_page(request: Request):
+    """Admin page for managing invitation codes"""
+    # Get current user
+    user = await auth.get_optional_user(request)
+    
+    # Check if user is admin
+    if not user or not auth.is_admin(user):
+        return RedirectResponse(url="/")
+    
+    # Get invitation codes created by this admin
+    invitation_codes = auth.get_user_invitation_codes(user["id"])
+    
+    return templates.TemplateResponse(
+        "admin.html", 
+        {"request": request, "user": user, "invitation_codes": invitation_codes}
+    )
+
+@app.post("/admin/create-invitation")
+async def create_invitation(request: Request):
+    """Create a new invitation code"""
+    # Get current user
+    user = await auth.get_optional_user(request)
+    
+    # Check if user is admin
+    if not user or not auth.is_admin(user):
+        return RedirectResponse(url="/")
+    
+    # Create a new invitation code
+    code = auth.create_invitation_code(user["id"])
+    
+    # Redirect back to admin page
+    return RedirectResponse(url="/admin", status_code=303)
+
+@app.get("/account")
+async def account_page(request: Request):
+    """User account page"""
+    # Get current user
+    user = await auth.get_optional_user(request)
+    
+    # Check if user is logged in
+    if not user:
+        return RedirectResponse(url="/login")
+    
+    # Get user's comparisons
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    
+    c.execute('''
+        SELECT id, name, show_name, created_at, last_accessed, never_expire
+        FROM comparisons
+        WHERE user_id = ?
+        ORDER BY created_at DESC
+    ''', (user["id"],))
+    
+    comparisons = [dict(zip(['id', 'name', 'show_name', 'created_at', 'last_accessed', 'never_expire'], row)) 
+                  for row in c.fetchall()]
+    
+    conn.close()
+    
+    return templates.TemplateResponse(
+        "account.html", 
+        {"request": request, "user": user, "comparisons": comparisons}
+    )
+
+@app.delete("/api/delete-comparison/{comparison_id}")
+async def delete_user_comparison(comparison_id: str, request: Request):
+    """Delete a comparison owned by the current user"""
+    # Get current user
+    user = await auth.get_optional_user(request)
+    
+    # Check if user is logged in
+    if not user:
+        return JSONResponse(status_code=401, content={"error": "Authentication required"})
+    
+    # Check if the comparison exists and belongs to the user
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute('SELECT user_id FROM comparisons WHERE id = ?', (comparison_id,))
+    result = c.fetchone()
+    conn.close()
+    
+    if not result or result[0] != user["id"]:
+        return JSONResponse(status_code=403, content={"error": "You don't have permission to delete this comparison"})
+    
+    # Delete the comparison
+    delete_comparison(comparison_id, UPLOADS_PATH)
+    return JSONResponse(content={"message": "Comparison deleted successfully"})
+
 @app.post("/upload/")
 async def upload_files(
     request: Request,
@@ -196,6 +349,7 @@ async def upload_files(
     name: str = Form(...),
     show_name: Optional[str] = Form(None),
     expiration_type: str = Form("from_last_access"),
+    expiration_enabled: Optional[str] = Form(None),
     expiration_days: int = Form(7),
     tags: Optional[str] = Form(None),
     file_positions: Optional[str] = Form(None),
@@ -208,6 +362,12 @@ async def upload_files(
     and stores the files in a unique directory.
     """
     logger.info(f"Received upload request with {len(files)} files")
+    
+    # Get current user if logged in
+    user = None
+    if request:
+        user = await auth.get_optional_user(request)
+        logger.info(f"Upload request from user: {user['username'] if user else 'anonymous'}")
     
     # Generate a unique ID for this comparison
     comparison_id = str(uuid.uuid4())
@@ -224,6 +384,7 @@ async def upload_files(
     # Process tags
     tag_list = []
     if tags and tags.strip():
+        # Split tags by comma and remove whitespace
         tag_list = [tag.strip() for tag in tags.split(',') if tag.strip()]
     
     # Process file positions if provided
@@ -298,6 +459,15 @@ async def upload_files(
         # Apply custom name if provided
         if file.filename in custom_names_data:
             update_image_custom_name(comparison_id, unique_filename, custom_names_data[file.filename])
+
+    # Determine if this comparison should never expire
+    never_expire = None
+    if user:
+        # For logged-in users, check if expiration was explicitly enabled
+        if expiration_enabled == "true":
+            never_expire = False
+        else:
+            never_expire = True
     
     # Create comparison record
     metadata = {
@@ -305,6 +475,7 @@ async def upload_files(
         "total_columns": total_columns,
         "expiration_type": expiration_type,
         "expiration_days": expiration_days,
+        "never_expire": never_expire
     }
     
     create_comparison(
@@ -312,7 +483,8 @@ async def upload_files(
         name=name,
         show_name=show_name,
         tags=tag_list,
-        metadata=metadata
+        metadata=metadata,
+        user_id=user["id"] if user else None
     )
     
     return JSONResponse(content={"comparison_id": comparison_id})
@@ -325,6 +497,9 @@ async def view_comparison(request: Request, comparison_id: str):
     Retrieves the comparison data, updates the last accessed timestamp,
     and renders the comparison template with all necessary data.
     """
+    # Get current user if logged in
+    user = await auth.get_optional_user(request)
+    
     # Update last accessed timestamp
     update_last_accessed(comparison_id)
     
@@ -364,19 +539,24 @@ async def view_comparison(request: Request, comparison_id: str):
     
     # Calculate expiration date
     expiration_date = datetime.now() + timedelta(days=comparison.get('expiration_days', 7))
+    never_expires = comparison.get('never_expire', False)
     
     # Calculate the number of rows to show in dropdown (max 20)
     dropdown_rows = min(comparison.get('total_rows', 1), 20)
     
     return templates.TemplateResponse("compare.html", {
-        "request": request, "images": images, "metadata": comparison, 
+        "request": request, 
+        "user": user,
+        "images": images, 
+        "metadata": comparison, 
         "total_rows": comparison.get('total_rows', 1), "total_columns": comparison.get('total_columns', 2),
         "image_names": image_names, "image_sizes": image_sizes, "expiration_date": expiration_date.strftime('%Y-%m-%d'),
-        "expiration_days": comparison.get('expiration_days', 7), "expiration_type": comparison.get('expiration_type', 'from_last_access'),
+        "expiration_days": comparison.get('expiration_days', 7), "expiration_type": comparison.get('expiration_type', 'from_last_access'), "never_expire": never_expires,
         "dropdown_rows": dropdown_rows
     })
 
 @app.get("/")
 async def home(request: Request):
     """Render the home page with upload form."""
-    return templates.TemplateResponse("index.html", {"request": request})
+    user = await auth.get_optional_user(request)
+    return templates.TemplateResponse("index.html", {"request": request, "user": user})

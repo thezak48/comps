@@ -66,8 +66,8 @@ function showToast(message, type = 'error', duration = 5000) {
 const dropZone = document.getElementById('dropZone');
 const fileInput = document.getElementById('fileInput');
 const preview = document.getElementById('preview');
-const showNameToggle = document.getElementById('show-name-toggle');
 const expirationToggle = document.getElementById('expiration-toggle');
+const showNameToggle = document.getElementById('show-name-toggle');
 const expirationToggleLabel = document.querySelector('label[for="expiration-toggle"]');
 const tagsToggle = document.getElementById('tags-toggle');
 const comparisonNameInput = document.getElementById('comparison-name');
@@ -1178,7 +1178,8 @@ function getMetadata() {
         show_name: showNameInput.value.trim(),
         expiration_type: expirationToggle.checked ? getSelectedExpirationType() : 'from_last_access',
         expiration_days: expirationToggle.checked ? getSelectedExpirationDays() : 7,
-        tags: tagsInput.value.trim()
+        tags: tagsInput.value.trim(),
+        never_expire: !expirationToggle.checked
     };
 }
 
@@ -1278,8 +1279,10 @@ document.getElementById('uploadButton').addEventListener('click', async () => {
     formData.append('name', metadata.name);
     formData.append('show_name', metadata.show_name);
     formData.append('expiration_type', metadata.expiration_type);
+    formData.append('expiration_enabled', expirationToggle.checked ? "true" : "false");
     formData.append('expiration_days', metadata.expiration_days);
     formData.append('tags', metadata.tags);
+    formData.append('never_expire', metadata.never_expire ? 'true' : 'false');
 
     try {
         const response = await fetch('/upload/', {
