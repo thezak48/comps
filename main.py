@@ -12,6 +12,7 @@ import sqlite3
 import uuid
 import time
 import json
+from typing import List, Optional
 from datetime import datetime, timedelta
 from pathlib import Path
 from fastapi.openapi.docs import get_swagger_ui_html
@@ -161,6 +162,174 @@ async def start_cleanup_task():
 async def health_check():
     """Health check endpoint for monitoring"""
     return {"status": "healthy"}
+
+@app.post("/upload/")
+async def upload_files(
+    request: Request,
+    files: List[UploadFile] = File(...),
+    name: str = Form(...),
+    show_name: Optional[str] = Form(None),
+    expiration_type: str = Form("from_last_access"),
+    expiration_days: int = Form(7),
+    tags: Optional[str] = Form(None),
+    file_positions: Optional[str] = Form(None),
+    custom_names: Optional[str] = Form(None)
+):
+    """
+    Handle file uploads for comparison.
+    
+    Accepts multiple files and metadata, creates a comparison record,
+    and stores the files in a unique directory.
+    """
+    logger.info(f"Received upload request with {len(files)} files")
+    
+    # Generate a unique ID for this comparison
+    comparison_id = str(uuid.uuid4())
+    
+    # Create directory for this comparison
+    comparison_dir = Path(UPLOADS_PATH) / comparison_id
+    comparison_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Process tags
+    tag_list = []
+    if tags and tags.strip():
+        tag_list = [tag.strip() for tag in tags.split(',') if tag.strip()]
+    
+    # Process file positions if provided
+    positions_data = {}
+    if file_positions:
+        try:
+            positions_data = json.loads(file_positions)
+        except json.JSONDecodeError:
+            return JSONResponse(
+                status_code=400,
+                content={"error": "Invalid file positions format"}
+            )
+    
+    # Process custom names if provided
+    custom_names_data = {}
+    if custom_names:
+        try:
+            custom_names_data = json.loads(custom_names)
+        except json.JSONDecodeError:
+            return JSONResponse(
+                status_code=400,
+                content={"error": "Invalid custom names format"}
+            )
+    
+    # Calculate total rows and columns from positions data
+    total_rows = 1
+    total_columns = 2  # Default minimum
+    
+    if positions_data:
+        max_row = 0
+        max_col = 0
+        for pos in positions_data:
+            max_row = max(max_row, pos.get('row', 0))
+            max_col = max(max_col, pos.get('column', 0))
+        total_rows = max_row + 1
+        total_columns = max_col + 1
+    
+    # Save files and record their positions
+    saved_files = []
+    for file in files:
+        # Generate a unique filename
+        file_ext = Path(file.filename).suffix
+        unique_filename = f"{uuid.uuid4()}{file_ext}"
+        file_path = comparison_dir / unique_filename
+        
+        # Save the file
+        with open(file_path, "wb") as buffer:
+            buffer.write(await file.read())
+        
+        saved_files.append(unique_filename)
+        
+        # Find position for this file
+        file_position = next((pos for pos in positions_data if pos.get('filename') == file.filename), None)
+        row = file_position.get('row', 0) if file_position else 0
+        column = file_position.get('column', 0) if file_position else 0
+        
+        # Store position in database
+        store_image_position(comparison_id, unique_filename, row, column)
+        
+        # Store metadata
+        image_size = os.path.getsize(file_path)
+        store_image_metadata(comparison_id, unique_filename, file.filename, f"{image_size} bytes")
+        
+        # Apply custom name if provided
+        if file.filename in custom_names_data:
+            update_image_custom_name(comparison_id, unique_filename, custom_names_data[file.filename])
+    
+    # Create comparison record
+    metadata = {
+        "total_rows": total_rows,
+        "total_columns": total_columns,
+    }
+    
+    create_comparison(
+        comparison_id=comparison_id,
+        name=name,
+        show_name=show_name,
+        tags=tag_list,
+        metadata=metadata
+    )
+    
+    return JSONResponse(content={"comparison_id": comparison_id})
+
+@app.get("/compare/{comparison_id}")
+async def view_comparison(request: Request, comparison_id: str):
+    """
+    View a comparison by its ID.
+    
+    Retrieves the comparison data, updates the last accessed timestamp,
+    and renders the comparison template with all necessary data.
+    """
+    # Update last accessed timestamp
+    update_last_accessed(comparison_id)
+    
+    # Get comparison data
+    comparison = get_comparison(comparison_id)
+    if not comparison:
+        return JSONResponse(
+            status_code=404,
+            content={"error": "Comparison not found"}
+        )
+    
+    # Get image positions
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    
+    c.execute('''
+        SELECT ip.filename, ip.row_number, ip.column_position, 
+               im.original_filename, im.image_size, im.custom_name
+        FROM image_positions ip
+        LEFT JOIN image_metadata im ON ip.comparison_id = im.comparison_id AND ip.filename = im.filename
+        WHERE ip.comparison_id = ?
+        ORDER BY ip.row_number, ip.column_position
+    ''', (comparison_id,))
+    
+    images = []
+    image_names = []
+    image_sizes = []
+    
+    for row in c.fetchall():
+        images.append(f"{comparison_id}/{row['filename']}")
+        # Use custom name if available, otherwise use original filename
+        image_names.append(row['custom_name'] or row['original_filename'])
+        image_sizes.append(row['image_size'])
+    
+    conn.close()
+    
+    # Calculate expiration date
+    expiration_date = datetime.now() + timedelta(days=comparison.get('expiration_days', 7))
+    
+    return templates.TemplateResponse("compare.html", {
+        "request": request, "images": images, "metadata": comparison, 
+        "total_rows": comparison.get('total_rows', 1), "total_columns": comparison.get('total_columns', 2),
+        "image_names": image_names, "image_sizes": image_sizes, "expiration_date": expiration_date.strftime('%Y-%m-%d'),
+        "expiration_days": comparison.get('expiration_days', 7), "expiration_type": comparison.get('expiration_type', 'from_last_access')
+    })
 
 @app.get("/")
 async def home(request: Request):
