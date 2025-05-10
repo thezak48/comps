@@ -28,6 +28,9 @@ from database import (
 router = APIRouter(prefix="/api/v1", tags=["api"])
 
 # Environment variables
+# Constants
+MAX_ROWS = 20
+
 UPLOADS_PATH = os.getenv('UPLOADS_PATH', 'uploads')
 DB_PATH = os.getenv('DB_PATH', 'comparisons.db')
 
@@ -66,16 +69,12 @@ async def list_comparisons():
 async def create_new_comparison(comparison: ComparisonCreate):
     """
     Create a new comparison.
-    
+
     Creates a new comparison with the specified parameters:
     - Name and show name (optional)
     - Tags for categorization (optional)
-    - Grid dimensions (rows and columns)
+    - Grid dimensions (rows and columns, max 20 rows)
     - Expiration settings
-    
-    Returns the created comparison with its assigned ID and timestamps.
-    
-    The comparison will be empty initially and images can be added later.
     """
     comparison_id = str(uuid.uuid4())
     
@@ -83,10 +82,10 @@ async def create_new_comparison(comparison: ComparisonCreate):
     metadata = {
         "total_columns": comparison.total_columns,
         "total_rows": comparison.total_rows,
-        "created_at": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-        "expiration_type": comparison.expiration_type,
-        "expiration_days": comparison.expiration_days
     }
+    
+    # Enforce maximum rows limit
+    metadata["total_rows"] = min(metadata["total_rows"], MAX_ROWS)
     
     # Create comparison directory
     comparison_dir = Path(UPLOADS_PATH) / comparison_id

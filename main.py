@@ -231,13 +231,16 @@ async def upload_files(
     total_rows = 1
     total_columns = 2  # Default minimum
     
+    # Enforce maximum of 20 rows
+    max_rows = 20
+    
     if positions_data:
         max_row = 0
         max_col = 0
         for pos in positions_data:
             max_row = max(max_row, pos.get('row', 0))
             max_col = max(max_col, pos.get('column', 0))
-        total_rows = max_row + 1
+        total_rows = min(max_row + 1, max_rows)
         total_columns = max_col + 1
     
     # Save files and record their positions
