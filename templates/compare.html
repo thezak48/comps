@@ -17,7 +17,7 @@
                         Comparison: <span id="currentRow">1</span>/<span id="totalRows">{{ total_rows }}</span>
                     </button>
                     <div class="dropdown-menu" aria-labelledby="rowDropdown">
-                        {% for row in range(min(total_rows, 20)) %}
+                        {% for row in range(dropdown_rows) %}
                             <a class="dropdown-item" href="#" data-row="{{ row }}">{{ row + 1 }}</a>
                         {% endfor %}
                     </div>

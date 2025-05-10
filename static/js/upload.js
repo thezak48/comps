@@ -1,13 +1,14 @@
 // Toast notification system
 const toastContainer = document.createElement('div');
 toastContainer.className = 'toast-container';
+const toastTypes = ['error', 'success', 'warning', 'info']; // Add 'info' type for notifications
 console.log('Creating toast container:', toastContainer);
 document.body.appendChild(toastContainer);
 
 /**
  * Show a toast notification
  * @param {string} message - The message to display
- * @param {string} type - The type of notification: 'error', 'success', or 'warning'
+ * @param {string} type - The type of notification: 'error', 'success', 'warning', or 'info'
  * @param {number} duration - How long to show the notification in ms (default: 5000ms)
  */
 function showToast(message, type = 'error', duration = 5000) {
@@ -22,6 +23,7 @@ function showToast(message, type = 'error', duration = 5000) {
         case 'error': icon = '❌'; break;
         case 'success': icon = '✅'; break;
         case 'warning': icon = '⚠️'; break;
+        case 'info': icon = 'ℹ️'; break;
         default: icon = 'ℹ️';
     }
     
@@ -459,7 +461,7 @@ function createColumnElement(rowIndex, colIndex) {
     cellDropZone.dataset.columnIndex = colIndex;
     cellDropZone.innerHTML = `
         <div class="drop-instructions">
-            Drop image here or <button class="btn btn-sm btn-outline-secondary cell-upload-btn">Select file</button>
+            Drop image(s) here or <button class="btn btn-sm btn-outline-secondary cell-upload-btn">Select file(s)</button>
         </div>
     `;
     filesDiv.appendChild(cellDropZone);
@@ -468,6 +470,7 @@ function createColumnElement(rowIndex, colIndex) {
     const cellFileInput = document.createElement('input');
     cellFileInput.type = 'file';
     cellFileInput.accept = 'image/*';
+    cellFileInput.multiple = true; // Allow multiple file selection
     cellFileInput.className = 'cell-file-input';
     cellFileInput.style.display = 'none';
     filesDiv.appendChild(cellFileInput);
@@ -476,14 +479,13 @@ function createColumnElement(rowIndex, colIndex) {
     const cellUploadBtn = cellDropZone.querySelector('.cell-upload-btn');
     cellUploadBtn.addEventListener('click', (e) => {
         e.stopPropagation();
-        cellFileInput.click();
+        cellFileInput.click(); // This will now allow multiple file selection
     });
 
     // Handle file selection for this specific cell
     cellFileInput.addEventListener('change', (e) => {
         if (e.target.files && e.target.files.length > 0) {
-            const file = e.target.files[0];
-            handleCellFileUpload(file, rowIndex, colIndex);
+            handleMultipleFilesForColumn(Array.from(e.target.files), rowIndex, colIndex);
         }
     });
     
@@ -654,6 +656,84 @@ function setupNameEditHandlers(fileLabel, rowIndex, colIndex, originalName) {
     });
 }
 
+// Function to handle multiple files being uploaded to a single column
+function handleMultipleFilesForColumn(files, rowIndex, colIndex) {
+    if (!files || files.length === 0) return;
+    
+    // Handle the first file in the current cell
+    handleCellFileUpload(files[0], rowIndex, colIndex);
+    
+    // If there are more files, create new rows for each additional file
+    if (files.length > 1) {
+        // Find empty cells in this column that we can use before creating new rows
+        const emptyCellIndices = findEmptyCellsInColumn(colIndex);
+        let newRowsNeeded = files.length - 1 - emptyCellIndices.length;
+        
+        if (emptyCellIndices.length > 0) {
+            showToast(`Using ${Math.min(emptyCellIndices.length, files.length - 1)} existing empty cell(s) in column ${colIndex + 1}`, 'info', 3000);
+        }
+        
+        if (newRowsNeeded > 0) {
+            showToast(`Creating ${newRowsNeeded} new row(s) for additional images`, 'info', 3000);
+        }
+        
+        // First use existing empty cells
+        let fileIndex = 1; // Start with the second file (first one is already handled)
+        
+        // Use existing empty cells first
+        for (let i = 0; i < emptyCellIndices.length && fileIndex < files.length; i++) {
+            const emptyRowIndex = emptyCellIndices[i];
+            handleCellFileUpload(files[fileIndex], emptyRowIndex, colIndex);
+            fileIndex++;
+        }
+        
+        // Then create new rows if needed
+        while (fileIndex < files.length) {
+            if (rowCount < maxRows) {
+                // Add a new row
+                fileMatrix[rowCount] = [];
+                for (let c = 0; c < columnCount; c++) {
+                    fileMatrix[rowCount][c] = null;
+                }
+                
+                // Place the file in the same column but new row
+                fileMatrix[rowCount][colIndex] = files[fileIndex];
+                
+                // Add to selected files set
+                selectedFiles.add(files[fileIndex]);
+                
+                // Increment row count
+                rowCount++;
+                fileIndex++;
+            } else {
+                showToast(`Maximum of ${maxRows} rows reached. Some images were not added.`, 'warning');
+                break;
+            }
+        }
+        
+        // Update the UI to show the new rows with files
+        updatePreview();
+        
+        // Show success message
+        showToast(`Added ${files.length} images to column ${colIndex + 1}`, 'success');
+    }
+}
+
+// Helper function to find empty cells in a specific column
+function findEmptyCellsInColumn(colIndex) {
+    const emptyCells = [];
+    
+    // Skip the first row if that's where the initial upload is happening
+    for (let r = 0; r < rowCount; r++) {
+        // Check if this cell is empty
+        if (fileMatrix[r] && fileMatrix[r][colIndex] === null) {
+            emptyCells.push(r);
+        }
+    }
+    
+    return emptyCells;
+}
+
 // Function to handle file upload to a specific cell
 function handleCellFileUpload(file, rowIndex, colIndex) {
     // Update the file matrix
@@ -738,8 +818,8 @@ function setupCellDragAndDrop(cellDropZone) {
         cellDropZone.classList.remove('cell-dragover');
         
         if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-            const file = e.dataTransfer.files[0]; // Take only the first file
-            handleCellFileUpload(file, rowIndex, colIndex);
+            // Handle multiple files being dropped
+            handleMultipleFilesForColumn(Array.from(e.dataTransfer.files), rowIndex, colIndex);
         }
     });
     
@@ -1143,8 +1223,8 @@ document.getElementById('uploadButton').addEventListener('click', async () => {
     }
     const metadata = getMetadata();
 
-    if (selectedFiles.size > 10) {
-        showError('Maximum 10 files allowed');
+    if (selectedFiles.size > 30) {
+        showError('Maximum 30 files allowed');
         return;
     }
 
@@ -1249,5 +1329,8 @@ window.addEventListener('DOMContentLoaded', function() {
     }
     
     // Test toast notification system
-    setTimeout(() => showToast('Upload form ready. Drag and drop images or click to select files.', 'success', 3000), 500);
+    setTimeout(() => {
+        showToast('Upload form ready. Drag and drop images or click to select files.', 'success', 3000);
+        showToast('Tip: You can upload multiple images to a column at once - they will fill empty cells or create new rows', 'info', 5000);
+    }, 500);
 });
