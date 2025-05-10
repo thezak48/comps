@@ -277,6 +277,8 @@ async def upload_files(
     metadata = {
         "total_rows": total_rows,
         "total_columns": total_columns,
+        "expiration_type": expiration_type,
+        "expiration_days": expiration_days,
     }
     
     create_comparison(

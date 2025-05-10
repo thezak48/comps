@@ -18,7 +18,7 @@ def create_comparison(comparison_id: str, name: Optional[str], show_name: Option
     
     c.execute(
         'INSERT INTO comparisons (id, name, show_name, total_rows, total_columns, expiration_type, expiration_days) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        (comparison_id, name, show_name, metadata.get('total_rows', 1), metadata.get('total_columns', 2), metadata.get('expiration_type', 'from_last_access'), metadata.get('expiration_days', 7))
+        (comparison_id, name, show_name, metadata.get('total_rows', 1), metadata.get('total_columns', 2), metadata.get('expiration_type', 'from_last_access'), int(metadata.get('expiration_days', 7)))
     )
     c.execute('CREATE INDEX IF NOT EXISTS idx_image_positions ON image_positions(comparison_id, row_number, column_position)')
 
@@ -183,17 +183,22 @@ def get_expired_comparisons(retention_days: int):
             c.execute('SELECT id, expiration_type, expiration_days, created_at, last_accessed FROM comparisons')
             comparisons = c.fetchall()
             
+            print(f"Checking for expired comparisons with retention_days={retention_days}")
+            print(f"Found {len(comparisons)} comparisons to check for expiration")
             current_time = datetime.now()
             for comp_id, exp_type, exp_days, created_at, last_accessed in comparisons:
                 # Use comparison's own expiration days if available, otherwise use default
                 days = exp_days if exp_days is not None else retention_days
+                print(f"Checking comparison {comp_id}: type={exp_type}, days={days}, created={created_at}, last_accessed={last_accessed}")
                 
                 if exp_type == 'from_creation' and created_at:
                     cutoff_date = datetime.strptime(created_at, '%Y-%m-%d %H:%M:%S') + timedelta(days=days)
+                    print(f"  From creation: cutoff={cutoff_date}, current={current_time}, expired={current_time > cutoff_date}")
                     if current_time > cutoff_date:
                         expired_ids.append(comp_id)
                 elif exp_type == 'from_last_access' and last_accessed:
                     cutoff_date = datetime.strptime(last_accessed, '%Y-%m-%d %H:%M:%S') + timedelta(days=days)
+                    print(f"  From last access: cutoff={cutoff_date}, current={current_time}, expired={current_time > cutoff_date}")
                     if current_time > cutoff_date:
                         expired_ids.append(comp_id)
         else:
