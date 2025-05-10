@@ -27,7 +27,7 @@ class ComparisonBase(BaseModel):
     )
     total_rows: int = Field(
         1, 
-        description="Number of rows in the comparison grid",
+        description="Number of rows in the comparison grid (max 20)",
         examples=[1]
     )
     total_columns: int = Field(
