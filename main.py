@@ -337,11 +337,15 @@ async def view_comparison(request: Request, comparison_id: str):
     # Calculate expiration date
     expiration_date = datetime.now() + timedelta(days=comparison.get('expiration_days', 7))
     
+    # Calculate the number of rows to show in dropdown (max 20)
+    dropdown_rows = min(comparison.get('total_rows', 1), 20)
+    
     return templates.TemplateResponse("compare.html", {
         "request": request, "images": images, "metadata": comparison, 
         "total_rows": comparison.get('total_rows', 1), "total_columns": comparison.get('total_columns', 2),
         "image_names": image_names, "image_sizes": image_sizes, "expiration_date": expiration_date.strftime('%Y-%m-%d'),
-        "expiration_days": comparison.get('expiration_days', 7), "expiration_type": comparison.get('expiration_type', 'from_last_access')
+        "expiration_days": comparison.get('expiration_days', 7), "expiration_type": comparison.get('expiration_type', 'from_last_access'),
+        "dropdown_rows": dropdown_rows
     })
 
 @app.get("/")
