@@ -1,3 +1,66 @@
+// Toast notification system
+const toastContainer = document.createElement('div');
+toastContainer.className = 'toast-container';
+console.log('Creating toast container:', toastContainer);
+document.body.appendChild(toastContainer);
+
+/**
+ * Show a toast notification
+ * @param {string} message - The message to display
+ * @param {string} type - The type of notification: 'error', 'success', or 'warning'
+ * @param {number} duration - How long to show the notification in ms (default: 5000ms)
+ */
+function showToast(message, type = 'error', duration = 5000) {
+    console.log('showToast called with message:', message, 'type:', type);
+    // Create toast element
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    
+    // Add icon based on type
+    let icon = '';
+    switch(type) {
+        case 'error': icon = '❌'; break;
+        case 'success': icon = '✅'; break;
+        case 'warning': icon = '⚠️'; break;
+        default: icon = 'ℹ️';
+    }
+    
+    // Create toast content
+    toast.innerHTML = `
+<div class="toast-content">
+    <span class="toast-icon">${icon}</span>
+    <span class="toast-message">${message}</span>
+</div>
+<span class="toast-close">×</span>
+`;
+    console.log('Toast HTML:', toast.innerHTML);
+    
+    // Add to container
+    toastContainer.appendChild(toast);
+    
+    console.log('Toast added to container:', toast);
+    // Add close button functionality
+    const closeBtn = toast.querySelector('.toast-close');
+    closeBtn.addEventListener('click', () => {
+        toast.style.animation = 'toast-out 0.3s forwards';
+        setTimeout(() => {
+            toastContainer.removeChild(toast);
+        }, 300);
+    });
+    
+    // Auto-remove after duration
+    setTimeout(() => {
+        if (toast.parentNode === toastContainer) {
+            toast.style.animation = 'toast-out 0.3s forwards';
+            setTimeout(() => {
+                if (toast.parentNode === toastContainer) {
+                    toastContainer.removeChild(toast);
+                }
+            }, 300);
+        }
+    }, duration);
+}
+
 const dropZone = document.getElementById('dropZone');
 const fileInput = document.getElementById('fileInput');
 const preview = document.getElementById('preview');
@@ -1005,11 +1068,15 @@ function updateColumnControls() {
     });
 }
 
+// Replace the old showError function with our toast notification system
 function showError(message) {
-    const errorDiv = document.createElement('div');
-    errorDiv.className = 'error-message';
-    errorDiv.textContent = message;
-    preview.insertAdjacentElement('beforebegin', errorDiv);
+    console.log('showError called with message:', message);
+    showToast(message, 'error');
+}
+
+function showSuccess(message) {
+    console.log('showSuccess called with message:', message);
+    showToast(message, 'success');
 }
 
 function validateMetadata() {
@@ -1067,7 +1134,7 @@ document.getElementById('uploadButton').addEventListener('click', async () => {
     }
 
     if (selectedFiles.size === 0) {
-        alert('Please select or drag some images first');
+        showError('Please select or drag some images first');
         return;
     }
 
@@ -1077,7 +1144,7 @@ document.getElementById('uploadButton').addEventListener('click', async () => {
     const metadata = getMetadata();
 
     if (selectedFiles.size > 10) {
-        alert('Maximum 10 files allowed');
+        showError('Maximum 10 files allowed');
         return;
     }
 
@@ -1145,12 +1212,14 @@ document.getElementById('uploadButton').addEventListener('click', async () => {
         console.log('Upload response received:', response);
         const data = await response.json();
         console.log('Upload response data:', data);
+        showSuccess('Upload successful! Redirecting to comparison view...');
         clearMetadata();
         window.location.href = `/compare/${data.comparison_id}`;
     } catch (error) {
         console.error('Upload failed:', error);
         showError('Upload failed: ' + error.message);
     } finally {
+        console.log('Upload completed');
         uploadInProgress = false;
         uploadButton.disabled = false;
         uploadButton.textContent = 'Compare Images';
@@ -1178,4 +1247,7 @@ window.addEventListener('DOMContentLoaded', function() {
         const tooltips = document.querySelectorAll('[data-bs-toggle="tooltip"]');
         tooltips.forEach(tooltip => new bootstrap.Tooltip(tooltip));
     }
+    
+    // Test toast notification system
+    setTimeout(() => showToast('Upload form ready. Drag and drop images or click to select files.', 'success', 3000), 500);
 });

@@ -209,6 +209,16 @@ async def upload_files(
     # Process custom names if provided
     custom_names_data = {}
     if custom_names:
+        if not name or name.strip() == '':
+            return JSONResponse(
+                status_code=400,
+                content={"error": "Please provide a comparison name"}
+            )
+        if len(files) < 2:
+            return JSONResponse(
+                status_code=400,
+                content={"error": "Please upload at least 2 files for comparison"}
+            )
         try:
             custom_names_data = json.loads(custom_names)
         except json.JSONDecodeError:
