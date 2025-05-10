@@ -243,6 +243,81 @@
         }
       }
     },
+    "/upload/": {
+      "post": {
+        "summary": "Upload Files",
+        "description": "Handle file uploads for comparison.\n\nAccepts multiple files and metadata, creates a comparison record,\nand stores the files in a unique directory.",
+        "operationId": "upload_files_upload__post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_files_upload__post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/compare/{comparison_id}": {
+      "get": {
+        "summary": "View Comparison",
+        "description": "View a comparison by its ID.\n\nRetrieves the comparison data, updates the last accessed timestamp,\nand renders the comparison template with all necessary data.",
+        "operationId": "view_comparison_compare__comparison_id__get",
+        "parameters": [
+          {
+            "name": "comparison_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Comparison Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/": {
       "get": {
         "summary": "Home",
@@ -263,6 +338,82 @@
   },
   "components": {
     "schemas": {
+      "Body_upload_files_upload__post": {
+        "properties": {
+          "files": {
+            "items": {
+              "type": "string",
+              "format": "binary"
+            },
+            "type": "array",
+            "title": "Files"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "show_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Show Name"
+          },
+          "expiration_type": {
+            "type": "string",
+            "title": "Expiration Type",
+            "default": "from_last_access"
+          },
+          "expiration_days": {
+            "type": "integer",
+            "title": "Expiration Days",
+            "default": 7
+          },
+          "tags": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tags"
+          },
+          "file_positions": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File Positions"
+          },
+          "custom_names": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Custom Names"
+          }
+        },
+        "type": "object",
+        "required": [
+          "files",
+          "name"
+        ],
+        "title": "Body_upload_files_upload__post"
+      },
       "Body_upload_images_api_v1_comparisons__comparison_id__images_post": {
         "properties": {
           "files": {
