@@ -1,5 +1,6 @@
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends, Query
 from fastapi.responses import JSONResponse
+import random
 import uuid
 import os
 import shutil
@@ -33,6 +34,31 @@ MAX_ROWS = 20
 
 UPLOADS_PATH = os.getenv('UPLOADS_PATH', 'uploads')
 DB_PATH = os.getenv('DB_PATH', 'comparisons.db')
+
+# Random name generator for comparisons
+def generate_random_name():
+    """
+    Generate a random, memorable name for a comparison when the user doesn't provide one.
+    Format: [Adjective] [Noun]
+    """
+    adjectives = [
+        "Amazing", "Brilliant", "Curious", "Dazzling", "Elegant", "Fantastic", 
+        "Graceful", "Harmonious", "Incredible", "Jubilant", "Keen", "Luminous", 
+        "Majestic", "Noble", "Optimistic", "Peaceful", "Quaint", "Radiant", 
+        "Serene", "Tranquil", "Unique", "Vibrant", "Wonderful", "Zealous"
+    ]
+    
+    nouns = [
+        "Aurora", "Breeze", "Cascade", "Diamond", "Echo", "Fountain", "Galaxy", 
+        "Horizon", "Island", "Journey", "Kaleidoscope", "Lagoon", "Mountain", 
+        "Nebula", "Ocean", "Panorama", "Quest", "Rainbow", "Sunset", "Treasure", 
+        "Universe", "Valley", "Waterfall", "Zenith"
+    ]
+    
+    adjective = random.choice(adjectives)
+    noun = random.choice(nouns)
+    
+    return f"{adjective} {noun}"
 
 @router.get("/comparisons", response_model=List[ComparisonResponse])
 async def list_comparisons():
@@ -77,6 +103,11 @@ async def create_new_comparison(comparison: ComparisonCreate):
     - Expiration settings
     """
     comparison_id = str(uuid.uuid4())
+    
+    # Generate a random name if none provided
+    if not comparison.name or comparison.name.strip() == '':
+        comparison.name = generate_random_name()
+        print(f"No name provided, generated random name: {comparison.name}")
     
     # Prepare metadata
     metadata = {

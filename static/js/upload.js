@@ -1160,11 +1160,11 @@ function showSuccess(message) {
 }
 
 function validateMetadata() {
-    const comparisonName = comparisonNameInput.value.trim();
-    if (!comparisonName) {
+    // No longer require a comparison name - we'll generate one if empty
+    /* if (!comparisonNameInput.value.trim()) {
         showError('Please enter a comparison name');
         return false;
-    }
+    } */
     if (columnCount < minColumns) {
         showError(`Minimum of ${minColumns} columns required`);
         return false;

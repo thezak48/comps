@@ -6,6 +6,7 @@ Handles file uploads, comparison viewing, and database operations.
 import asyncio
 import logging
 import os
+import random
 import re
 import shutil
 import sqlite3
@@ -28,6 +29,31 @@ from fastapi.templating import Jinja2Templates
 # Local imports
 from database import init_db, create_comparison, get_comparison, store_image_position, store_image_metadata, update_image_custom_name, update_last_accessed, get_expired_comparisons, delete_comparison
 from api.router import router as api_router
+
+# Random name generator for comparisons
+def generate_random_name():
+    """
+    Generate a random, memorable name for a comparison when the user doesn't provide one.
+    Format: [Adjective] [Noun]
+    """
+    adjectives = [
+        "Amazing", "Brilliant", "Curious", "Dazzling", "Elegant", "Fantastic", 
+        "Graceful", "Harmonious", "Incredible", "Jubilant", "Keen", "Luminous", 
+        "Majestic", "Noble", "Optimistic", "Peaceful", "Quaint", "Radiant", 
+        "Serene", "Tranquil", "Unique", "Vibrant", "Wonderful", "Zealous"
+    ]
+    
+    nouns = [
+        "Aurora", "Breeze", "Cascade", "Diamond", "Echo", "Fountain", "Galaxy", 
+        "Horizon", "Island", "Journey", "Kaleidoscope", "Lagoon", "Mountain", 
+        "Nebula", "Ocean", "Panorama", "Quest", "Rainbow", "Sunset", "Treasure", 
+        "Universe", "Valley", "Waterfall", "Zenith"
+    ]
+    
+    adjective = random.choice(adjectives)
+    noun = random.choice(nouns)
+    
+    return f"{adjective} {noun}"
 
 # Create FastAPI app with custom OpenAPI settings
 app = FastAPI(
@@ -186,6 +212,11 @@ async def upload_files(
     # Generate a unique ID for this comparison
     comparison_id = str(uuid.uuid4())
     
+    # Generate a random name if none provided
+    if not name or name.strip() == '':
+        name = generate_random_name()
+        logger.info(f"No name provided, generated random name: {name}")
+    
     # Create directory for this comparison
     comparison_dir = Path(UPLOADS_PATH) / comparison_id
     comparison_dir.mkdir(parents=True, exist_ok=True)
@@ -209,11 +240,6 @@ async def upload_files(
     # Process custom names if provided
     custom_names_data = {}
     if custom_names:
-        if not name or name.strip() == '':
-            return JSONResponse(
-                status_code=400,
-                content={"error": "Please provide a comparison name"}
-            )
         if len(files) < 2:
             return JSONResponse(
                 status_code=400,
