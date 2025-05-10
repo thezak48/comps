@@ -243,6 +243,144 @@
         }
       }
     },
+    "/login": {
+      "get": {
+        "summary": "Login Page",
+        "description": "Render the login page",
+        "operationId": "login_page_login_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Login",
+        "description": "Handle login form submission",
+        "operationId": "login_login_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/logout": {
+      "get": {
+        "summary": "Logout",
+        "description": "Log out the current user",
+        "operationId": "logout_logout_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin": {
+      "get": {
+        "summary": "Admin Page",
+        "description": "Admin page for managing invitation codes",
+        "operationId": "admin_page_admin_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/create-invitation": {
+      "post": {
+        "summary": "Create Invitation",
+        "description": "Create a new invitation code",
+        "operationId": "create_invitation_admin_create_invitation_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/account": {
+      "get": {
+        "summary": "Account Page",
+        "description": "User account page",
+        "operationId": "account_page_account_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/delete-comparison/{comparison_id}": {
+      "delete": {
+        "summary": "Delete User Comparison",
+        "description": "Delete a comparison owned by the current user",
+        "operationId": "delete_user_comparison_api_delete_comparison__comparison_id__delete",
+        "parameters": [
+          {
+            "name": "comparison_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Comparison Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/upload/": {
       "post": {
         "summary": "Upload Files",
@@ -367,6 +505,17 @@
             "type": "string",
             "title": "Expiration Type",
             "default": "from_last_access"
+          },
+          "expiration_enabled": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expiration Enabled"
           },
           "expiration_days": {
             "type": "integer",
