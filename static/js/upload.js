@@ -378,18 +378,22 @@ function createColumnElement(rowIndex, colIndex) {
     const columnPrefix = columnPrefixes[colIndex] || `column${colIndex+1}`;
     const columnDiv = document.createElement('div');
     columnDiv.className = 'comparison-column';
-    columnDiv.id = `column-${rowIndex}-${colIndex}`; // Simplified ID format
-    columnDiv.dataset.columnIndex = colIndex;
+    columnDiv.id = `column-${rowIndex}-${colIndex}`; 
     columnDiv.dataset.rowIndex = rowIndex;
+    columnDiv.dataset.columnIndex = colIndex;
     
     // Create a container for files in this column
     const filesDiv = document.createElement('div');
+    filesDiv.dataset.rowIndex = rowIndex;
+    filesDiv.dataset.columnIndex = colIndex;
     filesDiv.className = 'column-files';
     columnDiv.appendChild(filesDiv);
-    
+
     // Create a drop zone for this specific cell
     const cellDropZone = document.createElement('div');
     cellDropZone.className = 'cell-drop-zone';
+    cellDropZone.dataset.rowIndex = rowIndex;
+    cellDropZone.dataset.columnIndex = colIndex;
     cellDropZone.innerHTML = `
         <div class="drop-instructions">
             Drop image here or <button class="btn btn-sm btn-outline-secondary cell-upload-btn">Select file</button>
@@ -426,14 +430,20 @@ function createColumnElement(rowIndex, colIndex) {
     }
 
     // Add drag and drop event listeners for this cell
-    setupCellDragAndDrop(cellDropZone, rowIndex, colIndex);
+    setupCellDragAndDrop(cellDropZone);
     
     return columnDiv;
 }
 
 // Helper function to display a file preview
 function displayFilePreview(file, container) {
-    if (!file) return;
+    // Get row and column indices from container's data attributes
+    const rowIndex = parseInt(container.dataset.rowIndex);
+    const colIndex = parseInt(container.dataset.columnIndex);
+    
+    if (!file || isNaN(rowIndex) || isNaN(colIndex)) return;
+    
+    console.log(`Displaying preview for row ${rowIndex}, column ${colIndex}`);
     
     // Clear any existing content in the container
     container.innerHTML = '';
@@ -509,7 +519,7 @@ function displayFilePreview(file, container) {
         });
         
         // Setup drag and drop for the newly created file preview
-        setupImageCellDragAndDrop(fileDiv, rowIndex, colIndex);
+        setupImageCellDragAndDrop(fileDiv);
     };
     reader.readAsDataURL(file);
 }
@@ -603,7 +613,7 @@ function handleCellFileUpload(file, rowIndex, colIndex) {
         // Setup drag and drop for the newly created file preview
         const fileDiv = cellDropZone.querySelector('.file-preview');
         if (fileDiv) {
-            setupImageCellDragAndDrop(fileDiv, rowIndex, colIndex);
+            setupImageCellDragAndDrop(fileDiv);
         }
     }
 }
@@ -636,7 +646,19 @@ function removeFileFromCell(rowIndex, colIndex) {
 }
 
 // Setup drag and drop for a specific cell
-function setupCellDragAndDrop(cellDropZone, rowIndex, colIndex) {
+function setupCellDragAndDrop(cellDropZone) {
+    let rowIndex, colIndex;
+    
+    // Try to get indices directly from the cell drop zone
+    rowIndex = parseInt(cellDropZone.dataset.rowIndex);
+    colIndex = parseInt(cellDropZone.dataset.columnIndex);
+    
+    // Validate indices
+    if (isNaN(rowIndex) || isNaN(colIndex)) {
+        console.error('Invalid row or column index for cell drop zone');
+        return;
+    }
+
     cellDropZone.addEventListener('dragover', (e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -669,7 +691,25 @@ function setupCellDragAndDrop(cellDropZone, rowIndex, colIndex) {
 }
 
 // Setup drag and drop for a cell that already has an image
-function setupImageCellDragAndDrop(fileDiv, rowIndex, colIndex) {
+function setupImageCellDragAndDrop(fileDiv) {
+    let rowIndex, colIndex;
+    
+    // Try to get indices from the closest parent elements
+    const columnElement = fileDiv.closest('.comparison-column');
+    if (columnElement) {
+        rowIndex = parseInt(columnElement.dataset.rowIndex);
+        colIndex = parseInt(columnElement.dataset.columnIndex);
+    } else {
+        // Fallback to getting indices from the file div itself
+        rowIndex = parseInt(fileDiv.dataset.rowIndex);
+        colIndex = parseInt(fileDiv.dataset.columnIndex);
+    }
+
+    if (isNaN(rowIndex) || isNaN(colIndex)) {
+        console.error('Invalid row or column index');
+        return;
+    }
+
     fileDiv.addEventListener('dragover', (e) => {
         e.preventDefault();
         e.stopPropagation();
