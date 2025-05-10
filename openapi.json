@@ -36,7 +36,7 @@
           "api"
         ],
         "summary": "Create New Comparison",
-        "description": "Create a new comparison.\n\nCreates a new comparison with the specified parameters:\n- Name and show name (optional)\n- Tags for categorization (optional)\n- Grid dimensions (rows and columns)\n- Expiration settings\n\nReturns the created comparison with its assigned ID and timestamps.\n\nThe comparison will be empty initially and images can be added later.",
+        "description": "Create a new comparison.\n\nCreates a new comparison with the specified parameters:\n- Name and show name (optional)\n- Tags for categorization (optional)\n- Grid dimensions (rows and columns, max 20 rows)\n- Expiration settings",
         "operationId": "create_new_comparison_api_v1_comparisons_post",
         "requestBody": {
           "content": {
@@ -485,7 +485,7 @@
           "total_rows": {
             "type": "integer",
             "title": "Total Rows",
-            "description": "Number of rows in the comparison grid",
+            "description": "Number of rows in the comparison grid (max 20)",
             "default": 1,
             "examples": [
               1
@@ -572,7 +572,7 @@
           "total_rows": {
             "type": "integer",
             "title": "Total Rows",
-            "description": "Number of rows in the comparison grid",
+            "description": "Number of rows in the comparison grid (max 20)",
             "default": 1,
             "examples": [
               1
@@ -707,7 +707,7 @@
           "total_rows": {
             "type": "integer",
             "title": "Total Rows",
-            "description": "Number of rows in the comparison grid",
+            "description": "Number of rows in the comparison grid (max 20)",
             "default": 1,
             "examples": [
               1
