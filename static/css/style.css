@@ -5,7 +5,8 @@ body {
     background-color: #1a1a1a;
     color: #e0e0e0;}
 
-/* Navbar transition for hiding/showing */
+/* Navbar transition for hiding/showing 
+   This enables smooth animation when toggling navbar visibility */
 .navbar {
     transition: transform 0.3s ease-in-out;
     z-index: 1030;}
@@ -279,10 +280,12 @@ body.navbar-is-hidden .image-viewer {
     transition: object-fit 0.3s ease;
     cursor: move;
     transform-origin: center center;
-    margin-top: 0;}
+    margin-top: 0;
+    /* Removed max-width: 100% constraint to improve mobile viewing */
+}
 
 .comparison-image.fit {
-    max-width: 100% !important;
+    /* Removed max-width constraint for better mobile experience */
     max-height: calc(100vh - 76px) !important;
     margin-top: 0 !important;
     transform: none !important;
