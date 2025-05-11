@@ -231,6 +231,77 @@ toggleBorderSwitch.addEventListener('change', (event) => {
     currentImage.style.border = showBorder ? '1px solid #ccc' : 'none';
 });
 
+// BBCode Share functionality
+document.getElementById('shareBBCodeBtn').addEventListener('click', function() {
+    generateBBCode();
+    const bbcodeModal = new bootstrap.Modal(document.getElementById('bbcodeModal'));
+    bbcodeModal.show();
+});
+
+document.getElementById('copyBBCodeBtn').addEventListener('click', function() {
+    const bbcodeText = document.getElementById('bbcodeText');
+    bbcodeText.select();
+    
+    try {
+        // Execute the copy command
+        document.execCommand('copy');
+        
+        // Change button text temporarily to indicate success
+        const copyBtn = this;
+        const originalHTML = copyBtn.innerHTML;
+        copyBtn.innerHTML = '<i class="fa fa-check"></i> Copied!';
+        copyBtn.classList.remove('btn-primary');
+        copyBtn.classList.add('btn-success');
+        
+        setTimeout(function() {
+            copyBtn.innerHTML = originalHTML;
+            copyBtn.classList.remove('btn-success');
+            copyBtn.classList.add('btn-primary');
+        }, 2000);
+    } catch (err) {
+        console.error('Failed to copy text: ', err);
+        alert('Failed to copy to clipboard. Please select the text manually and copy it.');
+    }
+});
+
+function generateBBCode() {
+    // Get all unique column names (custom names)
+    const columnNames = [];
+    for (let col = 0; col < totalColumns; col++) {
+        // Get the image name from the first row of each column
+        const index = col;
+        const name = imageNames[index] || `Column ${col+1}`;
+        // Extract just the filename without extension and path
+        const simpleName = name.split('/').pop().split('\\').pop().split('.')[0];
+        columnNames.push(simpleName);
+    }
+    
+    // Generate the BBCode
+    let bbcode = `[comparison=${columnNames.join(', ')}]\n`;
+    
+    // Add all image URLs for all rows
+    for (let row = 0; row < totalRows; row++) {
+        // Add all columns in this row
+        for (let col = 0; col < totalColumns; col++) {
+            // Calculate the index in the flat array
+            const index = (row * totalColumns) + col;
+            
+            // Make sure the index is valid
+            if (index < imageUrls.length) {
+                bbcode += `${window.location.origin}/uploads/${imageUrls[index]}\n`;
+            }
+        }
+        
+        // Add a blank line between rows for readability (except after the last row)
+        if (row < totalRows - 1) {
+            bbcode += '\n';
+        }
+    }
+    
+    bbcode += '[/comparison]';
+    document.getElementById('bbcodeText').value = bbcode;
+}
+
 // Initialize display
 updateDisplay();
 updateNavigation();
