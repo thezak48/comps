@@ -5,7 +5,12 @@ const navbar = document.querySelector('.navbar');
 const currentImageInfoSpan = document.getElementById('currentImageInfo');
 const currentRowSpan = document.getElementById('currentRow');
 const currentColumnSpan = document.getElementById('currentColumn');
+const mobileCurrentImageInfoSpan = document.getElementById('mobileCurrentImageInfo');
+const mobileCurrentRowSpan = document.getElementById('mobileCurrentRow');
+const mobileCurrentColumnSpan = document.getElementById('mobileCurrentColumn');
+const mobileTotalRowsSpan = document.getElementById('mobileTotalRows');
 let currentRowIndex = 0;
+let navbarVisible = true;
 
 // Safely get DOM elements with error handling
 const toggleFitSwitch = document.querySelector('#toggleFit') || { addEventListener: () => {}};
@@ -14,8 +19,52 @@ const toggleBorderSwitch = document.getElementById('toggleBorder') || { addEvent
 toggleFitSwitch.checked = false;
 toggleBorderSwitch.checked = false;
 
+// Mobile controls
+const mobileToggleFitSwitch = document.querySelector('#mobileToggleFit') || { addEventListener: () => {}};
+const mobileToggleBorderSwitch = document.getElementById('mobileToggleBorder') || { addEventListener: () => {} };
+
 // Initialize scroll behavior with proper overflow handling
 const imageViewer = document.querySelector('.image-viewer');
+
+/**
+ * Toggle the visibility of the navbar
+ * @param {boolean} show - Whether to show (true) or hide (false) the navbar
+ */
+function toggleNavbarVisibility(show) {
+    if (show === navbarVisible) return; // No change needed
+    
+    navbarVisible = show;
+    
+    if (show) {
+        navbar.classList.remove('navbar-hidden');
+        document.body.classList.remove('navbar-is-hidden');
+    } else {
+        navbar.classList.add('navbar-hidden');
+        document.body.classList.add('navbar-is-hidden');
+    }
+}
+
+// Add mouse movement detection to show navbar when mouse is near the top
+document.addEventListener('mousemove', function(e) {
+    // Only apply this in original size mode (when not fit)
+    if (!currentImage.classList.contains('fit')) {
+        const mouseY = e.clientY;
+        
+        // Show navbar when mouse is near the top of the screen (within 100px)
+        if (mouseY < 100) {
+            toggleNavbarVisibility(true);
+            
+            // Hide navbar again after 3 seconds of inactivity near the top
+            clearTimeout(window.navbarTimeout);
+            window.navbarTimeout = setTimeout(() => {
+                // Only hide if we're still in original size mode
+                if (!currentImage.classList.contains('fit')) {
+                    toggleNavbarVisibility(false);
+                }
+            }, 3000);
+        }
+    }
+});
 
 function isInSameColumn(currentIndex, newIndex) {
     // Check if indices are valid
@@ -111,6 +160,21 @@ function updateDisplay() {
     const currentImageSize = imageSizes[absoluteIndex] || '';
     currentImageInfoSpan.textContent = `${currentImageName} [${currentImageSize}]`;
     document.title = `Compare - ${currentImageName}`;
+    
+    // If we're in original size mode, hide the navbar initially
+    if (!currentImage.classList.contains('fit')) {
+        toggleNavbarVisibility(false);
+    }
+    
+    // Update mobile info displays if they exist
+    if (mobileCurrentImageInfoSpan) {
+        mobileCurrentImageInfoSpan.textContent = `${currentImageName} [${currentImageSize}]`;
+    }
+    
+    // Add touch swipe detection for mobile
+    if ('ontouchstart' in window) {
+        setupTouchNavigation();
+    }
 }
 
 function updateNavigation() {
@@ -118,6 +182,12 @@ function updateNavigation() {
     absoluteIndex = Math.max(0, Math.min(absoluteIndex, imageUrls.length - 1));
     const { column, row } = calculatePosition(absoluteIndex);
     currentRowSpan.textContent = row + 1;
+    
+    // Update mobile navigation elements if they exist
+    if (mobileCurrentRowSpan) {
+        mobileCurrentRowSpan.textContent = row + 1;
+        mobileCurrentColumnSpan.textContent = column + 1;
+    }
     currentColumnSpan.textContent = column + 1;
     updateDots();
 }
@@ -187,43 +257,58 @@ currentImage.addEventListener('click', () => {
     updateNavigation();
 });
 
-// Function to toggle navbar visibility
-function toggleNavbarVisibility(show) {
-    // Clear any pending hide timers
-    clearTimeout(navbarTimer);
+// Setup touch navigation for mobile devices
+function setupTouchNavigation() {
+    let touchStartX = 0;
+    let touchEndX = 0;
+    let touchStartY = 0;
+    let touchEndY = 0;
     
-    if (show) {
-        // First show the navbar
-         navbar.classList.remove('navbar-hidden');
-        // Then after a small delay, adjust the body padding
-        setTimeout(() => {
-            document.body.classList.remove('navbar-is-hidden');
-        }, 50);
-     } else {
-        // First remove the body padding
-        document.body.classList.add('navbar-is-hidden');
-        // Then hide the navbar
-        navbar.classList.add('navbar-hidden');
+    currentImage.addEventListener('touchstart', function(e) {
+        touchStartX = e.changedTouches[0].screenX;
+        touchStartY = e.changedTouches[0].screenY;
+    }, false);
+    
+    currentImage.addEventListener('touchend', function(e) {
+        touchEndX = e.changedTouches[0].screenX;
+        touchEndY = e.changedTouches[0].screenY;
+        handleSwipe();
+    }, false);
+    
+    function handleSwipe() {
+        const xDiff = touchStartX - touchEndX;
+        const yDiff = touchStartY - touchEndY;
+        
+        // Determine if the swipe was primarily horizontal or vertical
+        if (Math.abs(xDiff) > Math.abs(yDiff)) {
+            if (xDiff > 50) {
+                // Swipe left - go to next column
+                navigateToColumn(1);
+            } else if (xDiff < -50) {
+                // Swipe right - go to previous column
+                navigateToColumn(-1);
+            }
+        } else {
+            if (yDiff > 50) {
+                // Swipe up - go to previous row
+                const prevRow = absoluteIndex - totalColumns;
+                if (prevRow >= 0) {
+                    absoluteIndex = prevRow;
+                    updateDisplay();
+                    updateNavigation();
+                }
+            } else if (yDiff < -50) {
+                // Swipe down - go to next row
+                const nextRow = absoluteIndex + totalColumns;
+                if (nextRow < imageUrls.length) {
+                    absoluteIndex = nextRow;
+                    updateDisplay();
+                    updateNavigation();
+                }
+            }
+        }
     }
 }
-
-// Add mouse movement detection to show navbar when mouse is near top of screen
-let navbarTimer;
-document.addEventListener('mousemove', (e) => {
-    const isOriginalSize = !currentImage.classList.contains('fit');
-    
-    // Only apply mouse movement detection when in original size mode
-    if (isOriginalSize) {
-        if (e.clientY < 60) {
-            toggleNavbarVisibility(true);
-            clearTimeout(navbarTimer);
-        } else {
-            navbarTimer = setTimeout(() => toggleNavbarVisibility(false), 1500);
-        }
-    } else {
-        toggleNavbarVisibility(true); // Always show navbar in fit mode
-    }
-});
 
 toggleFitSwitch.addEventListener('change', (event) => {
     const isImageFit = !event.target.checked;
@@ -274,42 +359,86 @@ toggleFitSwitch.addEventListener('change', (event) => {
     }
 });
 
+// Mobile toggle fit switch
+mobileToggleFitSwitch.addEventListener('change', (event) => {
+    const isImageFit = !event.target.checked;
+    
+    // Toggle fit class on image
+    currentImage.classList.toggle('fit', isImageFit);
+    
+    // Toggle fit-mode class on image viewer
+    imageViewer.classList.toggle('fit-mode', isImageFit);
+    
+    // Sync with desktop toggle
+    toggleFitSwitch.checked = !isImageFit;
+    
+    // Handle navbar visibility based on fit mode
+    if (isImageFit) {
+        // Always show navbar in fit mode
+        toggleNavbarVisibility(true);
+    } else {
+        // Initially hide navbar in original size mode
+        toggleNavbarVisibility(false);
+    }
+
+    // Handle cursor and scroll behavior
+    if (isImageFit) {
+        // Reset scroll position when switching to fit mode
+        imageViewer.scrollTo(0, 0);
+        currentImage.style.cursor = 'pointer';
+    } else {
+        // First reset scroll position
+        imageViewer.scrollTo(0, 0);
+        
+        // Create a wrapper if it doesn't exist
+        let imageContainer = document.querySelector('.image-container');
+        if (!imageContainer) {
+            imageContainer = document.createElement('div');
+            imageContainer.className = 'image-container';
+            
+            // Move the image into the container
+            const parent = currentImage.parentNode;
+            parent.appendChild(imageContainer);
+            imageContainer.appendChild(currentImage);
+        }
+        
+        currentImage.style.cursor = 'move';
+    }
+});
+
 toggleBorderSwitch.addEventListener('change', (event) => {
     const showBorder = event.target.checked;
     currentImage.style.border = showBorder ? '1px solid #ccc' : 'none';
+    
+    // Sync with mobile toggle
+    if (mobileToggleBorderSwitch) {
+        mobileToggleBorderSwitch.checked = showBorder;
+    }
+});
+
+// Mobile toggle border switch
+mobileToggleBorderSwitch.addEventListener('change', (event) => {
+    const showBorder = event.target.checked;
+    currentImage.style.border = showBorder ? '1px solid #ccc' : 'none';
+    
+    // Sync with desktop toggle
+    toggleBorderSwitch.checked = showBorder;
 });
 
 // BBCode Share functionality
 document.getElementById('shareBBCodeBtn').addEventListener('click', function() {
+    showBBCodeModal();
+});
+
+function showBBCodeModal() {
     generateBBCode();
     const bbcodeModal = new bootstrap.Modal(document.getElementById('bbcodeModal'));
     bbcodeModal.show();
-});
+}
 
-document.getElementById('copyBBCodeBtn').addEventListener('click', function() {
-    const bbcodeText = document.getElementById('bbcodeText');
-    bbcodeText.select();
-    
-    try {
-        // Execute the copy command
-        document.execCommand('copy');
-        
-        // Change button text temporarily to indicate success
-        const copyBtn = this;
-        const originalHTML = copyBtn.innerHTML;
-        copyBtn.innerHTML = '<i class="fa fa-check"></i> Copied!';
-        copyBtn.classList.remove('btn-primary');
-        copyBtn.classList.add('btn-success');
-        
-        setTimeout(function() {
-            copyBtn.innerHTML = originalHTML;
-            copyBtn.classList.remove('btn-success');
-            copyBtn.classList.add('btn-primary');
-        }, 2000);
-    } catch (err) {
-        console.error('Failed to copy text: ', err);
-        alert('Failed to copy to clipboard. Please select the text manually and copy it.');
-    }
+// Mobile BBCode Share functionality
+document.getElementById('mobileShareBBCodeBtn')?.addEventListener('click', function() {
+    showBBCodeModal();
 });
 
 function generateBBCode() {
