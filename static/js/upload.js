@@ -63,6 +63,23 @@ function showToast(message, type = 'error', duration = 5000) {
     }, duration);
 }
 
+/**
+ * Show a success toast notification
+ * @param {string} message - The success message to display
+ * @param {number} duration - How long to show the notification in ms (default: 5000ms)
+ */
+function showSuccess(message, duration = 5000) {
+    showToast(message, 'success', duration);
+}
+
+/**
+ * Show an error toast notification
+ * @param {string} message - The error message to display
+ */
+function showError(message) {
+    showToast(message, 'error');
+}
+
 const dropZone = document.getElementById('dropZone');
 const fileInput = document.getElementById('fileInput');
 const preview = document.getElementById('preview');
@@ -95,6 +112,7 @@ let isDragging = false;
 
 // Add this new structure to organize files by row and column
 let fileMatrix = []; // 2D array to store files by [row][column]
+let columnCustomNames = {}; // Store custom naming patterns for columns
 
 console.log('Upload.js initialized');
 
@@ -376,6 +394,13 @@ function updatePreview() {
         columnLabel.className = 'column-label';
         columnLabel.textContent = `Column ${colIndex+1}`;
         
+        // Add rename column button
+        const renameButton = document.createElement('button');
+        renameButton.className = 'btn btn-sm btn-secondary ms-1';
+        renameButton.innerHTML = '<i class="fas fa-tag"></i>';
+        renameButton.title = 'Batch rename all images in this column';
+        renameButton.onclick = () => openRenameColumnModal(colIndex);
+        
         const removeButton = document.createElement('button');
         removeButton.className = 'btn btn-sm btn-danger';
         removeButton.innerHTML = '<i class="fas fa-times"></i>';
@@ -390,6 +415,7 @@ function updatePreview() {
         if (columnCount > minColumns) {
             columnHeader.appendChild(removeButton);
         }
+        columnHeader.appendChild(renameButton);
         
         columnControlsBar.appendChild(columnHeader);
     }
@@ -524,7 +550,7 @@ function displayFilePreview(file, container) {
         fileDiv.className = 'file-preview';
         fileDiv.innerHTML = `
             <img src="${e.target.result}" style="max-height: 100px;">
-            <div class="file-label">${file.name}</div>
+            <div class="file-label">${file.customName || file.name}</div>
             <div class="replace-overlay"><i class="fas fa-exchange-alt"></i> Replace</div>
             <button class="btn btn-sm btn-primary replace-file-btn" title="Replace this image"><i class="fas fa-exchange-alt"></i></button>
             <button class="btn btn-sm btn-secondary edit-name-btn" title="Edit image name"><i class="fas fa-edit"></i></button>
@@ -1029,146 +1055,229 @@ function removeRow(rowIndex) {
     console.log(`Removed row ${rowIndex + 1}, now have ${rowCount} rows`);
 }
 
-function isColumnRemovable(columnPrefix) {
-    const isBaseColumn = columnPrefixes.indexOf(columnPrefix) < baseColumns;
-    const totalRemaining = columnCount - 1;
-    return !isBaseColumn || (isBaseColumn && baseColumns > minColumns);
-}
-
-function getColumnTooltip(columnPrefix) {
-    const isBaseColumn = columnPrefixes.indexOf(columnPrefix) < baseColumns;
-    if (isBaseColumn) {
-        if (baseColumns <= minColumns) {
-            return 'Cannot remove base columns below minimum';
-        }
-        return 'Remove base column';
-    }
-    return 'Remove added column';
-}
-
-// Update the column addition function for consistency
-function addColumn() {
-    if (columnCount >= maxColumns) {
-        showError(`Maximum ${maxColumns} columns allowed`);
-        return;
+/**
+ * Opens a modal dialog for batch renaming all images in a column
+ * @param {number} columnIndex - The index of the column to rename
+ */
+function openRenameColumnModal(columnIndex) {
+    // Check if we already have a modal, remove it if it exists
+    let existingModal = document.getElementById('renameColumnModal');
+    if (existingModal) {
+        document.body.removeChild(existingModal);
     }
     
-    // Add a new column prefix
-    columnPrefixes.push(`column${columnCount+1}`);
-    
-    // Add a new column to each row in the file matrix
-    for (let r = 0; r < rowCount; r++) {
-        if (!fileMatrix[r]) {
-            fileMatrix[r] = [];
-            for (let c = 0; c < columnCount; c++) {
-                fileMatrix[r][c] = null;
-            }
-        }
-        fileMatrix[r].push(null);
-    }
-    
-    // Add an empty array for new column in groupedFiles
-    if (groupedFiles.size > 0) {
-        groupedFiles.set(`column${columnCount+1}`, []);
-    }
-    
-    // Update column count
-    columnCount++;
-    
-    // Update the UI
-    updatePreview();
-}
-
-// Function to remove a column
-function removeColumn(columnIndex) {
-    console.log(`Attempting to remove column at index: ${columnIndex}`);
-    
-    // Check minimum column requirements
-    if (columnCount <= minColumns) {
-        showError(`Cannot remove column: Minimum ${minColumns} columns required`);
-        return;
-    }
-    
-    // Validate column index
-    if (columnIndex < 0 || columnIndex >= columnCount) {
-        console.error('Invalid column index:', columnIndex);
-        showError('Invalid column');
-        return;
-    }
-    
-    // Remove the column from prefixes array
-    columnPrefixes.splice(columnIndex, 1);
-    
-    // Update column count
-    columnCount--;
-    
-    // Remove the column from each row in the file matrix
+    // Count how many images are in this column
+    let imageCount = 0;
     for (let r = 0; r < fileMatrix.length; r++) {
-        if (fileMatrix[r]) {
-            fileMatrix[r].splice(columnIndex, 1);
+        if (fileMatrix[r] && fileMatrix[r][columnIndex]) {
+            imageCount++;
         }
     }
     
-    // Update groupedFiles if it's being used
-    if (groupedFiles.size > 0) {
-        // Remove the deleted column
-        groupedFiles.delete(`column${columnIndex+1}`);
+    if (imageCount === 0) {
+        showToast('No images in this column to rename', 'warning');
+        return;
+    }
+    
+    // Create modal element
+    const modal = document.createElement('div');
+    modal.id = 'renameColumnModal';
+    modal.className = 'modal fade';
+    modal.tabIndex = '-1';
+    modal.setAttribute('aria-labelledby', 'renameColumnModalLabel');
+    modal.setAttribute('aria-hidden', 'true');
+    
+    // Get existing naming pattern if any
+    const existingPattern = columnCustomNames[columnIndex] || '';
+    
+    // Create modal content
+    modal.innerHTML = `
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="renameColumnModalLabel">Rename Column ${columnIndex + 1}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Enter a naming pattern for all ${imageCount} images in this column.</p>
+                    <div class="form-group mb-3">
+                        <label for="baseNameInput">Base Name:</label>
+                        <input type="text" class="form-control" id="baseNameInput" 
+                               placeholder="e.g. Shot" value="${existingPattern}">
+                    </div>
+                    <div class="form-group mb-3">
+                        <label>Numbering:</label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="numberingOption" 
+                                   id="appendNumbering" value="append" checked>
+                            <label class="form-check-label" for="appendNumbering">
+                                Append number (Shot-1, Shot-2, ...)
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="numberingOption" 
+                                   id="prependNumbering" value="prepend">
+                            <label class="form-check-label" for="prependNumbering">
+                                Prepend number (1-Shot, 2-Shot, ...)
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="numberingOption" 
+                                   id="noNumbering" value="none">
+                            <label class="form-check-label" for="noNumbering">
+                                No numbering (all images use the same name)
+                            </label>
+                        </div>
+                    </div>
+                    <div class="preview-section">
+                        <h6>Preview:</h6>
+                        <div id="namePreview" class="p-2 bg-dark rounded">
+                            <code>Shot-1, Shot-2, ...</code>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="applyRenameBtn">Apply</button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Add modal to body
+    document.body.appendChild(modal);
+    
+    // Initialize Bootstrap modal
+    const modalInstance = new bootstrap.Modal(modal);
+    modalInstance.show();
+    
+    // Set up event listeners for preview updates
+    const baseNameInput = document.getElementById('baseNameInput');
+    const numberingOptions = document.querySelectorAll('input[name="numberingOption"]');
+    const namePreview = document.getElementById('namePreview');
+    
+    function updatePreview() {
+        const baseName = baseNameInput.value.trim() || 'Shot';
+        let numberingOption = 'append';
         
-        // Rename remaining columns to maintain sequential numbering
-        const newGroupedFiles = new Map();
-        for (let i = 0; i < columnCount; i++) {
-            const oldKey = `column${i >= columnIndex ? i+2 : i+1}`;
-            const newKey = `column${i+1}`;
-            
-            if (groupedFiles.has(oldKey)) {
-                newGroupedFiles.set(newKey, groupedFiles.get(oldKey));
+        for (const option of numberingOptions) {
+            if (option.checked) {
+                numberingOption = option.value;
+                break;
             }
         }
-        groupedFiles = newGroupedFiles;
+        
+        let previewText = '';
+        if (numberingOption === 'append') {
+            previewText = `${baseName}-1, ${baseName}-2, ${baseName}-3, ...`;
+        } else if (numberingOption === 'prepend') {
+            previewText = `1-${baseName}, 2-${baseName}, 3-${baseName}, ...`;
+        } else {
+            previewText = `${baseName}, ${baseName}, ${baseName}, ...`;
+        }
+        
+        namePreview.innerHTML = `<code>${previewText}</code>`;
     }
     
-    // Regenerate column prefixes with correct numbering
-    columnPrefixes = [];
-    for (let i = 0; i < columnCount; i++) {
-        columnPrefixes.push(`column${i+1}`);
-    }
+    // Update preview on input changes
+    baseNameInput.addEventListener('input', updatePreview);
+    numberingOptions.forEach(option => {
+        option.addEventListener('change', updatePreview);
+    });
     
-    console.log(`Column removed. New column count: ${columnCount}`);
-    console.log('New column prefixes:', columnPrefixes);
-    
-    // Update the UI
+    // Initial preview update
     updatePreview();
-}
-
-function updateColumnControls() {
-    document.querySelectorAll('.column-controls button').forEach(button => {
-        const columnPrefix = button.closest('.comparison-column').id.split('-')[1];
-        button.disabled = !isColumnRemovable(columnPrefix);
-        button.title = getColumnTooltip(columnPrefix);
+    
+    // Apply button click handler
+    document.getElementById('applyRenameBtn').addEventListener('click', () => {
+        applyColumnRename(columnIndex, baseNameInput.value.trim(), getSelectedNumberingOption());
+        modalInstance.hide();
     });
 }
 
-// Replace the old showError function with our toast notification system
-function showError(message) {
-    console.log('showError called with message:', message);
-    showToast(message, 'error');
+/**
+ * Gets the selected numbering option from the radio buttons
+ * @returns {string} The selected numbering option ('append', 'prepend', or 'none')
+ */
+function getSelectedNumberingOption() {
+    const options = document.querySelectorAll('input[name="numberingOption"]');
+    for (const option of options) {
+        if (option.checked) {
+            return option.value;
+        }
+    }
+    return 'append'; // Default
 }
 
-function showSuccess(message) {
-    console.log('showSuccess called with message:', message);
-    showToast(message, 'success');
+/**
+ * Applies the rename pattern to all images in a column
+ * @param {number} columnIndex - The index of the column to rename
+ * @param {string} baseName - The base name for the images
+ * @param {string} numberingOption - How to apply numbering ('append', 'prepend', or 'none')
+ */
+function applyColumnRename(columnIndex, baseName, numberingOption) {
+    if (!baseName) {
+        baseName = `Column${columnIndex + 1}`;
+    }
+    
+    // Store the naming pattern for this column
+    columnCustomNames[columnIndex] = baseName;
+    
+    // Count images in the column
+    let imageCount = 0;
+    for (let r = 0; r < fileMatrix.length; r++) {
+        if (fileMatrix[r] && fileMatrix[r][columnIndex]) {
+            imageCount++;
+        }
+    }
+    
+    // Apply custom names to all files in the column
+    let renamedCount = 0;
+    for (let r = 0; r < fileMatrix.length; r++) {
+        if (fileMatrix[r] && fileMatrix[r][columnIndex]) {
+            const file = fileMatrix[r][columnIndex];
+            let customName;
+            
+            if (numberingOption === 'append') {
+                customName = `${baseName}-${r + 1}`;
+            } else if (numberingOption === 'prepend') {
+                customName = `${r + 1}-${baseName}`;
+            } else {
+                customName = baseName;
+            }
+            
+            // Store the custom name in the file object
+            file.customName = customName;
+            renamedCount++;
+        }
+    }
+    
+    // Update the UI to show the new names
+    updatePreview();
+    
+    // Show success message
+    showToast(`Renamed ${renamedCount} images in column ${columnIndex + 1}`, 'success');
 }
 
+/**
+ * Validates the metadata form before upload
+ * @returns {boolean} True if validation passes, false otherwise
+ */
 function validateMetadata() {
-    // No longer require a comparison name - we'll generate one if empty
-    /* if (!comparisonNameInput.value.trim()) {
-        showError('Please enter a comparison name');
-        return false;
-    } */
-    if (columnCount < minColumns) {
-        showError(`Minimum of ${minColumns} columns required`);
+    const comparisonName = comparisonNameInput.value.trim();
+    
+    // Remove the validation for empty comparison name
+    // The server will generate a random name if none is provided
+    // This allows the random name generation to work
+    
+    // Only validate if show name toggle is checked but no name provided
+    // Check if show name is required but empty
+    if (showNameToggle.checked && !showNameInput.value.trim()) {
+        showToast('Please enter a show/film name or uncheck the option', 'warning');
+        showNameInput.focus();
         return false;
     }
+    
     return true;
 }
 
@@ -1251,6 +1360,11 @@ document.getElementById('uploadButton').addEventListener('click', async () => {
         });
     });
     formData.append('custom_names', JSON.stringify(customNames));
+    
+    // Add column naming patterns to form data
+    if (Object.keys(columnCustomNames).length > 0) {
+        formData.append('column_naming_patterns', JSON.stringify(columnCustomNames));
+    }
 
     // Add column order information to the form data
     formData.append('column_order', JSON.stringify(columnPrefixes));
