@@ -7,20 +7,14 @@ const currentColumnSpan = document.getElementById('currentColumn');
 let currentRowIndex = 0;
 
 // Safely get DOM elements with error handling
-const toggleFitBtn = document.getElementById('toggleFit') || { addEventListener: () => {} };
-const toggleBorderBtn = document.getElementById('toggleBorder') || { addEventListener: () => {} };
+const toggleFitSwitch = document.querySelector('#toggleFit') || { addEventListener: () => {}};
+const toggleBorderSwitch = document.getElementById('toggleBorder') || { addEventListener: () => {} };
 
-let isImageFit = true;
-currentImage.classList.add('fit');
-let showBorder = false;
+toggleFitSwitch.checked = false;
+toggleBorderSwitch.checked = false;
 
 // Initialize scroll behavior with proper overflow handling
 const imageViewer = document.querySelector('.image-viewer');
-
-// Set initial state for image viewer
-if (isImageFit) {
-    imageViewer.classList.add('fit-mode');
-}
 
 function isInSameColumn(currentIndex, newIndex) {
     // Check if indices are valid
@@ -192,17 +186,14 @@ currentImage.addEventListener('click', () => {
     updateNavigation();
 });
 
-toggleFitBtn.addEventListener('click', () => {
-    isImageFit = !isImageFit;
+toggleFitSwitch.addEventListener('change', (event) => {
+    const isImageFit = !event.target.checked;
     
     // Toggle fit class on image
     currentImage.classList.toggle('fit', isImageFit);
     
     // Toggle fit-mode class on image viewer
     imageViewer.classList.toggle('fit-mode', isImageFit);
-    
-    // Update button text
-    toggleFitBtn.textContent = isImageFit ? 'Original Size' : 'Fit to Screen';
     
     // Handle cursor and scroll behavior
     if (isImageFit) {
@@ -235,10 +226,9 @@ toggleFitBtn.addEventListener('click', () => {
     }
 });
 
-toggleBorderBtn.addEventListener('click', () => {
-    showBorder = !showBorder;
+toggleBorderSwitch.addEventListener('change', (event) => {
+    const showBorder = event.target.checked;
     currentImage.style.border = showBorder ? '1px solid #ccc' : 'none';
-    toggleBorderBtn.classList.toggle('active');
 });
 
 // Initialize display
