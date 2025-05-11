@@ -3,6 +3,7 @@ Authentication module for Comps.
 Handles user authentication, invitation codes, and session management.
 """
 import hashlib
+import os
 import secrets
 import sqlite3
 import time
@@ -13,7 +14,7 @@ from jose import JWTError, jwt
 from datetime import datetime, timedelta
 
 # Constants
-DB_PATH = 'comparisons.db'
+DB_PATH = os.getenv('DB_PATH', 'comparisons.db')
 SECRET_KEY = secrets.token_hex(32)  # Generate a random secret key
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 1 week
