@@ -752,5 +752,29 @@ body {
     50% { box-shadow: 0 4px 20px rgba(244, 67, 54, 0.3); }
 }
 
-/* Navbar Styles */
-.navbar {
+/* BBCode Share Modal Styles */
+#bbcodeText {
+    font-family: monospace;
+    color: #fff;
+    background-color: #333333;
+    resize: none;
+}
+
+#bbcodeModal .modal-dialog {
+    max-width: 800px;
+}
+
+.modal-header {
+    background-color: #2d2d2d;
+    border-bottom: 1px solid #404040;
+}
+
+.modal-body {
+    background-color: #2e2e2e;
+    color: #e0e0e0;
+}
+
+.modal-footer {
+    background-color: #2d2d2d;
+    border-bottom: 1px solid #404040;
+}
