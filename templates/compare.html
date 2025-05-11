@@ -84,20 +84,32 @@
                     {% endif %}
                 {% endif %}
             </div>
-            <div class="btn-group">
-                <button type="button" class="btn btn-primary" id="toggleFit">
-                    Fit to Screen
-                </button>
-                <button type="button" class="btn btn-primary" id="toggleBorder">
-                    Show Border
-                </button>
+            <div class="d-flex flex-column justify-content-end align-items-end">
+                <div class="form-check form-switch d-flex align-items-center gap-2 ps-0">
+                    <label class="form-check-label" for="toggleFit">
+                        Original Size
+                    </label>
+                    <input
+                    class="form-check-input m-0"
+                    type="checkbox"
+                    role="switch"
+                    id="toggleFit"
+                    />
+                    <label class="form-check-label" for="toggleFit">
+                        Fit to Screen
+                    </label>
+                </div>
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" role="switch" id="toggleBorder">
+                    <label class="form-check-label" for="toggleBorder">Show Border</label>
+                </div>
             </div>
         </div>
     </nav>
     <div class="comparison-container">
         <div class="image-viewer fit-mode" id="imageViewer">
             <div class="image-container">
-                <img id="currentImage" src="{{ url_for('uploads', path=images[0]) }}" alt="Comparison image" class="comparison-image">
+                <img id="currentImage" src="{{ url_for('uploads', path=images[0]) }}" alt="Comparison image" class="comparison-image fit">
             </div>
         </div>
     </div>
