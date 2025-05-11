@@ -1,6 +1,7 @@
 const { imageUrls, totalColumns, totalRows, imageNames, imageSizes } = compareData;
 let absoluteIndex = 0;
 const currentImage = document.getElementById('currentImage');
+const navbar = document.querySelector('.navbar');
 const currentImageInfoSpan = document.getElementById('currentImageInfo');
 const currentRowSpan = document.getElementById('currentRow');
 const currentColumnSpan = document.getElementById('currentColumn');
@@ -186,6 +187,44 @@ currentImage.addEventListener('click', () => {
     updateNavigation();
 });
 
+// Function to toggle navbar visibility
+function toggleNavbarVisibility(show) {
+    // Clear any pending hide timers
+    clearTimeout(navbarTimer);
+    
+    if (show) {
+        // First show the navbar
+         navbar.classList.remove('navbar-hidden');
+        // Then after a small delay, adjust the body padding
+        setTimeout(() => {
+            document.body.classList.remove('navbar-is-hidden');
+        }, 50);
+     } else {
+        // First remove the body padding
+        document.body.classList.add('navbar-is-hidden');
+        // Then hide the navbar
+        navbar.classList.add('navbar-hidden');
+    }
+}
+
+// Add mouse movement detection to show navbar when mouse is near top of screen
+let navbarTimer;
+document.addEventListener('mousemove', (e) => {
+    const isOriginalSize = !currentImage.classList.contains('fit');
+    
+    // Only apply mouse movement detection when in original size mode
+    if (isOriginalSize) {
+        if (e.clientY < 60) {
+            toggleNavbarVisibility(true);
+            clearTimeout(navbarTimer);
+        } else {
+            navbarTimer = setTimeout(() => toggleNavbarVisibility(false), 1500);
+        }
+    } else {
+        toggleNavbarVisibility(true); // Always show navbar in fit mode
+    }
+});
+
 toggleFitSwitch.addEventListener('change', (event) => {
     const isImageFit = !event.target.checked;
     
@@ -195,6 +234,15 @@ toggleFitSwitch.addEventListener('change', (event) => {
     // Toggle fit-mode class on image viewer
     imageViewer.classList.toggle('fit-mode', isImageFit);
     
+    // Handle navbar visibility based on fit mode
+    if (isImageFit) {
+        // Always show navbar in fit mode
+        toggleNavbarVisibility(true);
+    } else {
+        // Initially hide navbar in original size mode
+        toggleNavbarVisibility(false);
+    }
+
     // Handle cursor and scroll behavior
     if (isImageFit) {
         // Reset scroll position when switching to fit mode
