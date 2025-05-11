@@ -9,6 +9,37 @@ const mobileCurrentImageInfoSpan = document.getElementById('mobileCurrentImageIn
 const mobileCurrentRowSpan = document.getElementById('mobileCurrentRow');
 const mobileCurrentColumnSpan = document.getElementById('mobileCurrentColumn');
 const mobileTotalRowsSpan = document.getElementById('mobileTotalRows');
+
+/**
+ * Sets a cookie with the given name, value, and expiration days
+ * @param {string} name - The name of the cookie
+ * @param {string} value - The value to store in the cookie
+ * @param {number} days - Number of days until the cookie expires
+ */
+function setCookie(name, value, days) {
+    const date = new Date();
+    date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+    const expires = "expires=" + date.toUTCString();
+    document.cookie = name + "=" + value + ";" + expires + ";path=/";
+}
+
+/**
+ * Gets a cookie value by name
+ * @param {string} name - The name of the cookie to retrieve
+ * @returns {string} The cookie value or empty string if not found
+ */
+function getCookie(name) {
+    const cookieName = name + "=";
+    const cookies = document.cookie.split(';');
+    for (let i = 0; i < cookies.length; i++) {
+        let cookie = cookies[i].trim();
+        if (cookie.indexOf(cookieName) === 0) {
+            return cookie.substring(cookieName.length, cookie.length);
+        }
+    }
+    return "";
+}
+
 let currentRowIndex = 0;
 let navbarVisible = true;
 
@@ -19,9 +50,17 @@ const toggleBorderSwitch = document.getElementById('toggleBorder') || { addEvent
 toggleFitSwitch.checked = false;
 toggleBorderSwitch.checked = false;
 
+// Check for saved view preference in cookie
+const savedViewMode = getCookie('imageViewMode');
+if (savedViewMode === 'original') {
+    toggleFitSwitch.checked = true;
+    // We'll apply this setting after the image is loaded
+}
+
 // Mobile controls
 const mobileToggleFitSwitch = document.querySelector('#mobileToggleFit') || { addEventListener: () => {}};
 const mobileToggleBorderSwitch = document.getElementById('mobileToggleBorder') || { addEventListener: () => {} };
+mobileToggleFitSwitch.checked = toggleFitSwitch.checked; // Sync with desktop toggle
 
 // Initialize scroll behavior with proper overflow handling
 const imageViewer = document.querySelector('.image-viewer');
@@ -327,6 +366,10 @@ toggleFitSwitch.addEventListener('change', (event) => {
         // Initially hide navbar in original size mode
         toggleNavbarVisibility(false);
     }
+    
+    // Save preference to cookie (30 day expiration)
+    const viewMode = isImageFit ? 'fit' : 'original';
+    setCookie('imageViewMode', viewMode, 30);
 
     // Handle cursor and scroll behavior
     if (isImageFit) {
@@ -380,6 +423,10 @@ mobileToggleFitSwitch.addEventListener('change', (event) => {
         // Initially hide navbar in original size mode
         toggleNavbarVisibility(false);
     }
+    
+    // Save preference to cookie (30 day expiration)
+    const viewMode = isImageFit ? 'fit' : 'original';
+    setCookie('imageViewMode', viewMode, 30);
 
     // Handle cursor and scroll behavior
     if (isImageFit) {
@@ -482,3 +529,16 @@ function generateBBCode() {
 // Initialize display
 updateDisplay();
 updateNavigation();
+
+// Apply saved view mode preference after initialization
+document.addEventListener('DOMContentLoaded', () => {
+    const savedViewMode = getCookie('imageViewMode');
+    if (savedViewMode === 'original') {
+        // Apply original size mode
+        currentImage.classList.remove('fit');
+        imageViewer.classList.remove('fit-mode');
+        toggleFitSwitch.checked = true;
+        mobileToggleFitSwitch.checked = true;
+        currentImage.style.cursor = 'move';
+    }
+});
