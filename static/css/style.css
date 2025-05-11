@@ -5,9 +5,23 @@ body {
     background-color: #1a1a1a;
     color: #e0e0e0;}
 
-/* Add padding only for pages with fixed-top navbar */
+/* Navbar transition for hiding/showing */
+.navbar {
+    transition: transform 0.3s ease-in-out;
+    z-index: 1030;}
+
+.navbar-hidden {
+    transform: translateY(-100%);}
+
+/* Adjust body padding when navbar is hidden */
+body.navbar-is-hidden {
+    padding-top: 0 !important;
+    transition-delay: 0.1s;}
+
+/* Ensure smooth transition for body padding */
 body.has-fixed-nav {
-    padding-top: 70px;}
+    padding-top: 70px;
+    transition: padding-top 0.3s ease-in-out;}
 
 .container {
     flex: 1;
@@ -225,7 +239,8 @@ body.has-fixed-nav {
     padding: 15px;
     background: #1a1a1a;
     border-radius: 8px;
-    margin: 20px 0;}
+    margin: 20px 0;
+    transition: margin-top 0.3s ease-in-out, padding-top 0.3s ease-in-out;}
 
 /* Ensure column-files has proper dimensions */
 .column-files {
@@ -246,11 +261,18 @@ body.has-fixed-nav {
     position: relative;
     background: #1a1a1a;
     align-items: center;
+    transition: margin-top 0.3s ease-in-out, padding-top 0.3s ease-in-out;
     justify-content: center;
     box-sizing: border-box;
     margin-top: 0;
     padding-bottom: 20px;
     scroll-padding-top: 76px;}
+
+/* Adjust image viewer when navbar is hidden */
+body.navbar-is-hidden .image-viewer {
+    scroll-padding-top: 0 !important;
+    padding-top: 0 !important;
+}
 
 .comparison-image {
     position: relative;
