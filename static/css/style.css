@@ -619,6 +619,18 @@ body.navbar-is-hidden .image-viewer {
 .expiration-info .badge {
     background-color: #17a2b8;}
 
+/* Modal styles for column renaming */
+#renameColumnModal .modal-content {
+    background-color: #2d2d2d;
+    color: #e0e0e0;
+}
+
+#namePreview {
+    background-color: #1a1a1a;
+    padding: 10px;
+    border-radius: 4px;
+}
+
 /* General Styles */
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
