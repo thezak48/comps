@@ -116,6 +116,29 @@ let columnCustomNames = {}; // Store custom naming patterns for columns
 
 console.log('Upload.js initialized');
 
+/**
+ * Adds a new column to the comparison grid
+ */
+function addColumn() {
+    if (columnCount >= maxColumns) {
+        showToast(`Maximum ${maxColumns} columns allowed`, 'warning');
+        return;
+    }
+    
+    // Add new column to file matrix
+    for (let r = 0; r < fileMatrix.length; r++) {
+        fileMatrix[r].push(null);
+    }
+    
+    // Update column tracking
+    columnCount++;
+    addedColumns++;
+    columnPrefixes.push(`column${columnCount}`);
+    
+    // Update the UI
+    updatePreview();
+}
+
 // Toggle visibility of show name field
 showNameToggle.addEventListener('change', function() {
     const showNameContainer = document.getElementById('show-name-container');
@@ -211,7 +234,7 @@ function groupFiles(files) {
     }
     
     // Validate file count
-    if (files.length > 30) {
+    if (files.length > 120) {
         throw new Error('Maximum 30 files allowed');
     }
 
@@ -382,6 +405,7 @@ function updatePreview() {
         const columnHeader = document.createElement('div');
         columnHeader.className = 'column-header';
         columnHeader.dataset.columnIndex = colIndex;
+        columnHeader.dataset.columnPrefix = columnPrefixes[colIndex] || `column${colIndex+1}`;
         columnHeader.style.width = `calc(100% / ${columnCount})`;
         
         const dragHandle = document.createElement('div');
@@ -1333,8 +1357,8 @@ document.getElementById('uploadButton').addEventListener('click', async () => {
     }
     const metadata = getMetadata();
 
-    if (selectedFiles.size > 30) {
-        showError('Maximum 30 files allowed');
+    if (selectedFiles.size > 120) {
+        showError('Maximum 120 files allowed');
         return;
     }
 
