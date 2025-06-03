@@ -9,6 +9,7 @@ const mobileCurrentImageInfoSpan = document.getElementById('mobileCurrentImageIn
 const mobileCurrentRowSpan = document.getElementById('mobileCurrentRow');
 const mobileCurrentColumnSpan = document.getElementById('mobileCurrentColumn');
 const mobileTotalRowsSpan = document.getElementById('mobileTotalRows');
+const copyBBCodeBtn = document.querySelector('#copyBBCodeBtn')
 
 /**
  * Sets a cookie with the given name, value, and expiration days
@@ -525,6 +526,20 @@ function generateBBCode() {
     bbcode += '[/comparison]';
     document.getElementById('bbcodeText').value = bbcode;
 }
+
+copyBBCodeBtn.addEventListener('click', async () => {
+    const bbcode = document.querySelector('#bbcodeText').value;
+    try {
+        await navigator.clipboard.writeText(bbcode);
+        copyBBCodeBtn.innerHTML = '<i class="fa fa-check"></i> Copied to Clipboard';
+        copyBBCodeBtn.classList.replace('btn-primary', 'btn-success');
+    }
+    catch (e) {
+        console.error(e);
+        copyBBCodeBtn.innerHTML = '<i class="fa fa-xmark"></i> Failed to Copy to Clipboard';
+        copyBBCodeBtn.classList.replace('btn-primary', 'btn-danger');
+    }
+})
 
 // Initialize display
 updateDisplay();
