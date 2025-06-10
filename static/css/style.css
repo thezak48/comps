@@ -70,10 +70,12 @@ body.has-fixed-nav {
 .comparison-container {
     max-width: 100%;
     margin: 0 auto;
-    padding: 20px;
     text-align: center;
     overflow-x: auto;
     position: relative;}
+
+.comparison-container:not(.fit-mode) {
+    padding: 0;}
 
 .metadata-form {
     margin: 20px 0;
@@ -266,7 +268,7 @@ body.has-fixed-nav {
     justify-content: center;
     box-sizing: border-box;
     margin-top: 0;
-    padding-bottom: 20px;
+    padding: 0 0 20px 0;
     scroll-padding-top: 76px;}
 
 /* Adjust image viewer when navbar is hidden */
@@ -281,11 +283,11 @@ body.navbar-is-hidden .image-viewer {
     cursor: move;
     transform-origin: center center;
     margin-top: 0;
-    /* Removed max-width: 100% constraint to improve mobile viewing */
+    margin-left: 0;
+    margin-right: 0;
 }
 
 .comparison-image.fit {
-    /* Removed max-width constraint for better mobile experience */
     max-height: calc(100vh - 76px) !important;
     margin-top: 0 !important;
     transform: none !important;
@@ -294,7 +296,8 @@ body.navbar-is-hidden .image-viewer {
     position: relative;
     top: 0;
     left: 0;
-    margin: 0 auto;}
+    margin: 0;
+    padding: 0;}
 
 .navigation-dots {
     margin: 20px 0;}
