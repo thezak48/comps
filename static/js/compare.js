@@ -1,7 +1,6 @@
 const { imageUrls, totalColumns, totalRows, imageNames, imageSizes } = compareData;
 let absoluteIndex = 0;
 const currentImage = document.getElementById('currentImage');
-const navbar = document.querySelector('.navbar');
 const currentImageInfoSpan = document.getElementById('currentImageInfo');
 const currentRowSpan = document.getElementById('currentRow');
 const currentColumnSpan = document.getElementById('currentColumn');
@@ -42,7 +41,6 @@ function getCookie(name) {
 }
 
 let currentRowIndex = 0;
-let navbarVisible = true;
 
 // Safely get DOM elements with error handling
 const toggleFitSwitch = document.querySelector('#toggleFit') || { addEventListener: () => {}};
@@ -65,46 +63,6 @@ mobileToggleFitSwitch.checked = toggleFitSwitch.checked; // Sync with desktop to
 
 // Initialize scroll behavior with proper overflow handling
 const imageViewer = document.querySelector('.image-viewer');
-
-/**
- * Toggle the visibility of the navbar
- * @param {boolean} show - Whether to show (true) or hide (false) the navbar
- */
-function toggleNavbarVisibility(show) {
-    if (show === navbarVisible) return; // No change needed
-    
-    navbarVisible = show;
-    
-    if (show) {
-        navbar.classList.remove('navbar-hidden');
-        document.body.classList.remove('navbar-is-hidden');
-    } else {
-        navbar.classList.add('navbar-hidden');
-        document.body.classList.add('navbar-is-hidden');
-    }
-}
-
-// Add mouse movement detection to show navbar when mouse is near the top
-document.addEventListener('mousemove', function(e) {
-    // Only apply this in original size mode (when not fit)
-    if (!currentImage.classList.contains('fit')) {
-        const mouseY = e.clientY;
-        
-        // Show navbar when mouse is near the top of the screen (within 100px)
-        if (mouseY < 100) {
-            toggleNavbarVisibility(true);
-            
-            // Hide navbar again after 3 seconds of inactivity near the top
-            clearTimeout(window.navbarTimeout);
-            window.navbarTimeout = setTimeout(() => {
-                // Only hide if we're still in original size mode
-                if (!currentImage.classList.contains('fit')) {
-                    toggleNavbarVisibility(false);
-                }
-            }, 3000);
-        }
-    }
-});
 
 function isInSameColumn(currentIndex, newIndex) {
     // Check if indices are valid
@@ -200,12 +158,7 @@ function updateDisplay() {
     const currentImageSize = imageSizes[absoluteIndex] || '';
     currentImageInfoSpan.textContent = `${currentImageName} [${currentImageSize}]`;
     document.title = `Compare - ${currentImageName}`;
-    
-    // If we're in original size mode, hide the navbar initially
-    if (!currentImage.classList.contains('fit')) {
-        toggleNavbarVisibility(false);
-    }
-    
+
     // Update mobile info displays if they exist
     if (mobileCurrentImageInfoSpan) {
         mobileCurrentImageInfoSpan.textContent = `${currentImageName} [${currentImageSize}]`;
@@ -359,15 +312,6 @@ toggleFitSwitch.addEventListener('change', (event) => {
     // Toggle fit-mode class on image viewer
     imageViewer.classList.toggle('fit-mode', isImageFit);
     
-    // Handle navbar visibility based on fit mode
-    if (isImageFit) {
-        // Always show navbar in fit mode
-        toggleNavbarVisibility(true);
-    } else {
-        // Initially hide navbar in original size mode
-        toggleNavbarVisibility(false);
-    }
-    
     // Save preference to cookie (30 day expiration)
     const viewMode = isImageFit ? 'fit' : 'original';
     setCookie('imageViewMode', viewMode, 30);
@@ -415,15 +359,6 @@ mobileToggleFitSwitch.addEventListener('change', (event) => {
     
     // Sync with desktop toggle
     toggleFitSwitch.checked = !isImageFit;
-    
-    // Handle navbar visibility based on fit mode
-    if (isImageFit) {
-        // Always show navbar in fit mode
-        toggleNavbarVisibility(true);
-    } else {
-        // Initially hide navbar in original size mode
-        toggleNavbarVisibility(false);
-    }
     
     // Save preference to cookie (30 day expiration)
     const viewMode = isImageFit ? 'fit' : 'original';
