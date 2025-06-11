@@ -139,6 +139,36 @@ function addColumn() {
     updatePreview();
 }
 
+/**
+ * Removes a column from the comparison grid
+ * @param {number} columnIndex - The index of the column to remove
+ */
+function removeColumn(columnIndex) {
+    if (columnCount <= minColumns) {
+        showToast(`Minimum ${minColumns} columns required`, 'warning');
+        return;
+    }
+    
+    // Remove column from file matrix
+    for (let r = 0; r < fileMatrix.length; r++) {
+        if (fileMatrix[r]) {
+            // Remove files from selectedFiles if they're not used elsewhere
+            const file = fileMatrix[r][columnIndex];
+            if (file) {
+                selectedFiles.delete(file);
+            }
+            fileMatrix[r].splice(columnIndex, 1);
+        }
+    }
+    
+    // Update tracking variables
+    columnCount--;
+    columnPrefixes.splice(columnIndex, 1);
+    
+    // Update the UI
+    updatePreview();
+}
+
 // Toggle visibility of show name field
 showNameToggle.addEventListener('change', function() {
     const showNameContainer = document.getElementById('show-name-container');
