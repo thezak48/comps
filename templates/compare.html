@@ -60,6 +60,14 @@
                             <a class="dropdown-item" href="#" data-column="{{ column }}">Image {{ column + 1 }}/{{ total_columns }}: {{ image_names[column] }} [{{ image_sizes[column] }}]</a>
                         {% endfor %}
                     </div>
+                    <div class="dropdown d-inline-block ms-2">
+                        <select id="imageRendering" class="btn btn-secondary dropdown-toggle">
+                            <option value="auto">Rendering: Auto</option>
+                            <option value="smooth">Rendering: Smooth</option>
+                            <option value="crisp-edges">Rendering: Crisp</option>
+                            <option value="pixelated">Rendering: Pixel</option>
+                        </select>
+                    </div>
                 </div>
                 {% if metadata %}
                     <span class="comparison-name">{{ metadata.name }}</span>
@@ -142,6 +150,15 @@
                 <div class="form-check form-switch d-flex align-items-center justify-content-between mb-2">
                     <label class="form-check-label" for="mobileToggleBorder">Show Border</label>
                     <input class="form-check-input" type="checkbox" role="switch" id="mobileToggleBorder">
+                </div>
+                
+                <div class="dropdown d-inline-block ms-2">
+                    <select id="mobileImageRendering" class="btn btn-secondary dropdown-toggle">
+                        <option value="auto">Rendering: Auto</option>
+                        <option value="smooth">Rendering: Smooth</option>
+                        <option value="crisp-edges">Rendering: Crisp</option>
+                        <option value="pixelated">Rendering: Pixel</option>
+                    </select>
                 </div>
                 
                 <a href="#" id="mobileShareBBCodeBtn" class="btn btn-secondary w-100 mb-2"><i class="fa fa-share-alt"></i> Share BBCode</a>
