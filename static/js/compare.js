@@ -9,13 +9,18 @@ const mobileCurrentRowSpan = document.getElementById('mobileCurrentRow');
 const mobileCurrentColumnSpan = document.getElementById('mobileCurrentColumn');
 const mobileTotalRowsSpan = document.getElementById('mobileTotalRows');
 const copyBBCodeBtn = document.querySelector('#copyBBCodeBtn')
+const toggleFitSwitch = document.querySelector('#toggleFit') || { addEventListener: () => {}};
+const toggleBorderSwitch = document.getElementById('toggleBorder') || { addEventListener: () => {} };
+const imageRenderingSelect = document.getElementById('imageRendering') || { addEventListener: () => {} };
 
-/**
- * Sets a cookie with the given name, value, and expiration days
- * @param {string} name - The name of the cookie
- * @param {string} value - The value to store in the cookie
- * @param {number} days - Number of days until the cookie expires
- */
+// Initialize state from cookies
+toggleFitSwitch.checked = false;
+toggleBorderSwitch.checked = false;
+
+// Check for saved rendering preference
+const savedRendering = getCookie('imageRendering') || 'auto';
+imageRenderingSelect.value = savedRendering;
+
 function setCookie(name, value, days) {
     const date = new Date();
     date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
@@ -23,11 +28,6 @@ function setCookie(name, value, days) {
     document.cookie = name + "=" + value + ";" + expires + ";path=/";
 }
 
-/**
- * Gets a cookie value by name
- * @param {string} name - The name of the cookie to retrieve
- * @returns {string} The cookie value or empty string if not found
- */
 function getCookie(name) {
     const cookieName = name + "=";
     const cookies = document.cookie.split(';');
@@ -42,30 +42,13 @@ function getCookie(name) {
 
 let currentRowIndex = 0;
 
-// Safely get DOM elements with error handling
-const toggleFitSwitch = document.querySelector('#toggleFit') || { addEventListener: () => {}};
-const toggleBorderSwitch = document.getElementById('toggleBorder') || { addEventListener: () => {} };
-
-toggleFitSwitch.checked = false;
-toggleBorderSwitch.checked = false;
-
-// Check for saved view preference in cookie
-const savedViewMode = getCookie('imageViewMode');
-if (savedViewMode === 'original') {
-    toggleFitSwitch.checked = true;
-    // We'll apply this setting after the image is loaded
-}
-
-// Mobile controls
 const mobileToggleFitSwitch = document.querySelector('#mobileToggleFit') || { addEventListener: () => {}};
 const mobileToggleBorderSwitch = document.getElementById('mobileToggleBorder') || { addEventListener: () => {} };
-mobileToggleFitSwitch.checked = toggleFitSwitch.checked; // Sync with desktop toggle
+mobileToggleFitSwitch.checked = toggleFitSwitch.checked;
 
-// Initialize scroll behavior with proper overflow handling
 const imageViewer = document.querySelector('.image-viewer');
 
 function isInSameColumn(currentIndex, newIndex) {
-    // Check if indices are valid
     if (newIndex < 0 || newIndex >= imageUrls.length) {
         return false;
     }
@@ -83,17 +66,12 @@ function navigateToColumn(direction) {
     const newColumn = currentPos.column + direction;
     const currentRow = currentPos.row;
 
-    // Handle wrapping for right arrow
     if (direction > 0 && newColumn >= totalColumns) {
-        // Wrap to first column in same row
         absoluteIndex = currentRow * totalColumns;
     }
-    // Handle wrapping for left arrow
     else if (direction < 0 && newColumn < 0) {
-        // Wrap to last column in same row
         absoluteIndex = (currentRow * totalColumns) + (totalColumns - 1);
     }
-    // Normal column navigation within bounds
     else if (newColumn >= 0 && newColumn < totalColumns) {
         absoluteIndex = (currentRow * totalColumns) + newColumn;
     }
@@ -121,7 +99,6 @@ document.addEventListener('keydown', (e) => {
            break;
         case 'ArrowUp':
             e.preventDefault();
-            // Navigate up one row
             const prevRow = absoluteIndex - totalColumns;
             if (prevRow >= 0) {
                 absoluteIndex = prevRow;
@@ -131,7 +108,6 @@ document.addEventListener('keydown', (e) => {
            break;
         case 'ArrowDown':
             e.preventDefault();
-            // Navigate down one row
             const nextRow = absoluteIndex + totalColumns;
             if (nextRow < imageUrls.length) {
                 absoluteIndex = nextRow;
@@ -159,24 +135,20 @@ function updateDisplay() {
     currentImageInfoSpan.textContent = `${currentImageName} [${currentImageSize}]`;
     document.title = `Compare - ${currentImageName}`;
 
-    // Update mobile info displays if they exist
     if (mobileCurrentImageInfoSpan) {
         mobileCurrentImageInfoSpan.textContent = `${currentImageName} [${currentImageSize}]`;
     }
     
-    // Add touch swipe detection for mobile
     if ('ontouchstart' in window) {
         setupTouchNavigation();
     }
 }
 
 function updateNavigation() {
-    // Ensure index is within bounds
     absoluteIndex = Math.max(0, Math.min(absoluteIndex, imageUrls.length - 1));
     const { column, row } = calculatePosition(absoluteIndex);
     currentRowSpan.textContent = row + 1;
     
-    // Update mobile navigation elements if they exist
     if (mobileCurrentRowSpan) {
         mobileCurrentRowSpan.textContent = row + 1;
         mobileCurrentColumnSpan.textContent = column + 1;
@@ -197,14 +169,12 @@ function updateDots() {
         indicator.classList.toggle('active', parseInt(indicator.dataset.column, 10) === column));
 }
 
-// Add dropdown navigation handlers
 document.querySelectorAll('[data-row]').forEach(item => {
     item.addEventListener('click', (e) => {
         e.preventDefault();
         const newRow = parseInt(e.target.dataset.row, 10);
         const currentCol = absoluteIndex % totalColumns;
         
-        // Validate new position
         const newIndex = (newRow * totalColumns) + currentCol;
         if (newIndex >= imageUrls.length) {
             return;
@@ -221,7 +191,6 @@ document.querySelectorAll('[data-column]').forEach(item => {
         const newCol = parseInt(e.target.dataset.column, 10);
         const currentRow = Math.floor(absoluteIndex / totalColumns);
         
-        // Validate new position
         const newIndex = (currentRow * totalColumns) + newCol;
         if (newIndex >= imageUrls.length) {
             return;
@@ -232,25 +201,20 @@ document.querySelectorAll('[data-column]').forEach(item => {
     });
 });
 
-// Add click handler for image navigation
 currentImage.addEventListener('click', () => {
     const currentPos = calculatePosition(absoluteIndex);
     const nextIndex = absoluteIndex + 1;
     
-    // If next index is in the same row, move to it
     if (Math.floor(nextIndex / totalColumns) === currentPos.row) {
         absoluteIndex = nextIndex;
     } else {
-        // If at end of row, go back to first image in row
         absoluteIndex = currentPos.row * totalColumns;
     }
     
-    // Update display and navigation
     updateDisplay();
     updateNavigation();
 });
 
-// Setup touch navigation for mobile devices
 function setupTouchNavigation() {
     let touchStartX = 0;
     let touchEndX = 0;
@@ -272,18 +236,14 @@ function setupTouchNavigation() {
         const xDiff = touchStartX - touchEndX;
         const yDiff = touchStartY - touchEndY;
         
-        // Determine if the swipe was primarily horizontal or vertical
         if (Math.abs(xDiff) > Math.abs(yDiff)) {
             if (xDiff > 50) {
-                // Swipe left - go to next column
                 navigateToColumn(1);
             } else if (xDiff < -50) {
-                // Swipe right - go to previous column
                 navigateToColumn(-1);
             }
         } else {
             if (yDiff > 50) {
-                // Swipe up - go to previous row
                 const prevRow = absoluteIndex - totalColumns;
                 if (prevRow >= 0) {
                     absoluteIndex = prevRow;
@@ -291,7 +251,6 @@ function setupTouchNavigation() {
                     updateNavigation();
                 }
             } else if (yDiff < -50) {
-                // Swipe down - go to next row
                 const nextRow = absoluteIndex + totalColumns;
                 if (nextRow < imageUrls.length) {
                     absoluteIndex = nextRow;
@@ -306,40 +265,29 @@ function setupTouchNavigation() {
 toggleFitSwitch.addEventListener('change', (event) => {
     const isImageFit = !event.target.checked;
     
-    // Toggle fit class on image
     currentImage.classList.toggle('fit', isImageFit);
-    
-    // Toggle fit-mode class on image viewer
     imageViewer.classList.toggle('fit-mode', isImageFit);
     
-    // Save preference to cookie (30 day expiration)
     const viewMode = isImageFit ? 'fit' : 'original';
     setCookie('imageViewMode', viewMode, 30);
 
-    // Handle cursor and scroll behavior
     if (isImageFit) {
-        // Reset scroll position when switching to fit mode
         imageViewer.scrollTo(0, 0);
         currentImage.style.cursor = 'pointer';
     } else {
-        // First reset scroll position
         imageViewer.scrollTo(0, 0);
         
-        // Create a wrapper if it doesn't exist
         let imageContainer = document.querySelector('.image-container');
         if (!imageContainer) {
             imageContainer = document.createElement('div');
             imageContainer.className = 'image-container';
             
-            // Move the image into the container
             const parent = currentImage.parentNode;
             parent.appendChild(imageContainer);
             imageContainer.appendChild(currentImage);
         }
         
-        // Use a timeout to ensure the DOM has updated
         setTimeout(() => {
-            // Ensure we're at the top of the image
             imageViewer.scrollTo(0, 0);
         }, 50);
         
@@ -347,39 +295,28 @@ toggleFitSwitch.addEventListener('change', (event) => {
     }
 });
 
-// Mobile toggle fit switch
 mobileToggleFitSwitch.addEventListener('change', (event) => {
     const isImageFit = !event.target.checked;
     
-    // Toggle fit class on image
     currentImage.classList.toggle('fit', isImageFit);
-    
-    // Toggle fit-mode class on image viewer
     imageViewer.classList.toggle('fit-mode', isImageFit);
     
-    // Sync with desktop toggle
     toggleFitSwitch.checked = !isImageFit;
     
-    // Save preference to cookie (30 day expiration)
     const viewMode = isImageFit ? 'fit' : 'original';
     setCookie('imageViewMode', viewMode, 30);
 
-    // Handle cursor and scroll behavior
     if (isImageFit) {
-        // Reset scroll position when switching to fit mode
         imageViewer.scrollTo(0, 0);
         currentImage.style.cursor = 'pointer';
     } else {
-        // First reset scroll position
         imageViewer.scrollTo(0, 0);
         
-        // Create a wrapper if it doesn't exist
         let imageContainer = document.querySelector('.image-container');
         if (!imageContainer) {
             imageContainer = document.createElement('div');
             imageContainer.className = 'image-container';
             
-            // Move the image into the container
             const parent = currentImage.parentNode;
             parent.appendChild(imageContainer);
             imageContainer.appendChild(currentImage);
@@ -393,22 +330,36 @@ toggleBorderSwitch.addEventListener('change', (event) => {
     const showBorder = event.target.checked;
     currentImage.style.border = showBorder ? '1px solid #ccc' : 'none';
     
-    // Sync with mobile toggle
     if (mobileToggleBorderSwitch) {
         mobileToggleBorderSwitch.checked = showBorder;
     }
 });
 
-// Mobile toggle border switch
 mobileToggleBorderSwitch.addEventListener('change', (event) => {
     const showBorder = event.target.checked;
     currentImage.style.border = showBorder ? '1px solid #ccc' : 'none';
     
-    // Sync with desktop toggle
     toggleBorderSwitch.checked = showBorder;
 });
 
-// BBCode Share functionality
+// Image rendering controls
+imageRenderingSelect.addEventListener('change', (event) => {
+    const renderingMode = event.target.value;
+    currentImage.style.imageRendering = renderingMode;
+    
+    const mobileSelect = document.getElementById('mobileImageRendering');
+    if (mobileSelect) {
+        mobileSelect.value = renderingMode;
+    }
+    
+    setCookie('imageRendering', renderingMode, 30);
+});
+
+document.getElementById('mobileImageRendering')?.addEventListener('change', (event) => {
+    imageRenderingSelect.value = event.target.value;
+    imageRenderingSelect.dispatchEvent(new Event('change'));
+});
+
 document.getElementById('shareBBCodeBtn').addEventListener('click', function() {
     showBBCodeModal();
 });
@@ -419,40 +370,30 @@ function showBBCodeModal() {
     bbcodeModal.show();
 }
 
-// Mobile BBCode Share functionality
 document.getElementById('mobileShareBBCodeBtn')?.addEventListener('click', function() {
     showBBCodeModal();
 });
 
 function generateBBCode() {
-    // Get all unique column names (custom names)
     const columnNames = [];
     for (let col = 0; col < totalColumns; col++) {
-        // Get the image name from the first row of each column
         const index = col;
         const name = imageNames[index] || `Column ${col+1}`;
-        // Extract just the filename without extension and path
         const simpleName = name.split('/').pop().split('\\').pop().split('.')[0];
         columnNames.push(simpleName);
     }
     
-    // Generate the BBCode
     let bbcode = `[comparison=${columnNames.join(', ')}]\n`;
     
-    // Add all image URLs for all rows
     for (let row = 0; row < totalRows; row++) {
-        // Add all columns in this row
         for (let col = 0; col < totalColumns; col++) {
-            // Calculate the index in the flat array
             const index = (row * totalColumns) + col;
             
-            // Make sure the index is valid
             if (index < imageUrls.length) {
                 bbcode += `${window.location.origin}/uploads/${imageUrls[index]}\n`;
             }
         }
         
-        // Add a blank line between rows for readability (except after the last row)
         if (row < totalRows - 1) {
             bbcode += '\n';
         }
@@ -476,19 +417,15 @@ copyBBCodeBtn.addEventListener('click', async () => {
     }
 })
 
-// Initialize display
 updateDisplay();
 updateNavigation();
 
-// Apply saved view mode preference after initialization
 document.addEventListener('DOMContentLoaded', () => {
     const savedViewMode = getCookie('imageViewMode');
     if (savedViewMode === 'original') {
-        // Apply original size mode
         currentImage.classList.remove('fit');
         imageViewer.classList.remove('fit-mode');
-        toggleFitSwitch.checked = true;
-        mobileToggleFitSwitch.checked = true;
-        currentImage.style.cursor = 'move';
     }
+    
+    currentImage.style.imageRendering = savedRendering;
 });

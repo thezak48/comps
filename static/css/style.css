@@ -903,3 +903,39 @@ body {
     background-color: #2d2d2d;
     border-bottom: 1px solid #404040;
 }
+
+.btn-group select.btn-secondary:hover {
+    background-color: #404040;
+    border-color: #505050;
+}
+
+.btn-group select.btn-secondary:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(255,255,255,0.25);
+}
+
+.btn-group select.btn-secondary option {
+    background-color: #212529;
+    color: #fff;
+    padding: 8px;
+}
+
+/* Image rendering dropdown specific styles */
+#imageRendering,
+#mobileImageRendering {
+    background-color: #212529;
+    color: #fff;
+    border: 1px solid #404040;
+}
+
+#imageRendering option,
+#mobileImageRendering option {
+    background-color: #212529;
+    color: #fff;
+    padding: 8px;
+}
+
+#imageRendering option:hover,
+#mobileImageRendering option:hover {
+    background-color: #404040;
+}
