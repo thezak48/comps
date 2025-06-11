@@ -41,6 +41,17 @@ body {
     color: #fff;
 }
 
+.mobile-controls {
+    width: 100%;
+    padding: 10px;
+}
+
+.mobile-controls .dropdown-menu {
+    width: 100%;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
 .comparison-name {
     font-weight: bold;
     margin-right: 10px;
@@ -920,7 +931,6 @@ body {
     padding: 8px;
 }
 
-/* Image rendering dropdown specific styles */
 #imageRendering,
 #mobileImageRendering {
     background-color: #212529;

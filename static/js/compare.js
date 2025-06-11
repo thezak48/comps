@@ -1,10 +1,12 @@
 const { imageUrls, totalColumns, totalRows, imageNames, imageSizes } = compareData;
 let absoluteIndex = 0;
+
+// Get both desktop and mobile elements
 const currentImage = document.getElementById('currentImage');
 const currentImageInfoSpan = document.getElementById('currentImageInfo');
 const currentRowSpan = document.getElementById('currentRow');
 const currentColumnSpan = document.getElementById('currentColumn');
-const mobileCurrentImageInfoSpan = document.getElementById('mobileCurrentImageInfo');
+const mobileCurrentImageInfoSpan = document.getElementById('mobileCurrentImageInfo') || { textContent: '' };
 const mobileCurrentRowSpan = document.getElementById('mobileCurrentRow');
 const mobileCurrentColumnSpan = document.getElementById('mobileCurrentColumn');
 const mobileTotalRowsSpan = document.getElementById('mobileTotalRows');
@@ -195,6 +197,29 @@ document.querySelectorAll('[data-column]').forEach(item => {
         if (newIndex >= imageUrls.length) {
             return;
         }
+        absoluteIndex = (currentRow * totalColumns) + newCol;
+        updateDisplay();
+        updateNavigation();
+    });
+});
+
+// Add mobile dropdown handlers
+document.querySelectorAll('#mobileRowDropdown .dropdown-item').forEach(item => {
+    item.addEventListener('click', (e) => {
+        e.preventDefault();
+        const newRow = parseInt(e.target.dataset.row, 10);
+        const currentCol = absoluteIndex % totalColumns;
+        absoluteIndex = (newRow * totalColumns) + currentCol;
+        updateDisplay();
+        updateNavigation();
+    });
+});
+
+document.querySelectorAll('#mobileColumnDropdown .dropdown-item').forEach(item => {
+    item.addEventListener('click', (e) => {
+        e.preventDefault();
+        const newCol = parseInt(e.target.dataset.column, 10);
+        const currentRow = Math.floor(absoluteIndex / totalColumns);
         absoluteIndex = (currentRow * totalColumns) + newCol;
         updateDisplay();
         updateNavigation();

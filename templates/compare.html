@@ -117,7 +117,7 @@
             </div>
         </div>
         
-        <div class="collapse navbar-collapse" id="navbarContent">
+        <div class="collapse navbar-collapse" id="navbar">
             <div class="d-md-none mt-3 mobile-controls">
                 <div class="dropdown d-block mb-2">
                     <button class="btn btn-secondary dropdown-toggle w-100" type="button" id="mobileRowDropdown" data-bs-toggle="dropdown">
@@ -134,11 +134,11 @@
                     <button class="btn btn-secondary dropdown-toggle w-100" type="button" id="mobileColumnDropdown" data-bs-toggle="dropdown">
                         Image <span id="mobileCurrentColumn">1</span>/{{ total_columns }}: <span id="mobileCurrentImageInfo"></span>
                     </button>
-                    <div class="dropdown-menu w-100" aria-labelledby="mobileColumnDropdown">
+                    <ul class="dropdown-menu w-100" aria-labelledby="mobileColumnDropdown">
                         {% for column in range(total_columns) %}
                             <a class="dropdown-item" href="#" data-column="{{ column }}">Image {{ column + 1 }}/{{ total_columns }}: {{ image_names[column] }} [{{ image_sizes[column] }}]</a>
                         {% endfor %}
-                    </div>
+                    </ul>
                 </div>
                 
                 <div class="form-check form-switch d-flex align-items-center justify-content-between mb-2">
