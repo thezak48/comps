@@ -49,7 +49,6 @@ body {
 .mobile-controls .dropdown-menu {
     width: 100%;
     max-height: 300px;
-    overflow-y: auto;
 }
 
 .comparison-name {
@@ -73,7 +72,6 @@ body {
     max-width: 100%;
     margin: 0 auto;
     text-align: center;
-    overflow-x: auto;
     position: relative;
 }
 
@@ -243,7 +241,6 @@ body {
     min-width: 150px;
     display: flex;
     flex-direction: column;
-    overflow: auto;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
@@ -270,7 +267,6 @@ body {
     display: flex;
     flex-direction: column;
     width: 100%;
-    overflow-x: auto;
     padding: 15px;
     background: #1a1a1a;
     border-radius: 8px;
@@ -293,7 +289,6 @@ body {
 
 .image-viewer {
     width: 100%;
-    overflow: auto;
     position: relative;
     background: #1a1a1a;
     align-items: center;
@@ -395,7 +390,6 @@ body {
     border-bottom: 1px solid #eee;
     padding-bottom: 10px;
     max-width: 100%;
-    overflow: hidden;
     position: relative;
     cursor: pointer;
     transition: all 0.2s ease;
@@ -434,8 +428,6 @@ body {
     font-size: 0.9em;
     color: #666666;
     white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
     max-width: 100%;
 }
 
@@ -540,7 +532,6 @@ body {
     width: 100%;
     margin-bottom: 10px;
     gap: 15px;
-    overflow-x: auto;
     padding-bottom: 5px;
 }
 
@@ -581,7 +572,6 @@ body {
     flex-direction: row;
     flex-wrap: nowrap;
     gap: 15px;
-    overflow-x: auto;
     padding-bottom: 10px;
     width: 100%;
 }
@@ -609,7 +599,6 @@ body {
     transition: all 0.3s ease;
     background-color: #333;
     position: relative;
-    overflow: hidden;
     margin-bottom: 10px;
 }
 
@@ -651,7 +640,6 @@ body {
     display: flex;
     flex-direction: column;
     width: 100%;
-    overflow-x: auto;
     padding: 15px;
     background: #1a1a1a;
     border-radius: 8px;
@@ -828,7 +816,6 @@ body {
     display: flex;
     align-items: flex-start;
     animation: toast-in 0.3s ease-out forwards;
-    overflow: hidden;
     margin-bottom: 10px;
 }
 
