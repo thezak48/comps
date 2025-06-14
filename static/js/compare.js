@@ -20,7 +20,7 @@ toggleFitSwitch.checked = false;
 toggleBorderSwitch.checked = false;
 
 // Check for saved rendering preference
-const savedRendering = getCookie('imageRendering') || 'auto';
+const savedRendering = getCookie('imageRendering') || 'off';
 imageRenderingSelect.value = savedRendering;
 
 function setCookie(name, value, days) {
@@ -370,7 +370,12 @@ mobileToggleBorderSwitch.addEventListener('change', (event) => {
 // Image rendering controls
 imageRenderingSelect.addEventListener('change', (event) => {
     const renderingMode = event.target.value;
-    currentImage.style.imageRendering = renderingMode;
+    
+    if (renderingMode === 'off') {
+        currentImage.style.removeProperty('image-rendering');
+    } else {
+        currentImage.style.imageRendering = renderingMode;
+    }
     
     const mobileSelect = document.getElementById('mobileImageRendering');
     if (mobileSelect) {
@@ -451,6 +456,9 @@ document.addEventListener('DOMContentLoaded', () => {
         currentImage.classList.remove('fit');
         imageViewer.classList.remove('fit-mode');
     }
-    
-    currentImage.style.imageRendering = savedRendering;
+    if (savedRendering === 'off') {
+        currentImage.style.removeProperty('image-rendering');
+    } else {
+        currentImage.style.imageRendering = savedRendering;
+    }
 });
