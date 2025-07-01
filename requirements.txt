@@ -1,7 +1,7 @@
 fastapi==0.115.12
 python-multipart==0.0.20
 uvicorn==0.34.3
-pillow==11.2.1
+pillow==11.3.0
 python-jose==3.5.0
 sqlalchemy==2.0.41
 aiofiles==24.1.0
