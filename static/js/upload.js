@@ -1479,7 +1479,7 @@ document.getElementById('uploadButton').addEventListener('click', async () => {
 });
 
 // Configuration
-const MAX_BATCH_SIZE = 95 * 1024 * 1024; // 95MB to leave some headroom for form data
+const MAX_BATCH_SIZE = 50 * 1024 * 1024; // 95MB to leave some headroom for form data
 
 /**
  * Groups files into batches under MAX_BATCH_SIZE
