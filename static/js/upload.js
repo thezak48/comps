@@ -1370,10 +1370,8 @@ function clearMetadata() {
 }
 
 document.getElementById('uploadButton').addEventListener('click', async () => {
-    const formData = new FormData();
-    
     if (uploadInProgress) {
-        alert('Upload already in progress');
+        showToast('Upload already in progress', 'warning');
         return;
     }
 
@@ -1385,7 +1383,6 @@ document.getElementById('uploadButton').addEventListener('click', async () => {
     if (!validateMetadata()) {
         return;
     }
-    const metadata = getMetadata();
 
     if (selectedFiles.size > 120) {
         showError('Maximum 120 files allowed');
@@ -1402,79 +1399,110 @@ document.getElementById('uploadButton').addEventListener('click', async () => {
     uploadButton.disabled = true;
     uploadButton.textContent = 'Uploading...';
 
-    for (const file of selectedFiles) {
-        formData.append('files', file);
-    }
+    const metadata = getMetadata();
+    const files = Array.from(selectedFiles);
+    const totalFiles = files.length;
+    let uploadedFiles = 0;
+    let comparisonId = null;
 
-    // Add custom names to form data
-    const customNames = {};
-    fileMatrix.forEach((row, rowIndex) => {
-        row.forEach((file, colIndex) => {
-            if (file && file.customName) customNames[file.name] = file.customName;
-        });
-    });
-    formData.append('custom_names', JSON.stringify(customNames));
-    
-    // Add column naming patterns to form data
-    if (Object.keys(columnCustomNames).length > 0) {
-        formData.append('column_naming_patterns', JSON.stringify(columnCustomNames));
-    }
+    // Create batches
+    const MAX_BATCH_SIZE = 95 * 1024 * 1024; // 95MB
+    let batches = [];
+    let currentBatch = [];
+    let currentBatchSize = 0;
 
-    // Add column order information to the form data
-    formData.append('column_order', JSON.stringify(columnPrefixes));
-
-    // Add row count to the form data
-    formData.append('row_count', rowCount);
-
-    // Create file position data
-    const filePositions = [];
-    for (let r = 0; r < fileMatrix.length; r++) {
-        if (!fileMatrix[r]) continue;
-        
-        for (let c = 0; c < fileMatrix[r].length; c++) {
-            const file = fileMatrix[r][c];
-            if (file) {
-                filePositions.push({
-                    filename: file.name,
-                    row: r,
-                    column: c
-                });
-            }
+    for (const file of files) {
+        if (currentBatchSize + file.size > MAX_BATCH_SIZE && currentBatch.length > 0) {
+            batches.push(currentBatch);
+            currentBatch = [];
+            currentBatchSize = 0;
         }
+        currentBatch.push(file);
+        currentBatchSize += file.size;
     }
-    formData.append('file_positions', JSON.stringify(filePositions));
+    if (currentBatch.length > 0) {
+        batches.push(currentBatch);
+    }
 
-    formData.append('name', metadata.name);
-    formData.append('show_name', metadata.show_name);
-    formData.append('expiration_type', metadata.expiration_type);
-    formData.append('expiration_enabled', expirationToggle.checked ? "true" : "false");
-    formData.append('expiration_days', metadata.expiration_days);
-    formData.append('tags', metadata.tags);
-    formData.append('never_expire', metadata.never_expire ? 'true' : 'false');
+    showToast(`Starting upload of ${totalFiles} file(s) in ${batches.length} batch(es).`, 'info');
 
     try {
-        const response = await fetch('/upload/', {
-            method: 'POST',
-            body: formData
-        });
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+        for (let i = 0; i < batches.length; i++) {
+            const batch = batches[i];
+            const formData = new FormData();
+
+            // Append files for the current batch
+            for (const file of batch) {
+                formData.append('files', file);
+            }
+
+            // Append all metadata to each request.
+            // The server will use it to create the comparison on the first batch
+            // and identify it on subsequent batches.
+            const customNames = {};
+            fileMatrix.forEach((row) => {
+                row.forEach((file) => {
+                    if (file && file.customName) customNames[file.name] = file.customName;
+                });
+            });
+            formData.append('custom_names', JSON.stringify(customNames));
+            if (Object.keys(columnCustomNames).length > 0) {
+                formData.append('column_naming_patterns', JSON.stringify(columnCustomNames));
+            }
+            formData.append('column_order', JSON.stringify(columnPrefixes));
+            formData.append('row_count', rowCount);
+            const filePositions = [];
+            fileMatrix.forEach((row, r) => {
+                row.forEach((file, c) => {
+                    if (file) {
+                        filePositions.push({ filename: file.name, row: r, column: c });
+                    }
+                });
+            });
+            formData.append('file_positions', JSON.stringify(filePositions));
+            formData.append('name', metadata.name);
+            formData.append('show_name', metadata.show_name);
+            formData.append('expiration_type', metadata.expiration_type);
+            formData.append('expiration_enabled', expirationToggle.checked ? "true" : "false");
+            formData.append('expiration_days', metadata.expiration_days);
+            formData.append('tags', metadata.tags);
+            formData.append('never_expire', metadata.never_expire ? 'true' : 'false');
+            
+            // If we have a comparison ID from the first batch, send it along
+            if (comparisonId) {
+                formData.append('comparison_id', comparisonId);
+            }
+
+            uploadButton.textContent = `Uploading Batch ${i + 1}/${batches.length}...`;
+
+            const response = await fetch('/upload/', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.detail || `Batch ${i + 1} failed: HTTP ${response.status}`);
+            }
+
+            const data = await response.json();
+            if (i === 0) { // First batch
+                comparisonId = data.comparison_id;
+            }
+            uploadedFiles += batch.length;
         }
-        console.log('Upload response received:', response);
-        const data = await response.json();
-        console.log('Upload response data:', data);
-        showSuccess('Upload successful! Redirecting to comparison view...');
+
+        showSuccess('Upload successful! Redirecting...');
         clearMetadata();
-        window.location.href = `/compare/${data.comparison_id}`;
+        window.location.href = `/compare/${comparisonId}`;
+
     } catch (error) {
         console.error('Upload failed:', error);
         showError('Upload failed: ' + error.message);
     } finally {
-        console.log('Upload completed');
         uploadInProgress = false;
         uploadButton.disabled = false;
         uploadButton.textContent = 'Compare Images';
-        uploadButton.style.display = 'block';
     }
 });
 
