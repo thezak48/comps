@@ -1624,13 +1624,6 @@ dropZone.addEventListener('drop', async (e) => {
     }
 });
 
-document.getElementById('uploadButton').addEventListener('click', async () => {
-    const files = Array.from(selectedFiles);
-    if (files.length > 0) {
-        handleUpload(files);
-    }
-});
-
 // Helper function to update progress
 function updateProgress(message, percent) {
     const progressDiv = document.getElementById('uploadProgress');
