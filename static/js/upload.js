@@ -1400,7 +1400,17 @@ document.getElementById('uploadButton').addEventListener('click', async () => {
     uploadButton.textContent = 'Uploading...';
 
     const metadata = getMetadata();
-    const files = Array.from(selectedFiles);
+    
+    // Create a flat list of files from the fileMatrix to ensure correct order
+    const files = [];
+    fileMatrix.forEach(row => {
+        row.forEach(file => {
+            if (file) {
+                files.push(file);
+            }
+        });
+    });
+
     const totalFiles = files.length;
     let uploadedFiles = 0;
     let comparisonId = null;
