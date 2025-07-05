@@ -1,14 +1,15 @@
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends, Query
 from fastapi.responses import JSONResponse
-import random
-import uuid
-import os
-import shutil
 from pathlib import Path
 from typing import List, Optional
-import json
-import sqlite3
 from datetime import datetime
+import json
+import uuid
+import shutil
+import logging
+import os
+import random
+import sqlite3
 
 from .models import (
     ComparisonCreate, 
@@ -25,6 +26,9 @@ from database import (
     update_image_custom_name,
     update_last_accessed
 )
+
+# Set up logging
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1", tags=["api"])
 
@@ -92,48 +96,75 @@ async def list_comparisons():
     return comparisons
 
 @router.post("/comparisons", response_model=ComparisonResponse, status_code=201)
-async def create_new_comparison(comparison: ComparisonCreate):
+async def create_comparison(
+    files: List[UploadFile] = File(...),
+    metadata: Optional[str] = Form(None),
+    comparison_id: Optional[str] = Form(None),
+    is_batch: Optional[bool] = Form(False)
+):
     """
-    Create a new comparison.
+    Create a new comparison or add files to an existing comparison.
 
-    Creates a new comparison with the specified parameters:
+    For the first batch of a new comparison, the following metadata is required:
     - Name and show name (optional)
     - Tags for categorization (optional)
     - Grid dimensions (rows and columns, max 20 rows)
-    - Expiration settings
+    
+    Subsequent batches can be added by providing the comparison ID and setting
+    is_batch to true. In this case, metadata is not required.
     """
-    comparison_id = str(uuid.uuid4())
-    
-    # Generate a random name if none provided
-    if not comparison.name or comparison.name.strip() == '':
-        comparison.name = generate_random_name()
-        print(f"No name provided, generated random name: {comparison.name}")
-    
-    # Prepare metadata
-    metadata = {
-        "total_columns": comparison.total_columns,
-        "total_rows": comparison.total_rows,
-    }
-    
-    # Enforce maximum rows limit
-    metadata["total_rows"] = min(metadata["total_rows"], MAX_ROWS)
-    
-    # Create comparison directory
-    comparison_dir = Path(UPLOADS_PATH) / comparison_id
-    comparison_dir.mkdir(exist_ok=True, parents=True)
-    
-    # Store in database
-    create_comparison(
-        comparison_id=comparison_id,
-        name=comparison.name,
-        show_name=comparison.show_name,
-        tags=comparison.tags,
-        metadata=metadata
-    )
-    
-    # Get the created comparison
-    result = get_comparison(comparison_id)
-    return result
+    try:
+        # For subsequent batches in a multi-batch upload
+        if is_batch and comparison_id:
+            comparison = get_comparison(comparison_id)
+            if not comparison:
+                raise HTTPException(status_code=404, detail="Comparison not found")
+        else:
+            # Create new comparison for first batch
+            if not metadata:
+                raise HTTPException(status_code=400, detail="Metadata required for new comparison")
+            
+            metadata_dict = json.loads(metadata)
+            comparison = create_comparison(
+                name=metadata_dict.get("name", "Untitled"),
+                show_name=metadata_dict.get("show_name"),
+                tags=metadata_dict.get("tags", []),
+                total_rows=metadata_dict.get("total_rows", 1),
+                total_columns=metadata_dict.get("total_columns", len(files))
+            )
+            comparison_id = comparison["id"]
+
+        # Process uploaded files
+        uploads_dir = Path(UPLOADS_PATH) / comparison_id
+        uploads_dir.mkdir(parents=True, exist_ok=True)
+
+        for file in files:
+            # Generate a unique filename
+            file_ext = Path(file.filename).suffix
+            unique_filename = f"{uuid.uuid4()}{file_ext}"
+            
+            # Save the file
+            file_path = uploads_dir / unique_filename
+            with open(file_path, "wb") as f:
+                shutil.copyfileobj(file.file, f)
+
+            # Get file size
+            file_size = file_path.stat().st_size
+            size_str = f"{file_size / (1024*1024):.1f}MB"
+
+            # Store metadata
+            store_image_metadata(
+                comparison_id=comparison_id,
+                filename=unique_filename,
+                original_filename=file.filename,
+                image_size=size_str
+            )
+
+        return {"id": comparison_id}
+
+    except Exception as e:
+        logger.error(f"Error creating comparison: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/comparisons/{comparison_id}", response_model=ComparisonDetail)
 async def get_comparison_detail(comparison_id: str):

@@ -110,57 +110,31 @@ def store_image_position(comparison_id: str, filename: str, row_number: int, col
     conn.commit()
     conn.close()
 
-def store_image_metadata(comparison_id: str, filename: str, original_filename: str, image_size: str):
+def store_image_metadata(comparison_id: str, filename: str, original_filename: str, image_size: str, position: Optional[int] = None):
     """
-    Store metadata for an uploaded image
+    Store metadata for an uploaded image with optional position
     
     Args:
         comparison_id: The UUID of the comparison
         filename: The UUID-based filename in the filesystem
         original_filename: The original filename as uploaded by the user
         image_size: The size of the image (formatted string)
+        position: Optional position index to maintain upload order
     """
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     
-    # Check if the table exists (should be created by migrations)
-    c.execute('''
-        SELECT name FROM sqlite_master WHERE type='table' AND name='image_metadata'
-    ''')
-    if not c.fetchone():
-        # Create table if it doesn't exist (fallback)
+    try:
+        # Store the metadata with position
         c.execute('''
-            CREATE TABLE IF NOT EXISTS image_metadata (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                comparison_id TEXT NOT NULL,
-                filename TEXT NOT NULL,
-                original_filename TEXT,
-                image_size TEXT,
-                custom_name TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (comparison_id) REFERENCES comparisons (id)
-            )
-        ''')
+            INSERT INTO image_metadata 
+            (comparison_id, filename, original_filename, image_size, position) 
+            VALUES (?, ?, ?, ?, ?)
+        ''', (comparison_id, filename, original_filename, image_size, position))
         
-        # Create indices for performance
-        c.execute('''
-            CREATE INDEX IF NOT EXISTS idx_image_metadata_comparison 
-            ON image_metadata(comparison_id)
-        ''')
-        
-        c.execute('''
-            CREATE INDEX IF NOT EXISTS idx_image_metadata_filename 
-            ON image_metadata(filename)
-        ''')
-    
-    # Store the metadata
-    c.execute(
-        'INSERT OR REPLACE INTO image_metadata (comparison_id, filename, original_filename, image_size) VALUES (?, ?, ?, ?)',
-        (comparison_id, filename, original_filename, image_size)
-    )
-    
-    conn.commit()
-    conn.close()
+        conn.commit()
+    finally:
+        conn.close()
 
 def update_image_custom_name(comparison_id: str, filename: str, custom_name: str):
     """
@@ -181,6 +155,25 @@ def update_image_custom_name(comparison_id: str, filename: str, custom_name: str
     
     conn.commit()
     conn.close()
+
+def get_comparison_images(comparison_id: str) -> List[dict]:
+    """
+    Get all images for a comparison, ordered by position if available
+    """
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    
+    try:
+        c.execute('''
+            SELECT * FROM image_metadata 
+            WHERE comparison_id = ? 
+            ORDER BY position NULLS LAST, created_at
+        ''', (comparison_id,))
+        
+        return [dict(row) for row in c.fetchall()]
+    finally:
+        conn.close()
 
 def get_expired_comparisons(retention_days: int):
     """

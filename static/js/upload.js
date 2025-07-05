@@ -1478,9 +1478,194 @@ document.getElementById('uploadButton').addEventListener('click', async () => {
     }
 });
 
+// Configuration
+const MAX_BATCH_SIZE = 95 * 1024 * 1024; // 95MB to leave some headroom for form data
+
+/**
+ * Groups files into batches under MAX_BATCH_SIZE
+ * @param {File[]} files - Array of files to batch
+ * @returns {Array<File[]>} Array of file batches
+ */
+function createBatches(files) {
+    const batches = [];
+    let currentBatch = [];
+    let currentSize = 0;
+
+    // Group files by rows to maintain order
+    const rows = new Map();
+    for (const file of files) {
+        const rowPrefix = file.name.split('_')[0];
+        if (!rows.has(rowPrefix)) {
+            rows.set(rowPrefix, []);
+        }
+        rows.get(rowPrefix).push(file);
+    }
+
+    // Create batches maintaining row grouping
+    for (const [_, rowFiles] of rows) {
+        let rowBatch = [];
+        let rowSize = 0;
+
+        for (const file of rowFiles) {
+            if (rowSize + file.size > MAX_BATCH_SIZE) {
+                if (rowBatch.length > 0) {
+                    batches.push(rowBatch);
+                }
+                rowBatch = [file];
+                rowSize = file.size;
+            } else {
+                rowBatch.push(file);
+                rowSize += file.size;
+            }
+        }
+
+        if (rowBatch.length > 0) {
+            batches.push(rowBatch);
+        }
+    }
+
+    return batches;
+}
+
+/**
+ * Uploads a batch of files
+ * @param {File[]} batch - Array of files to upload
+ * @param {string} comparisonId - ID of the comparison (null for first batch)
+ * @param {object} metadata - Comparison metadata
+ * @returns {Promise<string>} Comparison ID
+ */
+async function uploadBatch(batch, comparisonId, metadata) {
+    const formData = new FormData();
+    
+    // Add all files in the batch
+    batch.forEach((file, index) => {
+        formData.append('files', file);
+    });
+
+    // Handle metadata and batch flags differently for first and subsequent batches
+    if (comparisonId) {
+        // Subsequent batch - only need the comparison ID
+        formData.append('comparison_id', comparisonId);
+    } else {
+        // First batch - include all metadata
+        formData.append('name', metadata.name || '');
+        formData.append('show_name', metadata.show_name || '');
+        formData.append('tags', metadata.tags || '');
+        formData.append('row_count', metadata.total_rows.toString());
+        
+        // Create file position data for this batch
+        const filePositions = batch.map((file, index) => ({
+            filename: file.name,
+            row: Math.floor(index / metadata.total_columns),
+            column: index % metadata.total_columns
+        }));
+        formData.append('file_positions', JSON.stringify(filePositions));
+    }
+
+    try {
+        const response = await fetch('/upload/', {
+            method: 'POST',
+            body: formData
+        });
+
+        if (!response.ok) {
+            throw new Error(`Upload failed: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        return data.comparison_id;
+    } catch (error) {
+        throw new Error(`Upload failed: ${error.message}`);
+    }
+}
+
+/**
+ * Handles the file upload process including batching
+ * @param {File[]} files - Array of files to upload
+ */
+async function handleUpload(files) {
+    try {
+        // Prepare metadata
+        const metadata = {
+            name: comparisonNameInput.value || 'Untitled Comparison',
+            show_name: showNameToggle.checked ? showNameInput.value : null,
+            tags: tagsToggle.checked ? tagsInput.value.split(',').map(t => t.trim()) : [],
+            total_rows: columnPrefixes.length,
+            total_columns: Math.max(...Array.from(groupedFiles.values()).map(f => f.length))
+        };
+
+        // Create batches
+        const batches = createBatches(files);
+        let comparisonId = null;
+
+        // Upload each batch
+        for (let i = 0; i < batches.length; i++) {
+            const batch = batches[i];
+            updateProgress(`Uploading batch ${i + 1}/${batches.length}...`, (i / batches.length) * 100);
+            
+            comparisonId = await uploadBatch(batch, comparisonId, metadata);
+        }
+
+        // Redirect to comparison page
+        window.location.href = `/compare/${comparisonId}`;
+    } catch (error) {
+        showError(error.message);
+    }
+}
+
+// Update the event listeners to use the new upload handler
+dropZone.addEventListener('drop', async (e) => {
+    e.preventDefault();
+    dropZone.classList.remove('dragover');
+    
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length > 0) {
+        handleUpload(files);
+    }
+});
+
+document.getElementById('uploadButton').addEventListener('click', async () => {
+    const files = Array.from(selectedFiles);
+    if (files.length > 0) {
+        handleUpload(files);
+    }
+});
+
+// Helper function to update progress
+function updateProgress(message, percent) {
+    const progressDiv = document.getElementById('uploadProgress');
+    progressDiv.style.display = 'block';
+    progressDiv.innerHTML = `${message} (${Math.round(percent)}%)`;
+}
+
 // Call this after the page loads
 window.addEventListener('DOMContentLoaded', function() {
     document.getElementById('uploadButton').style.display = 'block';
+    
+    // Create upload container if it doesn't exist
+    let uploadContainer = document.querySelector('.upload-container');
+    if (!uploadContainer) {
+        uploadContainer = document.createElement('div');
+        uploadContainer.className = 'upload-container';
+        // Insert after the upload button
+        const uploadButton = document.getElementById('uploadButton');
+        if (uploadButton && uploadButton.parentNode) {
+            uploadButton.parentNode.insertBefore(uploadContainer, uploadButton.nextSibling);
+        } else {
+            document.body.appendChild(uploadContainer);
+        }
+    }
+    
+    // Create progress div if it doesn't exist
+    let progressDiv = document.getElementById('uploadProgress');
+    if (!progressDiv) {
+        progressDiv = document.createElement('div');
+        progressDiv.id = 'uploadProgress';
+        progressDiv.className = 'upload-progress mt-3';
+        progressDiv.style.display = 'none';
+        uploadContainer.appendChild(progressDiv);
+    }
+    
     // Initialize the first row in the file matrix
     fileMatrix[0] = [];
     for (let i = 0; i < columnCount; i++) {
