@@ -30,3 +30,11 @@ Tots not vibe coded because lazy
 Comps provides a RESTful API for programmatic access:
 
 For more details, see the [API Documentation](https://thezak48.github.io/comps/).
+
+## License
+
+This project is licensed under the GNU General Public License v3.0 - see the [LICENSE](LICENSE) file for details.
+
+### Third-Party Code
+
+This project includes code from EasyCompare (Copyright (C) 2020 N3xusHD, Sec-ant) licensed under GPL-3.0.
