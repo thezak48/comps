@@ -1,12 +1,33 @@
 const { imageUrls, totalColumns, totalRows, imageNames, imageSizes } = compareData;
 let absoluteIndex = 0;
 
-// Add preload function near the top
+// Replace the existing preloadImages function with this improved version
 function preloadImages() {
-    imageUrls.forEach(url => {
-        const img = new Image();
-        img.src = `/uploads/${url}`;
+    // Create a promise for each image load
+    const preloadPromises = imageUrls.map(url => {
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+            img.onload = () => resolve(url);
+            img.onerror = () => reject(url);
+            img.src = `/uploads/${url}`;
+        });
     });
+
+    // Add loading indicator to the page
+    const loadingIndicator = document.createElement('div');
+    loadingIndicator.id = 'preloadIndicator';
+    loadingIndicator.style.cssText = 'position: fixed; bottom: 20px; right: 20px; background: rgba(0,0,0,0.7); color: white; padding: 10px; border-radius: 5px;';
+    loadingIndicator.textContent = 'Loading images...';
+    document.body.appendChild(loadingIndicator);
+
+    // Wait for all images to load
+    Promise.allSettled(preloadPromises)
+        .then(results => {
+            const loaded = results.filter(r => r.status === 'fulfilled').length;
+            const failed = results.filter(r => r.status === 'rejected').length;
+            console.log(`Preloaded ${loaded} images, ${failed} failed`);
+            loadingIndicator.remove();
+        });
 }
 
 // Get both desktop and mobile elements

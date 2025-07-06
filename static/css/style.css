@@ -936,3 +936,13 @@ body {
 #mobileImageRendering option:hover {
     background-color: #404040;
 }
+
+#preloadIndicator {
+    z-index: 1000;
+    animation: fadeInOut 2s infinite;
+}
+
+@keyframes fadeInOut {
+    0%, 100% { opacity: 0.7; }
+    50% { opacity: 1; }
+}
