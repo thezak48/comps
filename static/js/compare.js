@@ -123,11 +123,11 @@ document.addEventListener('keydown', (e) => {
         case 'ArrowLeft':
             e.preventDefault();
             navigateToColumn(-1);
-           break;
+            break;
         case 'ArrowRight':
             e.preventDefault();
             navigateToColumn(1);
-           break;
+            break;
         case 'ArrowUp':
             e.preventDefault();
             const prevRow = absoluteIndex - totalColumns;
@@ -136,7 +136,7 @@ document.addEventListener('keydown', (e) => {
                 updateDisplay();
                 updateNavigation();
             }
-           break;
+            break;
         case 'ArrowDown':
             e.preventDefault();
             const nextRow = absoluteIndex + totalColumns;
@@ -145,7 +145,43 @@ document.addEventListener('keydown', (e) => {
                 updateDisplay();
                 updateNavigation();
             }
-           break;
+            break;
+        // Add number key navigation for rows
+        case '1': case '2': case '3': case '4': case '5': 
+        case '6': case '7': case '8': case '9': case '0':
+            e.preventDefault();
+            const currentColumn = absoluteIndex % totalColumns;
+            let targetRow = parseInt(e.key) - 1;
+            // Handle the '0' key as row 10
+            if (e.key === '0') targetRow = 9;
+            
+            // Only navigate if the target row exists
+            if (targetRow < totalRows) {
+                absoluteIndex = (targetRow * totalColumns) + currentColumn;
+                if (absoluteIndex < imageUrls.length) {
+                    updateDisplay();
+                    updateNavigation();
+                }
+            }
+            break;
+        // Add numpad support for rows
+        case 'Numpad1': case 'Numpad2': case 'Numpad3': case 'Numpad4': case 'Numpad5':
+        case 'Numpad6': case 'Numpad7': case 'Numpad8': case 'Numpad9': case 'Numpad0':
+            e.preventDefault();
+            const currentColumnNumpad = absoluteIndex % totalColumns;
+            let targetRowNumpad = parseInt(e.key.replace('Numpad', '')) - 1;
+            // Handle the numpad '0' key as row 10
+            if (e.key === 'Numpad0') targetRowNumpad = 9;
+            
+            // Only navigate if the target row exists
+            if (targetRowNumpad < totalRows) {
+                absoluteIndex = (targetRowNumpad * totalColumns) + currentColumnNumpad;
+                if (absoluteIndex < imageUrls.length) {
+                    updateDisplay();
+                    updateNavigation();
+                }
+            }
+            break;
     }
 });
 
