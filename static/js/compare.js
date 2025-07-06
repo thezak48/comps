@@ -1,6 +1,14 @@
 const { imageUrls, totalColumns, totalRows, imageNames, imageSizes } = compareData;
 let absoluteIndex = 0;
 
+// Add preload function near the top
+function preloadImages() {
+    imageUrls.forEach(url => {
+        const img = new Image();
+        img.src = `/uploads/${url}`;
+    });
+}
+
 // Get both desktop and mobile elements
 const currentImage = document.getElementById('currentImage');
 const currentImageInfoSpan = document.getElementById('currentImageInfo');
@@ -451,6 +459,10 @@ updateDisplay();
 updateNavigation();
 
 document.addEventListener('DOMContentLoaded', () => {
+    // Start preloading images
+    preloadImages();
+    
+    // Check for saved preferences
     const savedViewMode = getCookie('imageViewMode');
     if (savedViewMode === 'original') {
         currentImage.classList.remove('fit');
