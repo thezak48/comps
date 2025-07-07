@@ -1,0 +1,7 @@
+This project includes code from the following third-party sources:
+
+1. EasyCompare
+   - Copyright (C) 2020 N3xusHD, Sec-ant
+   - Licensed under GNU GPL v3.0
+   - Source: [URL to the original project]
+   - Files affected: static/js/compare.js (solarization implementation)

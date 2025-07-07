@@ -1,5 +1,77 @@
+/*
+ * Image Comparison Tool
+ * Copyright (C) 2025 thezak48
+ * 
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ * 
+ * This program incorporates work covered by the following copyright and permission notice:
+ * - Solarization curve implementation from EasyCompare
+ * - Copyright (C) 2020 N3xusHD, Sec-ant
+ * - Licensed under GNU GPL v3.0
+ */
+
 const { imageUrls, totalColumns, totalRows, imageNames, imageSizes } = compareData;
 let absoluteIndex = 0;
+let isSolarized = false;
+
+/*
+ * Solarization curve implementation
+ * Adapted from EasyCompare
+ * Copyright (C) 2020 N3xusHD, Sec-ant
+ * Licensed under GNU GPL v3.0
+ */
+let rgbSolarCurve;
+
+function solarCurve(x, t = 5, k = 5.5) {
+    const m = (k * Math.PI - 128 / t);
+    const A = -1 / 4194304 * m;
+    const B = 3 / 32768 * m;
+    const C = 1 / t;
+    return Math.round(
+        127.9999 * Math.sin(
+            A * x ** 3 + B * x ** 2 + C * x - Math.PI / 2
+        ) + 127.5
+    ) || 0;
+}
+
+const STORAGE_KEY = 'solarizationCurves';
+let solarizationInProgress = false;
+
+// Modify generateSolarCurves to use localStorage
+function generateSolarCurves() {
+    // Try to load from localStorage first
+    const savedCurves = localStorage.getItem(STORAGE_KEY);
+    if (savedCurves) {
+        const parsed = JSON.parse(savedCurves);
+        rgbSolarCurve = parsed.map(arr => new Uint8Array(arr));
+        return;
+    }
+
+    // Generate new curves if not found in storage
+    if (!rgbSolarCurve) {
+        rgbSolarCurve = [
+            new Uint8Array(Array.from({ length: 256 }, (_, x) => solarCurve(x))),
+            new Uint8Array(Array.from({ length: 256 }, (_, x) => solarCurve(x - 5))),
+            new Uint8Array(Array.from({ length: 256 }, (_, x) => solarCurve(x + 5)))
+        ];
+        // Save to localStorage
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(rgbSolarCurve.map(arr => Array.from(arr))));
+    }
+}
+
+function processSolarization(imageData) {
+    const data = imageData.data;
+    for (let i = 0; i < data.length; i += 4) {
+        data[i] = rgbSolarCurve[0][data[i]];         // Red
+        data[i + 1] = rgbSolarCurve[1][data[i + 1]]; // Green
+        data[i + 2] = rgbSolarCurve[2][data[i + 2]]; // Blue
+    }
+    return imageData;
+}
+// Solarization curve implementation adapted from EasyCompare end
 
 // Replace the existing preloadImages function with this improved version
 function preloadImages() {
@@ -182,6 +254,19 @@ document.addEventListener('keydown', (e) => {
                 }
             }
             break;
+        // Modify the keydown event handler for 's' key
+        case 's':
+        case 'S':
+            e.preventDefault();
+            if (!rgbSolarCurve) {
+                generateSolarCurves();
+            }
+            isSolarized = !isSolarized;
+            if (!isSolarized) {
+                solarizedImageCache.clear(); // Clear cache when disabling solarization
+            }
+            updateDisplay();
+            break;
     }
 });
 
@@ -194,8 +279,59 @@ function navigate(direction) {
     }
 }
 
+const solarizedImageCache = new Map();
+
 function updateDisplay() {
-    currentImage.src = `/uploads/${imageUrls[absoluteIndex]}`;
+    if (isSolarized) {
+        if (solarizationInProgress) {
+            return; // Prevent multiple simultaneous processing
+        }
+
+        // Check if image is already in cache
+        const currentUrl = imageUrls[absoluteIndex];
+        if (solarizedImageCache.has(currentUrl)) {
+            currentImage.src = solarizedImageCache.get(currentUrl);
+        } else {
+            solarizationInProgress = true;
+
+            // Create loading indicator
+            const loadingIndicator = document.createElement('div');
+            loadingIndicator.id = 'solarizeIndicator';
+            loadingIndicator.style.cssText = 'position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.8); color: white; padding: 15px; border-radius: 5px; z-index: 1000;';
+            loadingIndicator.textContent = 'Processing solarization...';
+            document.body.appendChild(loadingIndicator);
+
+            const img = new Image();
+            img.onload = function() {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                canvas.width = img.naturalWidth;
+                canvas.height = img.naturalHeight;
+                ctx.drawImage(img, 0, 0);
+                
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                const processedData = processSolarization(imageData);
+                ctx.putImageData(processedData, 0, 0);
+                
+                const solarizedDataUrl = canvas.toDataURL();
+                solarizedImageCache.set(currentUrl, solarizedDataUrl);
+                currentImage.src = solarizedDataUrl;
+                
+                // Remove loading indicator
+                loadingIndicator.remove();
+                solarizationInProgress = false;
+            }
+            img.onerror = function() {
+                loadingIndicator.remove();
+                solarizationInProgress = false;
+                console.error('Failed to load image for solarization');
+            }
+            img.src = `/uploads/${currentUrl}`;
+        }
+    } else {
+        currentImage.src = `/uploads/${imageUrls[absoluteIndex]}`;
+    }
+    
     currentImage.style.cursor = 'pointer';
     const currentImageName = imageNames[absoluteIndex] || 'Unknown';
     const currentImageSize = imageSizes[absoluteIndex] || '';
@@ -530,4 +666,5 @@ document.addEventListener('DOMContentLoaded', () => {
     } else {
         currentImage.style.imageRendering = savedRendering;
     }
+    generateSolarCurves();
 });
