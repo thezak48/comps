@@ -1370,10 +1370,8 @@ function clearMetadata() {
 }
 
 document.getElementById('uploadButton').addEventListener('click', async () => {
-    const formData = new FormData();
-    
     if (uploadInProgress) {
-        alert('Upload already in progress');
+        showToast('Upload already in progress', 'warning');
         return;
     }
 
@@ -1385,7 +1383,6 @@ document.getElementById('uploadButton').addEventListener('click', async () => {
     if (!validateMetadata()) {
         return;
     }
-    const metadata = getMetadata();
 
     if (selectedFiles.size > 120) {
         showError('Maximum 120 files allowed');
@@ -1399,82 +1396,97 @@ document.getElementById('uploadButton').addEventListener('click', async () => {
 
     uploadInProgress = true;
     const uploadButton = document.getElementById('uploadButton');
+    const progressBarContainer = document.createElement('div');
+    progressBarContainer.className = 'progress-bar-container';
+    progressBarContainer.innerHTML = `
+        <div class="progress">
+            <div class="progress-bar" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
+        </div>
+        <div class="progress-text">Starting upload...</div>
+    `;
+    uploadButton.parentElement.appendChild(progressBarContainer);
+    
     uploadButton.disabled = true;
     uploadButton.textContent = 'Uploading...';
 
-    for (const file of selectedFiles) {
-        formData.append('files', file);
-    }
-
-    // Add custom names to form data
-    const customNames = {};
-    fileMatrix.forEach((row, rowIndex) => {
-        row.forEach((file, colIndex) => {
-            if (file && file.customName) customNames[file.name] = file.customName;
-        });
-    });
-    formData.append('custom_names', JSON.stringify(customNames));
-    
-    // Add column naming patterns to form data
-    if (Object.keys(columnCustomNames).length > 0) {
-        formData.append('column_naming_patterns', JSON.stringify(columnCustomNames));
-    }
-
-    // Add column order information to the form data
-    formData.append('column_order', JSON.stringify(columnPrefixes));
-
-    // Add row count to the form data
-    formData.append('row_count', rowCount);
-
-    // Create file position data
-    const filePositions = [];
-    for (let r = 0; r < fileMatrix.length; r++) {
-        if (!fileMatrix[r]) continue;
-        
-        for (let c = 0; c < fileMatrix[r].length; c++) {
-            const file = fileMatrix[r][c];
-            if (file) {
-                filePositions.push({
-                    filename: file.name,
-                    row: r,
-                    column: c
-                });
-            }
-        }
-    }
-    formData.append('file_positions', JSON.stringify(filePositions));
-
-    formData.append('name', metadata.name);
-    formData.append('show_name', metadata.show_name);
-    formData.append('expiration_type', metadata.expiration_type);
-    formData.append('expiration_enabled', expirationToggle.checked ? "true" : "false");
-    formData.append('expiration_days', metadata.expiration_days);
-    formData.append('tags', metadata.tags);
-    formData.append('never_expire', metadata.never_expire ? 'true' : 'false');
+    const metadata = getMetadata();
+    const comparisonFormData = new FormData();
+    comparisonFormData.append('name', metadata.name);
+    comparisonFormData.append('show_name', metadata.show_name);
+    comparisonFormData.append('expiration_type', metadata.expiration_type);
+    comparisonFormData.append('expiration_enabled', expirationToggle.checked ? "true" : "false");
+    comparisonFormData.append('expiration_days', metadata.expiration_days);
+    comparisonFormData.append('tags', metadata.tags);
+    comparisonFormData.append('total_rows', rowCount);
+    comparisonFormData.append('total_columns', columnCount);
 
     try {
-        const response = await fetch('/upload/', {
+        // 1. Create the comparison
+        const comparisonResponse = await fetch('/api/comparison', {
             method: 'POST',
-            body: formData
+            body: comparisonFormData
         });
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+
+        if (!comparisonResponse.ok) {
+            const errorData = await comparisonResponse.json();
+            throw new Error(errorData.error || `Failed to create comparison: ${comparisonResponse.statusText}`);
         }
-        console.log('Upload response received:', response);
-        const data = await response.json();
-        console.log('Upload response data:', data);
-        showSuccess('Upload successful! Redirecting to comparison view...');
+
+        const { comparison_id } = await comparisonResponse.json();
+
+        // 2. Upload each file individually
+        const filesToUpload = [];
+        fileMatrix.forEach((row, rowIndex) => {
+            row.forEach((file, colIndex) => {
+                if (file) {
+                    filesToUpload.push({ file, row: rowIndex, column: colIndex });
+                }
+            });
+        });
+
+        const totalFiles = filesToUpload.length;
+        const progressBar = progressBarContainer.querySelector('.progress-bar');
+        const progressText = progressBarContainer.querySelector('.progress-text');
+
+        for (let i = 0; i < totalFiles; i++) {
+            const { file, row, column } = filesToUpload[i];
+            const imageFormData = new FormData();
+            imageFormData.append('file', file);
+            imageFormData.append('row', row);
+            imageFormData.append('column', column);
+            imageFormData.append('original_filename', file.name);
+            if (file.customName) {
+                imageFormData.append('custom_name', file.customName);
+            }
+
+            const imageResponse = await fetch(`/api/comparison/${comparison_id}/image`, {
+                method: 'POST',
+                body: imageFormData
+            });
+
+            if (!imageResponse.ok) {
+                throw new Error(`Failed to upload ${file.name}`);
+            }
+
+            const progress = Math.round(((i + 1) / totalFiles) * 100);
+            progressBar.style.width = `${progress}%`;
+            progressBar.textContent = `${progress}%`;
+            progressBar.setAttribute('aria-valuenow', progress);
+            progressText.textContent = `Uploading ${i + 1} of ${totalFiles}: ${file.name}`;
+        }
+
+        showSuccess('Upload successful! Redirecting...');
         clearMetadata();
-        window.location.href = `/compare/${data.comparison_id}`;
+        window.location.href = `/compare/${comparison_id}`;
+
     } catch (error) {
         console.error('Upload failed:', error);
         showError('Upload failed: ' + error.message);
+        progressBarContainer.remove(); // Clean up progress bar on failure
     } finally {
-        console.log('Upload completed');
         uploadInProgress = false;
         uploadButton.disabled = false;
         uploadButton.textContent = 'Compare Images';
-        uploadButton.style.display = 'block';
     }
 });
 

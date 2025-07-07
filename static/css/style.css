@@ -231,6 +231,17 @@ body {
     cursor: not-allowed;
 }
 
+.progress-bar-container {
+    width: 100%;
+    margin-top: 15px;
+}
+
+.progress-text {
+    margin-top: 5px;
+    color: #e0e0e0;
+    font-size: 0.9em;
+}
+
 .comparison-column {
     margin: 10px;
     padding: 15px;
