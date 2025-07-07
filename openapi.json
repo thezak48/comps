@@ -381,6 +381,91 @@
         }
       }
     },
+    "/api/comparison": {
+      "post": {
+        "summary": "Api Create Comparison",
+        "description": "Creates a new comparison record and returns its ID.\nThis endpoint does not accept files.",
+        "operationId": "api_create_comparison_api_comparison_post",
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_api_create_comparison_api_comparison_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/comparison/{comparison_id}/image": {
+      "post": {
+        "summary": "Api Upload Image",
+        "description": "Uploads a single image to an existing comparison.",
+        "operationId": "api_upload_image_api_comparison__comparison_id__image_post",
+        "parameters": [
+          {
+            "name": "comparison_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Comparison Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_api_upload_image_api_comparison__comparison_id__image_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/upload/": {
       "post": {
         "summary": "Upload Files",
@@ -476,6 +561,112 @@
   },
   "components": {
     "schemas": {
+      "Body_api_create_comparison_api_comparison_post": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "show_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Show Name"
+          },
+          "expiration_type": {
+            "type": "string",
+            "title": "Expiration Type",
+            "default": "from_last_access"
+          },
+          "expiration_enabled": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expiration Enabled"
+          },
+          "expiration_days": {
+            "type": "integer",
+            "title": "Expiration Days",
+            "default": 7
+          },
+          "tags": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tags"
+          },
+          "total_rows": {
+            "type": "integer",
+            "title": "Total Rows",
+            "default": 1
+          },
+          "total_columns": {
+            "type": "integer",
+            "title": "Total Columns",
+            "default": 2
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "Body_api_create_comparison_api_comparison_post"
+      },
+      "Body_api_upload_image_api_comparison__comparison_id__image_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "format": "binary",
+            "title": "File"
+          },
+          "row": {
+            "type": "integer",
+            "title": "Row"
+          },
+          "column": {
+            "type": "integer",
+            "title": "Column"
+          },
+          "original_filename": {
+            "type": "string",
+            "title": "Original Filename"
+          },
+          "custom_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Custom Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file",
+          "row",
+          "column",
+          "original_filename"
+        ],
+        "title": "Body_api_upload_image_api_comparison__comparison_id__image_post"
+      },
       "Body_upload_files_upload__post": {
         "properties": {
           "files": {
