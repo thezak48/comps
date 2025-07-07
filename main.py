@@ -342,6 +342,101 @@ async def delete_user_comparison(comparison_id: str, request: Request):
     delete_comparison(comparison_id, UPLOADS_PATH)
     return JSONResponse(content={"message": "Comparison deleted successfully"})
 
+@app.post("/api/comparison")
+async def api_create_comparison(
+    request: Request,
+    name: str = Form(...),
+    show_name: Optional[str] = Form(None),
+    expiration_type: str = Form("from_last_access"),
+    expiration_enabled: Optional[str] = Form(None),
+    expiration_days: int = Form(7),
+    tags: Optional[str] = Form(None),
+    total_rows: int = Form(1),
+    total_columns: int = Form(2)
+):
+    """
+    Creates a new comparison record and returns its ID.
+    This endpoint does not accept files.
+    """
+    logger.info(f"Received request to create a new comparison")
+    user = await auth.get_optional_user(request)
+    user_id = user["id"] if user else None
+    logger.info(f"Create comparison request from user: {user['username'] if user else 'anonymous'}")
+
+    comparison_id = str(uuid.uuid4())
+
+    if not name or name.strip() == '':
+        name = generate_random_name()
+        logger.info(f"No name provided, generated random name: {name}")
+
+    tag_list = [tag.strip() for tag in tags.split(',') if tag.strip()] if tags and tags.strip() else []
+
+    never_expire = None
+    if user:
+        if expiration_enabled == "true":
+            never_expire = False
+        else:
+            never_expire = True
+
+    metadata = {
+        "total_rows": total_rows,
+        "total_columns": total_columns,
+        "expiration_type": expiration_type,
+        "expiration_days": expiration_days,
+        "never_expire": never_expire
+    }
+
+    create_comparison(
+        comparison_id=comparison_id,
+        name=name,
+        show_name=show_name,
+        tags=tag_list,
+        metadata=metadata,
+        user_id=user_id
+    )
+
+    return JSONResponse(content={"comparison_id": comparison_id})
+
+
+@app.post("/api/comparison/{comparison_id}/image")
+async def api_upload_image(
+    comparison_id: str,
+    file: UploadFile = File(...),
+    row: int = Form(...),
+    column: int = Form(...),
+    original_filename: str = Form(...),
+    custom_name: Optional[str] = Form(None)
+):
+    """
+    Uploads a single image to an existing comparison.
+    """
+    logger.info(f"Uploading image {original_filename} to comparison {comparison_id} at ({row}, {column})")
+
+    comparison = get_comparison(comparison_id)
+    if not comparison:
+        return JSONResponse(status_code=404, content={"error": "Comparison not found"})
+
+    comparison_dir = Path(UPLOADS_PATH) / comparison_id
+    comparison_dir.mkdir(parents=True, exist_ok=True)
+
+    file_ext = Path(file.filename).suffix
+    unique_filename = f"{uuid.uuid4()}{file_ext}"
+    file_path = comparison_dir / unique_filename
+
+    with open(file_path, "wb") as buffer:
+        buffer.write(await file.read())
+
+    store_image_position(comparison_id, unique_filename, row, column)
+
+    image_size = os.path.getsize(file_path)
+    store_image_metadata(comparison_id, unique_filename, original_filename, f"{image_size} bytes")
+
+    if custom_name:
+        update_image_custom_name(comparison_id, unique_filename, custom_name)
+
+    return JSONResponse(content={"filename": unique_filename, "message": "Image uploaded successfully"})
+
+
 @app.post("/upload/")
 async def upload_files(
     request: Request,
