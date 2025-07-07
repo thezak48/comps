@@ -20,6 +20,7 @@ from fastapi.openapi.docs import get_swagger_ui_html
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 # Third-party imports
+import aiofiles
 from fastapi import FastAPI, UploadFile, File, Request, Form
 from fastapi.staticfiles import StaticFiles
 from fastapi.openapi.utils import get_openapi
@@ -423,8 +424,8 @@ async def api_upload_image(
     unique_filename = f"{uuid.uuid4()}{file_ext}"
     file_path = comparison_dir / unique_filename
 
-    with open(file_path, "wb") as buffer:
-        buffer.write(await file.read())
+    async with aiofiles.open(file_path, "wb") as buffer:
+        await buffer.write(await file.read())
 
     store_image_position(comparison_id, unique_filename, row, column)
 
@@ -534,8 +535,8 @@ async def upload_files(
         file_path = comparison_dir / unique_filename
         
         # Save the file
-        with open(file_path, "wb") as buffer:
-            buffer.write(await file.read())
+        async with aiofiles.open(file_path, "wb") as buffer:
+            await buffer.write(await file.read())
         
         saved_files.append(unique_filename)
         
