@@ -9,8 +9,26 @@ body {
     position: static;
     background-color: #2d2d2d;
     border-bottom: 1px solid #404040;
-    margin-bottom: 20px;
-    padding: 10px 0;
+    margin-bottom: 0;
+    padding: 0 15px;
+    height: 90px;
+    min-height: 56px;
+    display: flex;
+    align-items: center;
+}
+
+.navbar .container-fluid {
+    display: flex;
+    align-items: center;
+    height: 100%;
+    padding: 0;
+}
+
+.navbar .metadata-container {
+    display: flex;
+    align-items: center;
+    max-width: 60%;
+    height: 100%;
 }
 
 .navbar-expand-md .navbar-collapse {
