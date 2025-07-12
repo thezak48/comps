@@ -9,8 +9,26 @@ body {
     position: static;
     background-color: #2d2d2d;
     border-bottom: 1px solid #404040;
-    margin-bottom: 20px;
-    padding: 10px 0;
+    margin-bottom: 0;
+    padding: 0 15px;
+    height: 90px;
+    min-height: 56px;
+    display: flex;
+    align-items: center;
+}
+
+.navbar .container-fluid {
+    display: flex;
+    align-items: center;
+    height: 100%;
+    padding: 0;
+}
+
+.navbar .metadata-container {
+    display: flex;
+    align-items: center;
+    max-width: 60%;
+    height: 100%;
 }
 
 .navbar-expand-md .navbar-collapse {
@@ -312,7 +330,7 @@ body {
 
 .comparison-image {
     position: relative;
-    transition: object-fit 0.3s ease;
+    transition: object-fit 0.3s ease, transform 0.2s ease-in-out;
     cursor: move;
     transform-origin: center center;
     margin-top: 0;
@@ -321,9 +339,10 @@ body {
 }
 
 .comparison-image.fit {
-    max-height: calc(100vh - 76px) !important;
+    max-height: calc(100vh - 76px); /* Fallback for browsers that might not support dvh */
+    max-height: calc(100dvh - 76px);
     margin-top: 0 !important;
-    transform: none !important;
+    /* transform: none !important; */
     cursor: pointer;
     object-fit: contain;
     position: relative;
