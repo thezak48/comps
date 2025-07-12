@@ -312,7 +312,7 @@ body {
 
 .comparison-image {
     position: relative;
-    transition: object-fit 0.3s ease;
+    transition: object-fit 0.3s ease, transform 0.2s ease-in-out;
     cursor: move;
     transform-origin: center center;
     margin-top: 0;
@@ -321,9 +321,10 @@ body {
 }
 
 .comparison-image.fit {
-    max-height: calc(100vh - 76px) !important;
+    max-height: calc(100vh - 76px); /* Fallback for browsers that might not support dvh */
+    max-height: calc(100dvh - 76px);
     margin-top: 0 !important;
-    transform: none !important;
+    /* transform: none !important; */
     cursor: pointer;
     object-fit: contain;
     position: relative;

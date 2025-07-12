@@ -16,6 +16,8 @@
 const { imageUrls, totalColumns, totalRows, imageNames, imageSizes } = compareData;
 let absoluteIndex = 0;
 let isSolarized = false;
+let zoomLevel = 1;
+const ZOOM_STEP = 0.1; // Change this from 0 to 0.1
 
 /*
  * Solarization curve implementation
@@ -251,6 +253,20 @@ document.addEventListener('keydown', (e) => {
             }
             updateDisplay();
             break;
+        case '+':
+        case '=': // Numpad plus and regular plus
+            e.preventDefault();
+            zoomIn();
+            break;
+        case '-':
+            e.preventDefault();
+            zoomOut();
+            break;
+        case 'r':
+        case 'R':
+            e.preventDefault();
+            resetZoom();
+            break;
     }
 });
 
@@ -316,6 +332,7 @@ function updateDisplay() {
         currentImage.src = `/uploads/${imageUrls[absoluteIndex]}`;
     }
     
+    applyZoom();
     currentImage.style.cursor = 'pointer';
     const currentImageName = imageNames[absoluteIndex] || 'Unknown';
     const currentImageSize = imageSizes[absoluteIndex] || '';
@@ -342,6 +359,52 @@ function updateNavigation() {
     }
     currentColumnSpan.textContent = column + 1;
     updateDots();
+}
+
+function applyZoom() {
+    // For "Fit to Screen" mode (when toggleFit is NOT checked)
+    if (!toggleFitSwitch.checked) {
+        currentImage.style.transform = `scale(${zoomLevel})`;
+        
+        // Show temporary zoom indicator
+        const zoomIndicator = document.getElementById('zoomIndicator') || document.createElement('div');
+        zoomIndicator.id = 'zoomIndicator';
+        zoomIndicator.style.cssText = 'position: fixed; bottom: 20px; right: 20px; background: rgba(0,0,0,0.7); color: white; padding: 10px; border-radius: 5px; z-index: 1000;';
+        zoomIndicator.textContent = `Zoom: ${Math.round(zoomLevel * 100)}%`;
+        document.body.appendChild(zoomIndicator);
+        
+        // Remove the indicator after 1.5 seconds
+        setTimeout(() => {
+            zoomIndicator.remove();
+        }, 1500);
+    } else {
+        // In "Original Size" mode, no transform needed
+        currentImage.style.transform = 'none';
+    }
+}
+
+function zoomIn() {
+    // Only allow zooming in "Fit to Screen" mode
+    if (!toggleFitSwitch.checked) {
+        zoomLevel += ZOOM_STEP;
+        applyZoom();
+        console.log("Zoomed in to:", zoomLevel);
+    }
+}
+
+function zoomOut() {
+    // Only allow zooming in "Fit to Screen" mode
+    if (!toggleFitSwitch.checked) {
+        zoomLevel = Math.max(ZOOM_STEP, zoomLevel - ZOOM_STEP);
+        applyZoom();
+        console.log("Zoomed out to:", zoomLevel);
+    }
+}
+
+function resetZoom() {
+    zoomLevel = 1;
+    applyZoom();
+    console.log("Zoom reset to:", zoomLevel);
 }
 
 function updateDots() {
@@ -481,6 +544,8 @@ toggleFitSwitch.addEventListener('change', (event) => {
     const viewMode = isImageFit ? 'fit' : 'original';
     setCookie('imageViewMode', viewMode, 30);
 
+    resetZoom();
+
     if (isImageFit) {
         imageViewer.scrollTo(0, 0);
         currentImage.style.cursor = 'pointer';
@@ -515,6 +580,8 @@ mobileToggleFitSwitch.addEventListener('change', (event) => {
     
     const viewMode = isImageFit ? 'fit' : 'original';
     setCookie('imageViewMode', viewMode, 30);
+
+    resetZoom();
 
     if (isImageFit) {
         imageViewer.scrollTo(0, 0);
