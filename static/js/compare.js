@@ -535,8 +535,8 @@ function setupTouchNavigation() {
     }
 }
 
-toggleFitSwitch.addEventListener('change', (event) => {
-    const isImageFit = !event.target.checked;
+function handleFitToggle(isChecked) {
+    const isImageFit = !isChecked;
     
     currentImage.classList.toggle('fit', isImageFit);
     imageViewer.classList.toggle('fit-mode', isImageFit);
@@ -568,61 +568,23 @@ toggleFitSwitch.addEventListener('change', (event) => {
         
         currentImage.style.cursor = 'move';
     }
-});
 
-mobileToggleFitSwitch.addEventListener('change', (event) => {
-    const isImageFit = !event.target.checked;
-    
-    currentImage.classList.toggle('fit', isImageFit);
-    imageViewer.classList.toggle('fit-mode', isImageFit);
-    
-    toggleFitSwitch.checked = !isImageFit;
-    
-    const viewMode = isImageFit ? 'fit' : 'original';
-    setCookie('imageViewMode', viewMode, 30);
+    // Sync both switches
+    toggleFitSwitch.checked = isChecked;
+    mobileToggleFitSwitch.checked = isChecked;
+}
 
-    resetZoom();
-
-    if (isImageFit) {
-        imageViewer.scrollTo(0, 0);
-        currentImage.style.cursor = 'pointer';
-    } else {
-        imageViewer.scrollTo(0, 0);
-        
-        let imageContainer = document.querySelector('.image-container');
-        if (!imageContainer) {
-            imageContainer = document.createElement('div');
-            imageContainer.className = 'image-container';
-            
-            const parent = currentImage.parentNode;
-            parent.appendChild(imageContainer);
-            imageContainer.appendChild(currentImage);
-        }
-        
-        currentImage.style.cursor = 'move';
-    }
-});
-
-toggleBorderSwitch.addEventListener('change', (event) => {
-    const showBorder = event.target.checked;
-    currentImage.style.border = showBorder ? '1px solid #ccc' : 'none';
+function handleBorderToggle(isChecked) {
+    currentImage.style.border = isChecked ? '1px solid #ccc' : 'none';
     
+    // Sync both switches
+    toggleBorderSwitch.checked = isChecked;
     if (mobileToggleBorderSwitch) {
-        mobileToggleBorderSwitch.checked = showBorder;
+        mobileToggleBorderSwitch.checked = isChecked;
     }
-});
+}
 
-mobileToggleBorderSwitch.addEventListener('change', (event) => {
-    const showBorder = event.target.checked;
-    currentImage.style.border = showBorder ? '1px solid #ccc' : 'none';
-    
-    toggleBorderSwitch.checked = showBorder;
-});
-
-// Image rendering controls
-imageRenderingSelect.addEventListener('change', (event) => {
-    const renderingMode = event.target.value;
-    
+function handleRenderingChange(renderingMode) {
     if (renderingMode === 'off') {
         currentImage.style.removeProperty('image-rendering');
     } else {
@@ -633,14 +595,23 @@ imageRenderingSelect.addEventListener('change', (event) => {
     if (mobileSelect) {
         mobileSelect.value = renderingMode;
     }
+    imageRenderingSelect.value = renderingMode;
     
     setCookie('imageRendering', renderingMode, 30);
-});
+}
 
-document.getElementById('mobileImageRendering')?.addEventListener('change', (event) => {
-    imageRenderingSelect.value = event.target.value;
-    imageRenderingSelect.dispatchEvent(new Event('change'));
-});
+toggleFitSwitch.addEventListener('change', (event) => handleFitToggle(event.target.checked));
+
+mobileToggleFitSwitch.addEventListener('change', (event) => handleFitToggle(event.target.checked));
+
+toggleBorderSwitch.addEventListener('change', (event) => handleBorderToggle(event.target.checked));
+
+mobileToggleBorderSwitch.addEventListener('change', (event) => handleBorderToggle(event.target.checked));
+
+// Image rendering controls
+imageRenderingSelect.addEventListener('change', (event) => handleRenderingChange(event.target.value));
+
+document.getElementById('mobileImageRendering')?.addEventListener('change', (event) => handleRenderingChange(event.target.value));
 
 document.getElementById('shareBBCodeBtn').addEventListener('click', function() {
     showBBCodeModal();
