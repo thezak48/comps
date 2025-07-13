@@ -65,44 +65,75 @@
                                 <th>Code</th>
                                 <th>Status</th>
                                 <th>Created</th>
+                                <th>Used By</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for code in invitation_codes %}
                             <tr>
-                                <td>
-                                    <span class="invitation-code {% if code.is_used %}used-code{% endif %}">
-                                        {% if code.is_used %}
-                                            {% set code_length = code.code|length %}
-                                            {% if code_length > 8 %}
-                                                {{ code.code[:4] }}
-                                                {{ '*' * (code_length - 8) }}
-                                                {{ code.code[-4:] }}
-                                            {% else %}
-                                                {{ '*' * code_length }}
-                                            {% endif %}
-                                        {% else %}
-                                            {{ code.code }}
-                                        {% endif %}
-                                    </span>
-                                </td>
+                                <td><code>{{ code.code }}</code></td>
                                 <td>
                                     {% if code.is_used %}
-                                    <span class="badge bg-secondary">Used by {{ code.used_by }}</span>
+                                    <span class="badge bg-success">Used</span>
                                     {% else %}
-                                    <span class="badge bg-success">Available</span>
+                                    <span class="badge bg-secondary">Unused</span>
                                     {% endif %}
                                 </td>
-                                <td>{{ code.created_at }}</td>
+                                <td>{{ code.created_at.split(' ')[0] }}</td>
+                                <td>{{ code.used_by or 'N/A' }}</td>
                             </tr>
                             {% endfor %}
                         </tbody>
                     </table>
                 </div>
             </div>
+
+            {% if user.is_super_admin %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">User Management</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-dark">
+                        <thead>
+                            <tr>
+                                <th>Username</th>
+                                <th>Is Admin</th>
+                                <th>Joined</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for u in all_users %}
+                            <tr>
+                                <td>{{ u.username }} {% if u.is_super_admin %}<span class="badge bg-danger">Super Admin</span>{% endif %}</td>
+                                <td>
+                                    {% if u.is_admin %}
+                                    <span class="badge bg-info">Admin</span>
+                                    {% else %}
+                                    <span class="badge bg-secondary">User</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ u.created_at.split(' ')[0] }}</td>
+                                <td>
+                                    {% if not u.is_super_admin %}
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" role="switch" id="adminSwitch{{ u.id }}" {% if u.is_admin %}checked{% endif %} onchange="toggleAdmin({{ u.id }}, this.checked)">
+                                        <label class="form-check-label" for="adminSwitch{{ u.id }}">Set Admin</label>
+                                    </div>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% endif %}
+
         </div>
     </div>
-
+    
     <footer class="footer mt-auto py-3">
         <div class="container">
             <div class="d-flex justify-content-between align-items-center">
@@ -117,5 +148,31 @@
     </footer>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    {% if user.is_super_admin %}
+    <script>
+        async function toggleAdmin(userId, isAdmin) {
+            try {
+                const response = await fetch('/admin/user/set-admin', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        user_id: userId,
+                        is_admin: isAdmin
+                    }),
+                    redirect: 'manual' // Prevent fetch from following the redirect automatically
+                });
+
+                // After the request, reload the page to show the updated status
+                window.location.reload();
+
+            } catch (error) {
+                console.error('Error updating admin status:', error);
+                alert('An error occurred while updating admin status.');
+            }
+        }
+    </script>
+    {% endif %}
 </body>
 </html>
