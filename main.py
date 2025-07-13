@@ -78,6 +78,9 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 cookie_sec = APIKeyCookie(name="session")
 
+# Store background tasks to prevent premature garbage collection
+background_tasks = set()
+
 # Get configuration from environment
 DB_PATH = os.getenv('DB_PATH', 'comparisons.db')
 UPLOADS_PATH = os.getenv('UPLOADS_PATH', 'uploads')
@@ -180,7 +183,9 @@ async def cleanup_old_comparisons():
 @app.on_event("startup")
 async def start_cleanup_task():
     """Start the background cleanup task when the application starts"""
-    asyncio.create_task(cleanup_old_comparisons())
+    task = asyncio.create_task(cleanup_old_comparisons())
+    # Add task to the set of background tasks
+    background_tasks.add(task)
 
     # Check if database migrations are complete
     try:
