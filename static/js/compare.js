@@ -267,6 +267,11 @@ document.addEventListener('keydown', (e) => {
             e.preventDefault();
             resetZoom();
             break;
+        case '?':
+        case '/': // Often shares key with ?
+            e.preventDefault();
+            document.getElementById('toggle-hotkey-legend')?.click();
+            break;
     }
 });
 
@@ -673,6 +678,72 @@ copyBBCodeBtn.addEventListener('click', async () => {
 updateDisplay();
 updateNavigation();
 
+function createHotkeyLegend() {
+    const legendContainer = document.createElement('div');
+    legendContainer.id = 'hotkey-legend-container';
+    legendContainer.style.cssText = 'position: fixed; bottom: 20px; left: 20px; z-index: 1001;';
+
+    const toggleBtn = document.createElement('button');
+    toggleBtn.id = 'toggle-hotkey-legend';
+    toggleBtn.className = 'btn btn-sm btn-secondary';
+    toggleBtn.innerHTML = '<i class="fa fa-question"></i>';
+    toggleBtn.setAttribute('title', 'Show Hotkeys (?)');
+    toggleBtn.style.width = '32px';
+    toggleBtn.style.height = '32px';
+    toggleBtn.style.borderRadius = '50%';
+
+
+    const legend = document.createElement('div');
+    legend.id = 'hotkey-legend';
+    legend.style.cssText = 'display: none; position: absolute; bottom: 100%; left: 0; background: rgba(0,0,0,0.8); color: white; padding: 15px; border-radius: 5px; margin-bottom: 10px; width: 250px; backdrop-filter: blur(5px);';
+    legend.innerHTML = `
+        <style>
+            #hotkey-legend ul { list-style: none; padding: 0; }
+            #hotkey-legend li { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
+            #hotkey-legend .keys { display: flex; align-items: center; gap: 0.25rem; }
+            #hotkey-legend kbd { 
+                background-color: #333;
+                border: 1px solid #555;
+                border-radius: 3px;
+                padding: 2px 6px;
+                font-family: monospace;
+                font-size: 0.9em;
+            }
+            #hotkey-legend .key-separator { color: #888; }
+        </style>
+        <h5 class="mb-3">Hotkeys</h5>
+        <ul>
+            <li><span>Prev/Next Image</span><span class="keys"><kbd>&larr;</kbd><span class="key-separator">/</span><kbd>&rarr;</kbd></span></li>
+            <li><span>Prev/Next Row</span><span class="keys"><kbd>&uarr;</kbd><span class="key-separator">/</span><kbd>&darr;</kbd></span></li>
+            <li><span>Go to Column 1-10</span><span class="keys"><kbd>1-9</kbd><span class="key-separator">,</span><kbd>0</kbd></span></li>
+            <li><span>Toggle Solarization</span><span class="keys"><kbd>s</kbd></span></li>
+            <li><span>Zoom In/Out</span><span class="keys"><kbd>+</kbd><span class="key-separator">/</span><kbd>-</kbd></span></li>
+            <li><span>Reset Zoom</span><span class="keys"><kbd>r</kbd></span></li>
+        </ul>
+        <hr class="my-2" style="border-color: #555;">
+        <div class="text-center" style="font-size: 0.8em; color: #ccc;">
+            <p style="margin: 0;">Toggle this legend: <kbd>?</kbd></p>
+        </div>
+    `;
+
+    toggleBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isHidden = legend.style.display === 'none';
+        legend.style.display = isHidden ? 'block' : 'none';
+    });
+
+    // Hide legend when clicking outside
+    document.addEventListener('click', (e) => {
+        if (!legendContainer.contains(e.target)) {
+            legend.style.display = 'none';
+        }
+    });
+
+    legendContainer.appendChild(legend);
+    legendContainer.appendChild(toggleBtn);
+    document.body.appendChild(legendContainer);
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     // Start preloading images
     preloadImages();
@@ -689,4 +760,5 @@ document.addEventListener('DOMContentLoaded', () => {
         currentImage.style.imageRendering = savedRendering;
     }
     generateSolarCurves();
+    createHotkeyLegend();
 });
