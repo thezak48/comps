@@ -326,6 +326,43 @@
         }
       }
     },
+    "/admin/user/set-admin": {
+      "post": {
+        "summary": "Set User Admin Status",
+        "description": "Set a user's admin status (super admin only)",
+        "operationId": "set_user_admin_status_admin_user_set_admin_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserAdminUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/account": {
       "get": {
         "summary": "Account Page",
@@ -1234,6 +1271,25 @@
           "column"
         ],
         "title": "ImageDetail"
+      },
+      "UserAdminUpdate": {
+        "properties": {
+          "user_id": {
+            "type": "integer",
+            "title": "User Id"
+          },
+          "is_admin": {
+            "type": "boolean",
+            "title": "Is Admin"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_id",
+          "is_admin"
+        ],
+        "title": "UserAdminUpdate",
+        "description": "Pydantic model for updating a user's admin status."
       },
       "ValidationError": {
         "properties": {
