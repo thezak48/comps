@@ -88,6 +88,64 @@
                     You haven't created any comparisons yet. <a href="/">Create one now</a>!
                 </div>
             {% endif %}
+
+            <!-- API Keys Section -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h3>API Keys</h3>
+                </div>
+                <div class="card-body">
+                    <p>Generate and manage API keys for programmatic access to Comps.</p>
+                    
+                    <!-- Form to generate a new key -->
+                    <form id="create-api-key-form" action="/account/api-keys/create" method="POST" class="row g-3 align-items-center mb-4">
+                        <div class="col-auto">
+                            <label for="key-name-input" class="visually-hidden">Key Name</label>
+                            <input type="text" class="form-control" id="key-name-input" name="key_name" placeholder="Descriptive name for the key" required>
+                        </div>
+                        <div class="col-auto">
+                            <button type="submit" class="btn btn-primary">Generate New Key</button>
+                        </div>
+                    </form>
+
+                    <!-- Display area for the new key -->
+                    <div id="new-key-display" class="alert alert-success" style="display: none;">
+                        <strong>New API Key Generated!</strong> Copy it now, you will not be able to see it again.
+                        <div class="input-group mt-2">
+                            <input type="text" id="new-key-value" class="form-control" readonly>
+                            <button class="btn btn-outline-secondary" type="button" id="copy-key-btn">Copy</button>
+                        </div>
+                    </div>
+
+                    <!-- Table of existing keys -->
+                    <h5>Your Keys</h5>
+                    <table class="table account-container" id="api-keys-table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Key Prefix</th>
+                                <th>Created</th>
+                                <th>Last Used</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for key in api_keys %}
+                            <tr data-key-id="{{ key.id }}">
+                                <td>{{ key.key_name }}</td>
+                                <td>{{ key.key_prefix }}...</td>
+                                <td>{{ key.created_at.split(' ')[0] }}</td>
+                                <td>{{ key.last_used_at.split(' ')[0] if key.last_used_at else 'Never' }}</td>
+                                <td>
+                                    <button class="btn btn-danger btn-sm delete-key-btn" data-key-id="{{ key.id }}">Delete</button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
         </div>
     </div>
 
@@ -144,7 +202,7 @@
             confirmDeleteBtn.addEventListener('click', async function() {
                 if (comparisonToDelete) {
                     try {
-                        const response = await fetch(`/api/delete-comparison/${comparisonToDelete}`, {
+                        const response = await fetch(`/api/v1/delete-comparison/${comparisonToDelete}`, {
                             method: 'DELETE',
                             headers: { 'Content-Type': 'application/json' }
                         });
@@ -158,6 +216,91 @@
                 }
                 deleteModal.hide();
             });
+
+            // Handle API Key Creation
+            const createApiKeyForm = document.getElementById('create-api-key-form');
+            if (createApiKeyForm) {
+                createApiKeyForm.addEventListener('submit', async function(e) {
+                    e.preventDefault();
+                    const form = e.target;
+                    const formData = new FormData(form);
+                    const newKeyDisplay = document.getElementById('new-key-display');
+                    const newKeyValueInput = document.getElementById('new-key-value');
+
+                    newKeyDisplay.style.display = 'none';
+
+                    const response = await fetch(form.action, {
+                        method: form.method,
+                        body: formData
+                    });
+
+                    const result = await response.json();
+
+                    if (response.ok) {
+                        newKeyValueInput.value = result.key;
+                        newKeyDisplay.style.display = 'block';
+                        form.reset();
+                        // Dynamically add the new key to the table instead of reloading
+                        const tableBody = document.getElementById('api-keys-table').querySelector('tbody');
+                        const newRow = document.createElement('tr');
+                        const now = new Date().toISOString().split('T')[0];
+                        newRow.innerHTML = `
+                            <td>${formData.get('key_name')}</td>
+                            <td>${result.key.substring(0, 12)}...</td>
+                            <td>${now}</td>
+                            <td>Never</td>
+                            <td><button class="btn btn-danger btn-sm" disabled>Delete</button></td>
+                        `;
+                        tableBody.prepend(newRow);
+                        // Give user a moment to see the key before hiding it
+                        setTimeout(() => {
+                            newKeyDisplay.style.display = 'none';
+                        }, 15000); // Hide after 15 seconds
+                    } else {
+                        alert('Error creating key: ' + (result.error || 'Unknown error'));
+                    }
+                });
+            }
+
+            // Handle Copying the new key
+            const copyKeyBtn = document.getElementById('copy-key-btn');
+            if(copyKeyBtn) {
+                copyKeyBtn.addEventListener('click', function() {
+                    const keyInput = document.getElementById('new-key-value');
+                    keyInput.select();
+                    document.execCommand('copy');
+                    this.textContent = 'Copied!';
+                    setTimeout(() => { this.textContent = 'Copy'; }, 2000);
+                });
+            }
+
+            // Handle API Key Deletion
+            const apiKeysTable = document.getElementById('api-keys-table');
+            if(apiKeysTable) {
+                apiKeysTable.addEventListener('click', async function(e) {
+                    if (e.target && e.target.classList.contains('delete-key-btn')) {
+                        const button = e.target;
+                        const keyId = button.dataset.keyId;
+
+                        if (confirm('Are you sure you want to delete this API key? This action cannot be undone.')) {
+                            const formData = new FormData();
+                            formData.append('key_id', keyId);
+
+                            const response = await fetch(`/account/api-keys/delete/${keyId}`, {
+                                method: 'DELETE',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ key_id: keyId })
+                            });
+
+                            if (response.ok) {
+                                button.closest('tr').remove();
+                            } else {
+                                alert('Error deleting key: ' + (await response.text()));
+                            }
+                        }
+                    }
+                });
+            }
         });
     </script>
 </body>

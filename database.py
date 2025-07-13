@@ -31,11 +31,11 @@ def create_comparison(comparison_id: str, name: Optional[str], show_name: Option
     if user_id is not None:
         c.execute('UPDATE comparisons SET user_id = ? WHERE id = ?', (user_id, comparison_id))
         c.execute('SELECT never_expire_comparisons FROM users WHERE id = ?', (user_id,))
-        never_expire = c.fetchone()[0]
-        if never_expire:
-            # Only set never_expire if the user didn't explicitly choose to have it expire
-            if metadata.get('never_expire') is None:
-                c.execute('UPDATE comparisons SET never_expire = 1 WHERE id = ?', (comparison_id,))
+        user_never_expire_setting = c.fetchone()
+        if user_never_expire_setting and user_never_expire_setting[0]:
+            # If the user's setting is to never expire, and the comparison isn't explicitly set to expire
+            if metadata.get('never_expire') is None or metadata.get('never_expire') is True:
+                 c.execute('UPDATE comparisons SET never_expire = 1 WHERE id = ?', (comparison_id,))
 
 
     if tags:
@@ -97,6 +97,30 @@ def get_comparison(comparison_id: str):
         }
     
     return None
+
+def get_user_comparisons(user_id: int) -> List[dict]:
+    """Get all comparisons created by a specific user."""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    
+    c.execute(
+        'SELECT id, name, show_name, created_at, last_accessed, never_expire FROM comparisons WHERE user_id = ? ORDER BY last_accessed DESC',
+        (user_id,)
+    )
+    
+    comparisons = []
+    for row in c.fetchall():
+        comparisons.append({
+            'id': row[0],
+            'name': row[1],
+            'show_name': row[2],
+            'created_at': row[3],
+            'last_accessed': row[4],
+            'never_expire': bool(row[5])
+        })
+        
+    conn.close()
+    return comparisons
 
 def store_image_position(comparison_id: str, filename: str, row_number: int, column_position: int):
     conn = sqlite3.connect(DB_PATH)
