@@ -6,6 +6,46 @@
     "version": "1.0.0"
   },
   "paths": {
+    "/api/v1/login": {
+      "post": {
+        "tags": [
+          "api"
+        ],
+        "summary": "Api Login",
+        "description": "Authenticate and get an access token for API usage.\n- **username**: Your username\n- **password**: Your invitation code",
+        "operationId": "api_login_api_v1_login_post",
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_api_login_api_v1_login_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/comparisons": {
       "get": {
         "tags": [
@@ -115,57 +155,6 @@
         }
       }
     },
-    "/api/v1/comparisons/{comparison_id}/images": {
-      "post": {
-        "tags": [
-          "api"
-        ],
-        "summary": "Upload Images",
-        "description": "Upload images to an existing comparison.\n\nUpload one or more image files to a comparison and specify their positions in the grid.\n\n- Files should be image files (jpg, jpeg, png, bmp, webp)\n- Positions can be specified as a JSON string mapping filenames to grid positions\n\nExample positions JSON:\n```json\n{\n    \"image1.jpg\": {\"row\": 0, \"column\": 0},\n    \"image2.jpg\": {\"row\": 0, \"column\": 1}\n}\n```",
-        "operationId": "upload_images_api_v1_comparisons__comparison_id__images_post",
-        "parameters": [
-          {
-            "name": "comparison_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Comparison Id"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "multipart/form-data": {
-              "schema": {
-                "$ref": "#/components/schemas/Body_upload_images_api_v1_comparisons__comparison_id__images_post"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/v1/comparisons/{comparison_id}/images/{filename}": {
       "put": {
         "tags": [
@@ -200,6 +189,138 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/CustomNameUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/delete-comparison/{comparison_id}": {
+      "delete": {
+        "tags": [
+          "api"
+        ],
+        "summary": "Delete User Comparison",
+        "description": "Delete a comparison owned by the current user",
+        "operationId": "delete_user_comparison_api_v1_delete_comparison__comparison_id__delete",
+        "parameters": [
+          {
+            "name": "comparison_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Comparison Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/comparison": {
+      "post": {
+        "tags": [
+          "api"
+        ],
+        "summary": "Api Create Comparison",
+        "description": "Creates a new comparison record and returns its ID.\nThis endpoint does not accept files.",
+        "operationId": "api_create_comparison_api_v1_comparison_post",
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_api_create_comparison_api_v1_comparison_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/comparison/{comparison_id}/image": {
+      "post": {
+        "tags": [
+          "api"
+        ],
+        "summary": "Api Upload Image",
+        "description": "Uploads a single image to an existing comparison.",
+        "operationId": "api_upload_image_api_v1_comparison__comparison_id__image_post",
+        "parameters": [
+          {
+            "name": "comparison_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Comparison Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_api_upload_image_api_v1_comparison__comparison_id__image_post"
               }
             }
           }
@@ -301,8 +422,10 @@
           "200": {
             "description": "Successful Response",
             "content": {
-              "application/json": {
-                "schema": {}
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
               }
             }
           }
@@ -366,51 +489,14 @@
     "/account": {
       "get": {
         "summary": "Account Page",
-        "description": "User account page",
         "operationId": "account_page_account_get",
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/delete-comparison/{comparison_id}": {
-      "delete": {
-        "summary": "Delete User Comparison",
-        "description": "Delete a comparison owned by the current user",
-        "operationId": "delete_user_comparison_api_delete_comparison__comparison_id__delete",
-        "parameters": [
-          {
-            "name": "comparison_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Comparison Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
+              "text/html": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "type": "string"
                 }
               }
             }
@@ -418,16 +504,15 @@
         }
       }
     },
-    "/api/comparison": {
+    "/account/api-keys/create": {
       "post": {
-        "summary": "Api Create Comparison",
-        "description": "Creates a new comparison record and returns its ID.\nThis endpoint does not accept files.",
-        "operationId": "api_create_comparison_api_comparison_post",
+        "summary": "Create Api Key Endpoint",
+        "operationId": "create_api_key_endpoint_account_api_keys_create_post",
         "requestBody": {
           "content": {
             "application/x-www-form-urlencoded": {
               "schema": {
-                "$ref": "#/components/schemas/Body_api_create_comparison_api_comparison_post"
+                "$ref": "#/components/schemas/Body_create_api_key_endpoint_account_api_keys_create_post"
               }
             }
           },
@@ -455,69 +540,21 @@
         }
       }
     },
-    "/api/comparison/{comparison_id}/image": {
-      "post": {
-        "summary": "Api Upload Image",
-        "description": "Uploads a single image to an existing comparison.",
-        "operationId": "api_upload_image_api_comparison__comparison_id__image_post",
+    "/account/api-keys/delete/{key_id}": {
+      "delete": {
+        "summary": "Delete Api Key Endpoint",
+        "operationId": "delete_api_key_endpoint_account_api_keys_delete__key_id__delete",
         "parameters": [
           {
-            "name": "comparison_id",
+            "name": "key_id",
             "in": "path",
             "required": true,
             "schema": {
-              "type": "string",
-              "title": "Comparison Id"
+              "type": "integer",
+              "title": "Key Id"
             }
           }
         ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "multipart/form-data": {
-              "schema": {
-                "$ref": "#/components/schemas/Body_api_upload_image_api_comparison__comparison_id__image_post"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/upload/": {
-      "post": {
-        "summary": "Upload Files",
-        "description": "Handle file uploads for comparison.\n\nAccepts multiple files and metadata, creates a comparison record,\nand stores the files in a unique directory.",
-        "operationId": "upload_files_upload__post",
-        "requestBody": {
-          "content": {
-            "multipart/form-data": {
-              "schema": {
-                "$ref": "#/components/schemas/Body_upload_files_upload__post"
-              }
-            }
-          },
-          "required": true
-        },
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -598,7 +635,7 @@
   },
   "components": {
     "schemas": {
-      "Body_api_create_comparison_api_comparison_post": {
+      "Body_api_create_comparison_api_v1_comparison_post": {
         "properties": {
           "name": {
             "type": "string",
@@ -662,9 +699,68 @@
         "required": [
           "name"
         ],
-        "title": "Body_api_create_comparison_api_comparison_post"
+        "title": "Body_api_create_comparison_api_v1_comparison_post"
       },
-      "Body_api_upload_image_api_comparison__comparison_id__image_post": {
+      "Body_api_login_api_v1_login_post": {
+        "properties": {
+          "grant_type": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^password$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grant Type"
+          },
+          "username": {
+            "type": "string",
+            "title": "Username"
+          },
+          "password": {
+            "type": "string",
+            "format": "password",
+            "title": "Password"
+          },
+          "scope": {
+            "type": "string",
+            "title": "Scope",
+            "default": ""
+          },
+          "client_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Id"
+          },
+          "client_secret": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "format": "password",
+            "title": "Client Secret"
+          }
+        },
+        "type": "object",
+        "required": [
+          "username",
+          "password"
+        ],
+        "title": "Body_api_login_api_v1_login_post"
+      },
+      "Body_api_upload_image_api_v1_comparison__comparison_id__image_post": {
         "properties": {
           "file": {
             "type": "string",
@@ -702,115 +798,20 @@
           "column",
           "original_filename"
         ],
-        "title": "Body_api_upload_image_api_comparison__comparison_id__image_post"
+        "title": "Body_api_upload_image_api_v1_comparison__comparison_id__image_post"
       },
-      "Body_upload_files_upload__post": {
+      "Body_create_api_key_endpoint_account_api_keys_create_post": {
         "properties": {
-          "files": {
-            "items": {
-              "type": "string",
-              "format": "binary"
-            },
-            "type": "array",
-            "title": "Files"
-          },
-          "name": {
+          "key_name": {
             "type": "string",
-            "title": "Name"
-          },
-          "show_name": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Show Name"
-          },
-          "expiration_type": {
-            "type": "string",
-            "title": "Expiration Type",
-            "default": "from_last_access"
-          },
-          "expiration_enabled": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Expiration Enabled"
-          },
-          "expiration_days": {
-            "type": "integer",
-            "title": "Expiration Days",
-            "default": 7
-          },
-          "tags": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Tags"
-          },
-          "file_positions": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "File Positions"
-          },
-          "custom_names": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Custom Names"
+            "title": "Key Name"
           }
         },
         "type": "object",
         "required": [
-          "files",
-          "name"
+          "key_name"
         ],
-        "title": "Body_upload_files_upload__post"
-      },
-      "Body_upload_images_api_v1_comparisons__comparison_id__images_post": {
-        "properties": {
-          "files": {
-            "items": {
-              "type": "string",
-              "format": "binary"
-            },
-            "type": "array",
-            "title": "Files"
-          },
-          "positions": {
-            "type": "string",
-            "title": "Positions"
-          }
-        },
-        "type": "object",
-        "required": [
-          "files"
-        ],
-        "title": "Body_upload_images_api_v1_comparisons__comparison_id__images_post"
+        "title": "Body_create_api_key_endpoint_account_api_keys_create_post"
       },
       "ComparisonCreate": {
         "properties": {
