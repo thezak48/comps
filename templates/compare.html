@@ -72,9 +72,6 @@
                 </div>
                 {% if metadata %}
                     <span class="comparison-name">{{ metadata.name }}</span>
-                    {% if metadata.show_name %}
-                        <span class="show-name text-muted">| {{ metadata.show_name }}</span>
-                    {% endif %}
                     <div class="tags d-inline-block">
                         {% for tag in metadata.tags %}
                             <span class="badge bg-secondary">{{ tag }}</span>

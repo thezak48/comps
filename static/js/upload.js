@@ -1422,7 +1422,7 @@ document.getElementById('uploadButton').addEventListener('click', async () => {
 
     try {
         // 1. Create the comparison
-        const comparisonResponse = await fetch('/api/comparison', {
+        const comparisonResponse = await fetch('/api/v1/comparison', {
             method: 'POST',
             body: comparisonFormData
         });
@@ -1459,7 +1459,7 @@ document.getElementById('uploadButton').addEventListener('click', async () => {
                 imageFormData.append('custom_name', file.customName);
             }
 
-            const imageResponse = await fetch(`/api/comparison/${comparison_id}/image`, {
+            const imageResponse = await fetch(`/api/v1/comparison/${comparison_id}/image`, {
                 method: 'POST',
                 body: imageFormData
             });

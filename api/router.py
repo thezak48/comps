@@ -1,30 +1,25 @@
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends, Query
-from fastapi.responses import JSONResponse
-import random
-import uuid
+import logging
 import os
-import shutil
+import random
+import sqlite3
+import uuid
+from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
-import json
-import sqlite3
-from datetime import datetime
 
-from .models import (
-    ComparisonCreate, 
-    ComparisonResponse, 
-    ComparisonDetail,
-    ImageDetail,
-    CustomNameUpdate
-)
-from database import (
-    create_comparison, 
-    get_comparison, 
-    store_image_position, 
-    store_image_metadata, 
-    update_image_custom_name,
-    update_last_accessed
-)
+import aiofiles
+from fastapi import (APIRouter, Depends, File, Form, HTTPException, Request,
+                     UploadFile)
+from fastapi.responses import JSONResponse
+from fastapi.security import APIKeyCookie, OAuth2PasswordRequestForm
+
+import auth
+from database import (create_comparison, delete_comparison, get_comparison,
+                      store_image_metadata, store_image_position,
+                      update_image_custom_name, update_last_accessed)
+
+from .models import (ComparisonCreate, ComparisonDetail, ComparisonResponse,
+                     CustomNameUpdate)
 
 router = APIRouter(prefix="/api/v1", tags=["api"])
 
@@ -34,6 +29,11 @@ MAX_ROWS = 20
 
 UPLOADS_PATH = os.getenv('UPLOADS_PATH', 'uploads')
 DB_PATH = os.getenv('DB_PATH', 'comparisons.db')
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+cookie_sec = APIKeyCookie(name="session")
 
 # Random name generator for comparisons
 def generate_random_name():
@@ -59,6 +59,23 @@ def generate_random_name():
     noun = random.choice(nouns)
     
     return f"{adjective} {noun}"
+
+@router.post("/login")
+async def api_login(form_data: OAuth2PasswordRequestForm = Depends()):
+    """
+    Authenticate and get an access token for API usage.
+    - **username**: Your username
+    - **password**: Your invitation code
+    """
+    user = auth.authenticate_user(form_data.username, form_data.password)
+    if not user:
+        raise HTTPException(
+            status_code=401,
+            detail="Incorrect username or invitation code",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    access_token = auth.create_access_token(data={"sub": str(user["id"])})
+    return {"access_token": access_token, "token_type": "bearer"}
 
 @router.get("/comparisons", response_model=List[ComparisonResponse])
 async def list_comparisons():
@@ -92,7 +109,10 @@ async def list_comparisons():
     return comparisons
 
 @router.post("/comparisons", response_model=ComparisonResponse, status_code=201)
-async def create_new_comparison(comparison: ComparisonCreate):
+async def create_new_comparison(
+    comparison_data: ComparisonCreate,
+    user: Optional[dict] = Depends(auth.get_optional_user)
+):
     """
     Create a new comparison.
 
@@ -104,19 +124,18 @@ async def create_new_comparison(comparison: ComparisonCreate):
     """
     comparison_id = str(uuid.uuid4())
     
-    # Generate a random name if none provided
-    if not comparison.name or comparison.name.strip() == '':
-        comparison.name = generate_random_name()
-        print(f"No name provided, generated random name: {comparison.name}")
+    # Use a random name if none is provided
+    name = comparison_data.name or generate_random_name()
     
-    # Prepare metadata
+    # Get user ID if a user is authenticated
+    user_id = user["id"] if user else None
+
+    # Prepare metadata, enforcing maximum rows limit
     metadata = {
-        "total_columns": comparison.total_columns,
-        "total_rows": comparison.total_rows,
+        "total_columns": comparison_data.total_columns,
+        "total_rows": min(comparison_data.total_rows, MAX_ROWS),
+        "never_expire": user["never_expire_comparisons"] if user else False
     }
-    
-    # Enforce maximum rows limit
-    metadata["total_rows"] = min(metadata["total_rows"], MAX_ROWS)
     
     # Create comparison directory
     comparison_dir = Path(UPLOADS_PATH) / comparison_id
@@ -125,15 +144,26 @@ async def create_new_comparison(comparison: ComparisonCreate):
     # Store in database
     create_comparison(
         comparison_id=comparison_id,
-        name=comparison.name,
-        show_name=comparison.show_name,
-        tags=comparison.tags,
-        metadata=metadata
+        name=name,
+        show_name=comparison_data.show_name,
+        tags=comparison_data.tags,
+        metadata=metadata,
+        user_id=user_id
     )
     
-    # Get the created comparison
-    result = get_comparison(comparison_id)
-    return result
+    # Return the response
+    return ComparisonResponse(
+        id=comparison_id,
+        name=name,
+        show_name=comparison_data.show_name,
+        tags=comparison_data.tags,
+        total_rows=metadata["total_rows"],
+        total_columns=metadata["total_columns"],
+        created_at=datetime.utcnow().isoformat(),
+        last_accessed=datetime.utcnow().isoformat(),
+        never_expire=metadata["never_expire"]
+    )
+
 
 @router.get("/comparisons/{comparison_id}", response_model=ComparisonDetail)
 async def get_comparison_detail(comparison_id: str):
@@ -188,86 +218,6 @@ async def get_comparison_detail(comparison_id: str):
     comparison_data["images"] = images
     return comparison_data
 
-@router.post("/comparisons/{comparison_id}/images", status_code=201)
-async def upload_images(
-    comparison_id: str,
-    files: List[UploadFile] = File(...),
-    positions: str = Form(None)
-):
-    """
-    Upload images to an existing comparison.
-    
-    Upload one or more image files to a comparison and specify their positions in the grid.
-    
-    - Files should be image files (jpg, jpeg, png, bmp, webp)
-    - Positions can be specified as a JSON string mapping filenames to grid positions
-    
-    Example positions JSON:
-    ```json
-    {
-        "image1.jpg": {"row": 0, "column": 0},
-        "image2.jpg": {"row": 0, "column": 1}
-    }
-    ```
-    """
-    # Check if comparison exists
-    comparison_data = get_comparison(comparison_id)
-    if not comparison_data:
-        raise HTTPException(status_code=404, detail="Comparison not found")
-    
-    # Parse positions if provided
-    positions_data = {}
-    if positions:
-        try:
-            positions_data = json.loads(positions)
-        except json.JSONDecodeError:
-            raise HTTPException(status_code=400, detail="Invalid positions JSON format")
-    
-    comparison_dir = Path(UPLOADS_PATH) / comparison_id
-    if not comparison_dir.exists():
-        comparison_dir.mkdir(exist_ok=True, parents=True)
-    
-    uploaded_files = []
-    
-    for file_index, file in enumerate(files):
-        original_filename = file.filename
-        file_ext = Path(file.filename).suffix
-        save_path = comparison_dir / f"{uuid.uuid4()}{file_ext}"
-        
-        if not file_ext.lower() in ['.jpg', '.jpeg', '.png', '.bmp', '.webp']:
-            raise HTTPException(status_code=400, detail=f"Unsupported file type: {file_ext}")
-        
-        try:
-            with save_path.open("wb") as buffer:
-                shutil.copyfileobj(file.file, buffer)
-            
-            # Determine row and column position
-            if original_filename in positions_data:
-                row_position = positions_data[original_filename]["row"]
-                column_index = positions_data[original_filename]["column"]
-            else:
-                # Default sequential positioning
-                column_index = file_index % comparison_data["total_columns"]
-                row_position = file_index // comparison_data["total_columns"]
-            
-            store_image_position(comparison_id, save_path.name, row_position, column_index)
-            
-            # Store image metadata
-            image_size = f"{file.size} bytes"
-            store_image_metadata(comparison_id, save_path.name, original_filename, image_size)
-            
-            uploaded_files.append({
-                "filename": save_path.name,
-                "original_filename": original_filename,
-                "row": row_position,
-                "column": column_index
-            })
-            
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Failed to save file: {str(e)}")
-    
-    return {"uploaded": uploaded_files}
-
 @router.put("/comparisons/{comparison_id}/images/{filename}", status_code=200)
 async def update_image_metadata(
     comparison_id: str,
@@ -302,3 +252,140 @@ async def update_image_metadata(
     update_image_custom_name(comparison_id, filename, update_data.custom_name)
     
     return {"message": "Image metadata updated successfully"}
+@router.delete("/delete-comparison/{comparison_id}")
+async def delete_user_comparison(comparison_id: str, request: Request):
+    """Delete a comparison owned by the current user"""
+    # Get current user
+    user = await auth.get_optional_user(request)
+
+    # Check if user is logged in
+    if not user:
+        return JSONResponse(status_code=401, content={"error": "Authentication required"})
+
+    # Check if the comparison exists and belongs to the user
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute('SELECT user_id FROM comparisons WHERE id = ?', (comparison_id,))
+    result = c.fetchone()
+    conn.close()
+
+    if not result or result[0] != user["id"]:
+        return JSONResponse(
+            status_code=403,
+            content={"error": "You don't have permission to delete this comparison"}
+        )
+
+    # Delete the comparison
+    try:
+        delete_comparison(comparison_id, UPLOADS_PATH)
+    except OSError as e:
+        logger.error("Error deleting comparison %s files: %s", comparison_id, e)
+        return JSONResponse(
+            status_code=500,
+            content={"error": "Failed to delete comparison files."}
+        )
+    return JSONResponse(content={"message": "Comparison deleted successfully"})
+
+@router.post("/comparison")
+async def api_create_comparison(
+    request: Request,
+    name: str = Form(...),
+    show_name: Optional[str] = Form(None),
+    expiration_type: str = Form("from_last_access"),
+    expiration_enabled: Optional[str] = Form(None),
+    expiration_days: int = Form(7),
+    tags: Optional[str] = Form(None),
+    total_rows: int = Form(1),
+    total_columns: int = Form(2)
+):
+    """
+    Creates a new comparison record and returns its ID.
+    This endpoint does not accept files.
+    """
+    logger.info("Received request to create a new comparison")
+    user = await auth.get_optional_user(request)
+    user_id = user["id"] if user else None
+    logger.info(
+        "Create comparison request from user: %s",
+        user['username'] if user else 'anonymous'
+    )
+
+    comparison_id = str(uuid.uuid4())
+
+    if not name or name.strip() == '':
+        name = generate_random_name()
+        logger.info("No name provided, generated random name: %s", name)
+
+    tag_list = []
+    if tags and tags.strip():
+        tag_list = [tag.strip() for tag in tags.split(',') if tag.strip()]
+
+    never_expire = None
+    if user:
+        if expiration_enabled == "true":
+            never_expire = False
+        else:
+            never_expire = True
+
+    metadata = {
+        "total_rows": total_rows,
+        "total_columns": total_columns,
+        "expiration_type": expiration_type,
+        "expiration_days": expiration_days,
+        "never_expire": never_expire
+    }
+
+    create_comparison(
+        comparison_id=comparison_id,
+        name=name,
+        show_name=show_name,
+        tags=tag_list,
+        metadata=metadata,
+        user_id=user_id
+    )
+
+    return JSONResponse(content={"comparison_id": comparison_id})
+
+
+@router.post("/comparison/{comparison_id}/image")
+async def api_upload_image(
+    comparison_id: str,
+    file: UploadFile = File(...),
+    row: int = Form(...),
+    column: int = Form(...),
+    original_filename: str = Form(...),
+    custom_name: Optional[str] = Form(None)
+):
+    """
+    Uploads a single image to an existing comparison.
+    """
+    logger.info(
+        "Uploading image %s to comparison %s at (%s, %s)",
+        original_filename, comparison_id, row, column
+    )
+
+    comparison = get_comparison(comparison_id)
+    if not comparison:
+        return JSONResponse(status_code=404, content={"error": "Comparison not found"})
+
+    comparison_dir = Path(UPLOADS_PATH) / comparison_id
+    comparison_dir.mkdir(parents=True, exist_ok=True)
+
+    file_ext = Path(file.filename).suffix
+    unique_filename = f"{uuid.uuid4()}{file_ext}"
+    file_path = comparison_dir / unique_filename
+
+    async with aiofiles.open(file_path, "wb") as buffer:
+        await buffer.write(await file.read())
+
+    store_image_position(comparison_id, unique_filename, row, column)
+
+    image_size = os.path.getsize(file_path)
+    store_image_metadata(comparison_id, unique_filename, original_filename, f"{image_size} bytes")
+
+    if custom_name:
+        update_image_custom_name(comparison_id, unique_filename, custom_name)
+
+    return JSONResponse(
+        content={"filename": unique_filename, "message": "Image uploaded successfully"}
+    )

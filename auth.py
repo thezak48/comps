@@ -7,10 +7,11 @@ import os
 import secrets
 import sqlite3
 from contextlib import contextmanager
-from typing import Optional, Dict, Any, Generator
 from datetime import datetime, timedelta
+from typing import Any, Dict, Generator, Optional
+
 from fastapi import Request
-from fastapi.security import APIKeyCookie
+from fastapi.security import APIKeyCookie, APIKeyHeader
 from jose import JWTError, jwt
 
 # Constants
@@ -26,6 +27,7 @@ if "SECRET_KEY" not in os.environ:
 
 # Cookie security
 cookie_sec = APIKeyCookie(name="session")
+api_key_header = APIKeyHeader(name="Authorization", auto_error=False)
 
 @contextmanager
 def get_db_cursor() -> Generator[sqlite3.Cursor, None, None]:
@@ -134,14 +136,16 @@ def create_access_token(data: dict) -> str:
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
-async def get_optional_user(request: Request) -> Optional[Dict[str, Any]]:
-    """Get the current user if logged in, otherwise return None"""
-    session = request.cookies.get("session")
-    if not session:
+async def get_current_user_from_token(token: str) -> Optional[Dict[str, Any]]:
+    """Decodes a JWT token and retrieves the user."""
+    if not token:
         return None
-
     try:
-        payload = jwt.decode(session, SECRET_KEY, algorithms=[ALGORITHM])
+        # Handle "Bearer <token>" format
+        if token.startswith("Bearer "):
+            token = token.split(" ")[1]
+
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         user_id = payload.get("sub")
         if user_id is None:
             return None
@@ -163,30 +167,25 @@ async def get_optional_user(request: Request) -> Optional[Dict[str, Any]]:
                 "is_super_admin": bool(user[4]),
             }
         return None
-    except (JWTError, sqlite3.Error) as e:
-        print(f"Error getting optional user: {e}")
+    except (JWTError, sqlite3.Error):
         return None
 
 def get_user_invitation_codes(user_id: int) -> list:
-    """Get all invitation codes created by a user"""
+    """Get all invitation codes created by a user."""
     with get_db_cursor() as cursor:
-        cursor.execute('''
-            SELECT ic.code, ic.is_used, u.username, ic.created_at
-            FROM invitation_codes ic
-            LEFT JOIN users u ON ic.used_by = u.id
-            WHERE ic.created_by = ?
-            ORDER BY ic.created_at DESC
-        ''', (user_id,))
-        codes = [
+        cursor.execute(
+            "SELECT code, created_at, used_by FROM invitation_codes WHERE created_by = ? ORDER BY created_at DESC",
+            (user_id,)
+        )
+        codes = cursor.fetchall()
+        return [
             {
-                "code": f"{code[:4]}...{code[-4:]}" if is_used else code,
-                "is_used": bool(is_used),
-                "used_by": used_by,
-                "created_at": created_at,
+                "code": row[0],
+                "created_at": row[1],
+                "is_used": bool(row[2]),
             }
-            for code, is_used, used_by, created_at in cursor.fetchall()
+            for row in codes
         ]
-    return codes
 
 def is_admin(user: dict) -> bool:
     """Check if a user is an admin"""
@@ -218,7 +217,98 @@ def get_all_users() -> list:
 def set_admin_status(user_id: int, admin_status: bool):
     """Set the admin status for a user"""
     with get_db_cursor() as cursor:
+        cursor.execute('UPDATE users SET is_admin = ? WHERE id = ?', (admin_status, user_id))
+
+# --- API Key Management ---
+
+def create_api_key(user_id: int, key_name: str) -> str:
+    """Generate a new API key for a user and store its hash."""
+    api_key = f"comps_{secrets.token_urlsafe(32)}"
+    prefix = api_key[:12] # e.g., "comps_AbCdEfG"
+    hashed_key = hashlib.sha256(api_key.encode()).hexdigest()
+    
+    with get_db_cursor() as cursor:
         cursor.execute(
-            'UPDATE users SET is_admin = ? WHERE id = ? AND is_super_admin = 0',
-            (1 if admin_status else 0, user_id)
+            "INSERT INTO api_keys (user_id, key_name, key_prefix, hashed_key) VALUES (?, ?, ?, ?)",
+            (user_id, key_name, prefix, hashed_key)
         )
+    return api_key
+
+def get_user_api_keys(user_id: int) -> list:
+    """Get all API keys for a specific user."""
+    with get_db_cursor() as cursor:
+        cursor.execute(
+            "SELECT id, key_name, key_prefix, created_at, last_used_at FROM api_keys WHERE user_id = ? ORDER BY created_at DESC",
+            (user_id,)
+        )
+        keys = cursor.fetchall()
+        return [
+            {
+                "id": row[0],
+                "key_name": row[1],
+                "key_prefix": row[2],
+                "created_at": row[3],
+                "last_used_at": row[4],
+            }
+            for row in keys
+        ]
+
+def delete_api_key(user_id: int, key_id: int) -> bool:
+    """Delete an API key belonging to a user."""
+    with get_db_cursor() as cursor:
+        # Ensure the key belongs to the user before deleting
+        cursor.execute(
+            "DELETE FROM api_keys WHERE id = ? AND user_id = ?", (key_id, user_id)
+        )
+        return cursor.rowcount > 0
+
+def get_user_from_api_key(api_key: str) -> Optional[Dict[str, Any]]:
+    """Validate an API key and return the associated user."""
+    if not api_key.startswith("comps_"):
+        return None
+        
+    prefix = api_key[:12]
+    hashed_key = hashlib.sha256(api_key.encode()).hexdigest()
+
+    with get_db_cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT u.id, u.username, u.is_admin, u.never_expire_comparisons, u.is_super_admin
+            FROM users u
+            JOIN api_keys ak ON u.id = ak.user_id
+            WHERE ak.key_prefix = ? AND ak.hashed_key = ?
+            """,
+            (prefix, hashed_key)
+        )
+        user_row = cursor.fetchone()
+
+        if user_row:
+            # Update last used timestamp
+            cursor.execute("UPDATE api_keys SET last_used_at = CURRENT_TIMESTAMP WHERE key_prefix = ?", (prefix,))
+            return {
+                "id": user_row[0], "username": user_row[1], "is_admin": bool(user_row[2]),
+                "never_expire_comparisons": bool(user_row[3]), "is_super_admin": bool(user_row[4])
+            }
+    return None
+
+async def get_optional_user(request: Request) -> Optional[Dict[str, Any]]:
+    """Get the current user from API Key or session cookie."""
+    # 1. Try API Key from Authorization header
+    auth_header = await api_key_header(request)
+    if auth_header:
+        # Check for "Bearer" for JWTs, otherwise assume API Key
+        if auth_header.lower().startswith("bearer "):
+            token = auth_header.split(" ")[1]
+            user = await get_current_user_from_token(token)
+        else: # Treat as an API Key
+            user = get_user_from_api_key(auth_header)
+        
+        if user:
+            return user
+
+    # 2. Fallback to session cookie for web UI
+    session_token = request.cookies.get("session")
+    if session_token:
+        return await get_current_user_from_token(session_token)
+
+    return None
