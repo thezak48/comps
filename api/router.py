@@ -25,7 +25,7 @@ router = APIRouter(prefix="/api/v1", tags=["api"])
 
 # Environment variables
 # Constants
-MAX_ROWS = 20
+MAX_ROWS = 200
 
 UPLOADS_PATH = os.getenv('UPLOADS_PATH', 'uploads')
 DB_PATH = os.getenv('DB_PATH', 'comparisons.db')
