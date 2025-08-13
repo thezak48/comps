@@ -3,7 +3,7 @@ def get_metrics():
     import sqlite3
     from datetime import datetime, timedelta
 
-    DB_PATH = "comparisons.db"
+    DB_PATH = os.getenv('DB_PATH', 'comparisons.db')
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     metrics = {}
