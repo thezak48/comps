@@ -29,7 +29,8 @@
                         <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
                             <li><a class="dropdown-item" href="/account"><i class="fa fa-cog"></i> My Account</a></li>
                             {% if user.is_admin %}
-                            <li><a class="dropdown-item active" href="/admin"><i class="fa fa-shield-alt"></i> Admin</a></li>
+                            <li><a class="dropdown-item" href="/admin"><i class="fa fa-shield-alt"></i> Admin</a></li>
+                            <li><a class="dropdown-item" href="/admin/metrics"><i class="fa fa-chart-bar"></i> Metrics</a></li>
                             {% endif %}
                             <li><hr class="dropdown-divider"></li>
                             <li><a class="dropdown-item" href="/logout"><i class="fa fa-sign-out-alt"></i> Logout</a></li>
@@ -45,8 +46,8 @@
     
     <div class="container">
         <div class="admin-container">
+            {% block content %}
             <h2 class="mb-4 text-light">Admin Panel</h2>
-            
             <div class="card mb-4">
                 <div class="card-header">
                     <h5 class="mb-0">Invitation Codes</h5>
@@ -57,7 +58,6 @@
                             <i class="fa fa-plus"></i> Generate New Invitation Code
                         </button>
                     </form>
-                    
                     <h6>Your Invitation Codes:</h6>
                     <table class="table table-dark">
                         <thead>
@@ -87,7 +87,6 @@
                     </table>
                 </div>
             </div>
-
             {% if user.is_super_admin %}
             <div class="card mb-4">
                 <div class="card-header">
@@ -130,7 +129,7 @@
                 </div>
             </div>
             {% endif %}
-
+            {% endblock %}
         </div>
     </div>
     

@@ -25,6 +25,7 @@ from api.router import router as api_router
 from database import (delete_comparison, get_comparison,
                       get_expired_comparisons, get_user_comparisons, init_db,
                       update_last_accessed)
+from database_metrics import get_metrics
 
 
 # Random name generator for comparisons
@@ -266,6 +267,19 @@ async def logout():
     response = RedirectResponse(url="/")
     response.delete_cookie(key="session")
     return response
+
+# Admin metrics page
+@app.get("/admin/metrics", response_class=HTMLResponse)
+async def admin_metrics_page(request: Request):
+    user = await auth.get_optional_user(request)
+    if not user or not auth.is_admin(user):
+        return RedirectResponse(url="/", status_code=status.HTTP_302_FOUND)
+
+    metrics = get_metrics()
+    return templates.TemplateResponse(
+        "metrics.html",
+        {"request": request, "user": user, "metrics": metrics}
+    )
 
 @app.get("/admin", response_class=HTMLResponse)
 async def admin_page(request: Request):
