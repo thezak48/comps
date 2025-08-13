@@ -267,7 +267,7 @@ body {
     border: 1px solid #404040;
     border-radius: 4px;
     width: calc((100% - (var(--column-count, 2) - 1) * 20px) / var(--column-count, 2));
-    min-width: 150px;
+    min-width: 200px;
     display: flex;
     flex-direction: column;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
@@ -300,6 +300,7 @@ body {
     background: #1a1a1a;
     border-radius: 8px;
     margin: 20px 0;
+    overflow-x: auto;
 }
 
 .column-files {
@@ -570,8 +571,10 @@ body {
     flex: 1;
     min-width: 200px;
     max-width: calc(100% / var(--column-count, 2));
+    width: calc((100% - (var(--column-count, 2) - 1) * 20px) / var(--column-count, 2));
     align-items: center;
     padding: 8px;
+    margin: 10px;
     background: #2d2d2d;
     border-radius: 4px 4px 0 0;
     justify-content: space-between;
