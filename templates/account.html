@@ -28,6 +28,10 @@
                         </a>
                         <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
                             <li><a class="dropdown-item active" href="/account"><i class="fa fa-cog"></i> My Account</a></li>
+                            {% if user.is_admin %}
+                            <li><a class="dropdown-item" href="/admin"><i class="fa fa-shield-alt"></i> Admin</a></li>
+                            <li><a class="dropdown-item" href="/admin/metrics"><i class="fa fa-chart-bar"></i> Metrics</a></li>
+                            {% endif %}
                             <li><hr class="dropdown-divider"></li>
                             <li><a class="dropdown-item" href="/logout"><i class="fa fa-sign-out-alt"></i> Logout</a></li>
                         </ul>
