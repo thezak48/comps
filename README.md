@@ -2,7 +2,7 @@
 
 [![Build Status](https://github.com/thezak48/comps/actions/workflows/docker-build.yml/badge.svg)](https://github.com/thezak48/comps/actions/workflows/docker-build.yml)
 [![Docker Image Version](https://img.shields.io/docker/v/thezak48/comps?sort=semver)](https://hub.docker.com/r/thezak48/comps)
-[![License](https://img.shields.io/github/license/thezak48/comps)](https://github.com/thezak48/comps/blob/develop/LICENSE)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://github.com/thezak48/comps/blob/develop/LICENSE)
 [![Security Status](https://github.com/thezak48/comps/workflows/security/badge.svg)](https://github.com/thezak48/comps/security/advisories)
 
 Comps is a open source self hostable version of Slowpoke Pics. A web-based tool for comparing multiple images side by side.
