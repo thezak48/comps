@@ -413,6 +413,24 @@
         }
       }
     },
+    "/admin/metrics": {
+      "get": {
+        "summary": "Admin Metrics Page",
+        "operationId": "admin_metrics_page_admin_metrics_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/admin": {
       "get": {
         "summary": "Admin Page",
