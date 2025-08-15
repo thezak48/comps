@@ -19,10 +19,10 @@
             <div class="display-4 fw-bold text-warning">{{ metrics.total_images }}</div>
         </div>
         <div class="card text-bg-dark h-100 shadow p-3 text-center" style="border-left: 6px solid #6f42c1;">
-            <div class="mb-2"><i class="fa fa-hdd fa-2x text-purple"></i></div>
+            <div class="mb-2"><i class="fa fa-hdd fa-2x" style="color:#b39ddb;"></i></div>
             <div class="fw-bold text-secondary">Total Image Size</div>
             <div class="display-6 fw-bold" style="color:#b39ddb;">
-                {{ (metrics.total_images_size_bytes // (1024*1024)) ~ ' MB' if metrics.total_images_size_bytes >= 1024*1024 else (metrics.total_images_size_bytes // 1024) ~ ' KB' if metrics.total_images_size_bytes >= 1024 else metrics.total_images_size_bytes ~ ' bytes' }}
+                {{ metrics.total_images_humansize }}
             </div>
         </div>
         <div class="card text-bg-dark h-100 shadow p-3 text-center" style="border-left: 6px solid #0dcaf0;">
