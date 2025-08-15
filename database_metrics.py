@@ -84,6 +84,17 @@ def get_metrics():
             if os.path.isfile(fp):
                 total_size += os.path.getsize(fp)
     metrics["total_images_size_bytes"] = total_size
+    metrics["total_images_humansize"] = format_bytes(total_size)
 
     conn.close()
     return metrics
+
+def format_bytes(bytes):
+    if bytes < 1024:
+        return f"{bytes} B"
+    elif bytes < 1024 * 1024:
+        return f"{(bytes / 1024):.2f} KB"
+    elif bytes < 1024 * 1024 * 1024:
+        return f"{(bytes / (1024 * 1024)):.2f} MB"
+    else:
+        return f"{(bytes / (1024 * 1024 * 1024)):.2f} GB"
