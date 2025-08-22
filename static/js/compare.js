@@ -651,10 +651,6 @@ function generateBBCode() {
                 bbcode += `${window.location.origin}/uploads/${imageUrls[index]}\n`;
             }
         }
-        
-        if (row < totalRows - 1) {
-            bbcode += '\n';
-        }
     }
     
     bbcode += '[/comparison]';
