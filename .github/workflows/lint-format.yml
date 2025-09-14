@@ -24,12 +24,25 @@ jobs:
           pip install -r requirements-dev.txt
       - name: Install Node.js dependencies
         run: npm install
-      - name: Run Python formatters/linters
+      - name: Run Black (Python)
         run: |
           source .venv/bin/activate
           black --check .
+      - name: Run isort (Python)
+        run: |
+          source .venv/bin/activate
           isort --check-only .
+      - name: Run flake8 (Python)
+        run: |
+          source .venv/bin/activate
           flake8 .
+      - name: Run djlint (Jinja)
+        run: |
+          source .venv/bin/activate
           djlint templates/ --check --profile=jinja
-      - name: Run JS/CSS formatters/linters
-        run: npm run check
+      - name: Run ESLint (JS)
+        run: npm run lint:js
+      - name: Run Stylelint (CSS)
+        run: npm run lint:css
+      - name: Run Prettier check (JS/CSS)
+        run: npm run prettier:check
