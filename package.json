@@ -2,6 +2,7 @@
   "name": "comps-static",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "lint:css": "stylelint \"static/css/**/*.css\"",
     "lint:js": "eslint \"static/js/**/*.js\"",
@@ -14,6 +15,7 @@
   },
   "devDependencies": {
     "eslint": "^9.35.0",
+    "eslint-config-prettier": "^10.1.8",
     "prettier": "^3.6.2",
     "stylelint": "^16.24.0",
     "stylelint-config-standard": "^39.0.0"

@@ -1,10 +1,12 @@
 <!DOCTYPE html>
 <html>
-<head>
-    <link type="text/css" rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css">
-    <link rel="shortcut icon" href="/static/images/favicon.ico">
-    <title>Comps API Documentation</title>
-    <style>
+    <head>
+        <link type="text/css"
+              rel="stylesheet"
+              href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css">
+        <link rel="shortcut icon" href="/static/images/favicon.ico">
+        <title>Comps API Documentation</title>
+        <style>
         /* Dark mode overrides for Swagger UI */
         body {
             background-color: #1a1a1a;
@@ -153,12 +155,12 @@
         .swagger-ui .markdown code, .swagger-ui .renderedMarkdown code {
             background-color: #333333;
         }
-    </style>
-</head>
-<body>
-    <div id="swagger-ui"></div>
-    <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
-    <script>
+        </style>
+    </head>
+    <body>
+        <div id="swagger-ui"></div>
+        <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+        <script>
         const ui = SwaggerUIBundle({
             url: '/openapi.json',
             dom_id: '#swagger-ui',
@@ -173,6 +175,6 @@
                 theme: "monokai"
             }
         });
-    </script>
-</body>
+        </script>
+    </body>
 </html>

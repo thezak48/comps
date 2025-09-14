@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% extends "base.jinja" %}
 
 {% block title %}Compare Images | Comps{% endblock %}
 
@@ -43,7 +43,7 @@
             {% endfor %}
         </div>
         <div class="dropdown d-inline-block ms-2">
-            <select id="imageRendering" class="btn btn-secondary dropdown-toggle">
+            <select id="image-rendering" class="btn btn-secondary dropdown-toggle">
                 <option value="off">Image Rendering: Off</option>
                 <option value="auto">Image Rendering: Auto</option>
                 <option value="smooth">Image Rendering: Smooth</option>
@@ -176,7 +176,7 @@
 
         <div class="dropdown d-inline-block ms-2">
             <select
-                    id="mobileImageRendering"
+                    id="mobile-image-rendering"
                     class="btn btn-secondary dropdown-toggle"
             >
                 <option value="off">Rendering: Off</option>
@@ -210,15 +210,15 @@
 
 <div
         class="modal fade"
-        id="bbcodeModal"
+        id="bbcode-modal"
         tabindex="-1"
-        aria-labelledby="bbcodeModalLabel"
+        aria-labelledby="bbcode-modal-label"
         aria-hidden="true"
 >
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="bbcodeModalLabel">
+                <h5 class="modal-title" id="bbcode-modal-label">
                     Share Comparison (BBCode)
                 </h5>
                 <button
@@ -231,7 +231,7 @@
             <div class="modal-body">
                 <p>Copy the BBCode below to share this comparison:</p>
                 <textarea
-                        id="bbcodeText"
+                        id="bbcode-text"
                         class="form-control"
                         rows="10"
                         readonly

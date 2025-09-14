@@ -1,8 +1,10 @@
+/* global bootstrap */
+
 // Toast notification system
-const toastContainer = document.createElement('div');
-toastContainer.className = 'toast-container';
-const toastTypes = ['error', 'success', 'warning', 'info']; // Add 'info' type for notifications
-console.log('Creating toast container:', toastContainer);
+const toastContainer = document.createElement("div");
+toastContainer.className = "toast-container";
+const toastTypes = ["error", "success", "warning", "info"]; // eslint-disable-line no-unused-vars
+console.log("Creating toast container:", toastContainer);
 document.body.appendChild(toastContainer);
 
 /**
@@ -11,22 +13,31 @@ document.body.appendChild(toastContainer);
  * @param {string} type - The type of notification: 'error', 'success', 'warning', or 'info'
  * @param {number} duration - How long to show the notification in ms (default: 5000ms)
  */
-function showToast(message, type = 'error', duration = 5000) {
-    console.log('showToast called with message:', message, 'type:', type);
+function showToast(message, type = "error", duration = 5000) {
+    console.log("showToast called with message:", message, "type:", type);
     // Create toast element
-    const toast = document.createElement('div');
+    const toast = document.createElement("div");
     toast.className = `toast ${type}`;
-    
+
     // Add icon based on type
-    let icon = '';
-    switch(type) {
-        case 'error': icon = '❌'; break;
-        case 'success': icon = '✅'; break;
-        case 'warning': icon = '⚠️'; break;
-        case 'info': icon = 'ℹ️'; break;
-        default: icon = 'ℹ️';
+    let icon = "";
+    switch (type) {
+        case "error":
+            icon = "❌";
+            break;
+        case "success":
+            icon = "✅";
+            break;
+        case "warning":
+            icon = "⚠️";
+            break;
+        case "info":
+            icon = "ℹ️";
+            break;
+        default:
+            icon = "ℹ️";
     }
-    
+
     // Create toast content
     toast.innerHTML = `
 <div class="toast-content">
@@ -35,25 +46,25 @@ function showToast(message, type = 'error', duration = 5000) {
 </div>
 <span class="toast-close">×</span>
 `;
-    console.log('Toast HTML:', toast.innerHTML);
-    
+    console.log("Toast HTML:", toast.innerHTML);
+
     // Add to container
     toastContainer.appendChild(toast);
-    
-    console.log('Toast added to container:', toast);
+
+    console.log("Toast added to container:", toast);
     // Add close button functionality
-    const closeBtn = toast.querySelector('.toast-close');
-    closeBtn.addEventListener('click', () => {
-        toast.style.animation = 'toast-out 0.3s forwards';
+    const closeBtn = toast.querySelector(".toast-close");
+    closeBtn.addEventListener("click", () => {
+        toast.style.animation = "toast-out 0.3s forwards";
         setTimeout(() => {
             toastContainer.removeChild(toast);
         }, 300);
     });
-    
+
     // Auto-remove after duration
     setTimeout(() => {
         if (toast.parentNode === toastContainer) {
-            toast.style.animation = 'toast-out 0.3s forwards';
+            toast.style.animation = "toast-out 0.3s forwards";
             setTimeout(() => {
                 if (toast.parentNode === toastContainer) {
                     toastContainer.removeChild(toast);
@@ -69,7 +80,7 @@ function showToast(message, type = 'error', duration = 5000) {
  * @param {number} duration - How long to show the notification in ms (default: 5000ms)
  */
 function showSuccess(message, duration = 5000) {
-    showToast(message, 'success', duration);
+    showToast(message, "success", duration);
 }
 
 /**
@@ -77,64 +88,70 @@ function showSuccess(message, duration = 5000) {
  * @param {string} message - The error message to display
  */
 function showError(message) {
-    showToast(message, 'error');
+    showToast(message, "error");
 }
 
-const dropZone = document.getElementById('dropZone');
-const fileInput = document.getElementById('fileInput');
-const preview = document.getElementById('preview');
-const expirationToggle = document.getElementById('expiration-toggle');
-const showNameToggle = document.getElementById('show-name-toggle');
-const expirationToggleLabel = document.querySelector('label[for="expiration-toggle"]');
-const tagsToggle = document.getElementById('tags-toggle');
-const comparisonNameInput = document.getElementById('comparison-name');
-const showNameInput = document.getElementById('show-name');
-const tagsInput = document.getElementById('tags');
+const dropZone = document.getElementById("dropZone");
+const fileInput = document.getElementById("fileInput");
+const preview = document.getElementById("preview");
+const expirationToggle = document.getElementById("expiration-toggle");
+const showNameToggle = document.getElementById("show-name-toggle");
+const expirationToggleLabel = document.querySelector('label[for="expiration-toggle"]'); // eslint-disable-line no-unused-vars
+const tagsToggle = document.getElementById("tags-toggle");
+const comparisonNameInput = document.getElementById("comparison-name");
+const showNameInput = document.getElementById("show-name");
+const tagsInput = document.getElementById("tags");
 let groupedFiles = new Map(); // Maps column prefixes to files
 let selectedFiles = new Set();
 let columnPrefixes = [];
 let columnCount = 2; // Initialize with minimum columns (2 empty columns by default)
-let rowCount = 1;    // Initialize with one row
+let rowCount = 1; // Initialize with one row
 let maxColumns = 10; // Maximum allowed columns
-let maxRows = 20;    // Maximum allowed rows
-let columnNamePrefix = 'column'; // New dynamic column naming
+let maxRows = 20; // Maximum allowed rows
+// eslint-disable-next-line no-unused-vars
+let columnNamePrefix = "column"; // New dynamic column naming
+// eslint-disable-next-line no-unused-vars
 let baseColumns = 0; // Track columns from uploaded files
+// eslint-disable-next-line no-unused-vars
 let addedColumns = 0; // Track manually added columns
+// eslint-disable-next-line no-unused-vars
 let columnIndexMap = new Map(); // Track column indices
 let detectedColumns = 2; // Track actual columns from uploaded files
 let minColumns = 2; // Define minimum required columns
+// eslint-disable-next-line no-unused-vars
 let columnTracker = new Map(); // Track column assignments
 let uploadInProgress = false;
 // Variables for drag and drop column reordering
 let dragSrcColumn = null;
 let draggedColumnIndex = -1;
-let isDragging = false;
+let isDragging = false; // eslint-disable-line no-unused-vars
 
 // Add this new structure to organize files by row and column
 let fileMatrix = []; // 2D array to store files by [row][column]
 let columnCustomNames = {}; // Store custom naming patterns for columns
 
-console.log('Upload.js initialized');
+console.log("Upload.js initialized");
 
 /**
  * Adds a new column to the comparison grid
  */
+// eslint-disable-next-line no-unused-vars
 function addColumn() {
     if (columnCount >= maxColumns) {
-        showToast(`Maximum ${maxColumns} columns allowed`, 'warning');
+        showToast(`Maximum ${maxColumns} columns allowed`, "warning");
         return;
     }
-    
+
     // Add new column to file matrix
     for (let r = 0; r < fileMatrix.length; r++) {
         fileMatrix[r].push(null);
     }
-    
+
     // Update column tracking
     columnCount++;
     addedColumns++;
     columnPrefixes.push(`column${columnCount}`);
-    
+
     // Update the UI
     updatePreview();
 }
@@ -145,10 +162,10 @@ function addColumn() {
  */
 function removeColumn(columnIndex) {
     if (columnCount <= minColumns) {
-        showToast(`Minimum ${minColumns} columns required`, 'warning');
+        showToast(`Minimum ${minColumns} columns required`, "warning");
         return;
     }
-    
+
     // Remove column from file matrix
     for (let r = 0; r < fileMatrix.length; r++) {
         if (fileMatrix[r]) {
@@ -160,75 +177,75 @@ function removeColumn(columnIndex) {
             fileMatrix[r].splice(columnIndex, 1);
         }
     }
-    
+
     // Update tracking variables
     columnCount--;
     columnPrefixes.splice(columnIndex, 1);
-    
+
     // Update the UI
     updatePreview();
 }
 
 // Toggle visibility of show name field
-showNameToggle.addEventListener('change', function() {
-    const showNameContainer = document.getElementById('show-name-container');
-    showNameContainer.style.display = this.checked ? 'block' : 'none';
+showNameToggle.addEventListener("change", function () {
+    const showNameContainer = document.getElementById("show-name-container");
+    showNameContainer.style.display = this.checked ? "block" : "none";
     if (!this.checked) {
-        showNameInput.value = '';
+        showNameInput.value = "";
     }
 });
 
 // Toggle visibility of expiration settings
-expirationToggle.addEventListener('change', function() {
-    const expirationContainer = document.getElementById('expiration-container');
-    expirationContainer.style.display = this.checked ? 'block' : 'none';
+expirationToggle.addEventListener("change", function () {
+    const expirationContainer = document.getElementById("expiration-container");
+    expirationContainer.style.display = this.checked ? "block" : "none";
     if (!this.checked) {
         // Reset to defaults when unchecked
-        document.getElementById('expiration-last-access').checked = true;
-        document.getElementById('expiration-days').value = '7';
+        document.getElementById("expiration-last-access").checked = true;
+        document.getElementById("expiration-days").value = "7";
     }
 });
 
 // Toggle visibility of tags field
-tagsToggle.addEventListener('change', function() {
-    const tagsContainer = document.getElementById('tags-container');
-    tagsContainer.style.display = this.checked ? 'block' : 'none';
+tagsToggle.addEventListener("change", function () {
+    const tagsContainer = document.getElementById("tags-container");
+    tagsContainer.style.display = this.checked ? "block" : "none";
     if (!this.checked) {
-        tagsInput.value = '';
+        tagsInput.value = "";
     }
 });
 
-dropZone.addEventListener('click', () => fileInput.click());
+dropZone.addEventListener("click", () => fileInput.click());
 
-dropZone.addEventListener('dragover', (e) => {
+dropZone.addEventListener("dragover", (e) => {
     e.preventDefault();
     e.stopPropagation();
-    dropZone.classList.add('dragover');
+    dropZone.classList.add("dragover");
 });
 
-dropZone.addEventListener('dragenter', (e) => {
+dropZone.addEventListener("dragenter", (e) => {
     e.preventDefault();
-    dropZone.classList.add('dragover');
+    dropZone.classList.add("dragover");
 });
 
-dropZone.addEventListener('dragleave', () => {
-    dropZone.classList.remove('dragover');
+dropZone.addEventListener("dragleave", () => {
+    dropZone.classList.remove("dragover");
 });
 
-dropZone.addEventListener('drop', (e) => {
+dropZone.addEventListener("drop", (e) => {
     e.preventDefault();
     e.stopPropagation();
-    dropZone.classList.remove('dragover');
+    dropZone.classList.remove("dragover");
     const droppedFiles = Array.from(e.dataTransfer.files);
     handleFiles(droppedFiles);
 });
 
-fileInput.addEventListener('change', (e) => {
+fileInput.addEventListener("change", (e) => {
     handleFiles(e.target.files);
 });
 
 // Add horizontal scroll handling
-preview.addEventListener('wheel', (e) => {
+preview.addEventListener("wheel", (e) => {
     if (e.deltaY !== 0 && e.shiftKey) {
         e.preventDefault();
         preview.scrollLeft += e.deltaY;
@@ -237,15 +254,15 @@ preview.addEventListener('wheel', (e) => {
 
 function handleFiles(files) {
     if (!files || files.length === 0) return;
-    preview.innerHTML = '';
-    preview.style.width = '100%';
-    const uploadButton = document.getElementById('uploadButton');
+    preview.innerHTML = "";
+    preview.style.width = "100%";
+    const uploadButton = document.getElementById("upload-button");
     try {
         groupFiles(Array.from(files));
-        uploadButton.style.display = 'block';
+        uploadButton.style.display = "block";
     } catch (error) {
         showError(error.message);
-        uploadButton.style.display = 'none';
+        uploadButton.style.display = "none";
     }
 }
 
@@ -253,7 +270,7 @@ function groupFiles(files) {
     groupedFiles.clear();
     selectedFiles.clear();
     fileMatrix = []; // Reset the file matrix
-    
+
     // Initialize matrix with proper size
     fileMatrix = [];
     for (let r = 0; r < rowCount; r++) {
@@ -262,14 +279,14 @@ function groupFiles(files) {
             fileMatrix[r][c] = null;
         }
     }
-    
+
     // Validate file count
     if (files.length > 120) {
-        throw new Error('Maximum 30 files allowed');
+        throw new Error("Maximum 30 files allowed");
     }
 
     // Remove any existing reordering instructions
-    const existingInstructions = document.querySelector('.reordering-instructions');
+    const existingInstructions = document.querySelector(".reordering-instructions");
     if (existingInstructions) {
         existingInstructions.remove();
     }
@@ -279,11 +296,11 @@ function groupFiles(files) {
     const fileGroups = new Map();
     let patternMatchCount = 0;
 
-    files.forEach(file => {
+    files.forEach((file) => {
         const match = file.name.match(filenameRegex);
         if (match) {
             patternMatchCount++;
-            const [_, prefix, number, ext] = match;
+            const [_, prefix, number, ext] = match; // eslint-disable-line no-unused-vars
             const columnPrefix = prefix.toLowerCase();
             const rowNumber = parseInt(number);
 
@@ -304,10 +321,10 @@ function groupFiles(files) {
                 rowNumbers.add(rowNum);
             });
         });
-        
+
         // Update row count based on detected rows
         rowCount = Math.max(1, rowNumbers.size);
-        
+
         // Initialize file matrix with proper size
         fileMatrix = [];
         for (let r = 0; r < rowCount; r++) {
@@ -316,9 +333,9 @@ function groupFiles(files) {
                 fileMatrix[r][c] = null;
             }
         }
-        
+
         // Validate column counts and consistency
-        const columnSizes = Array.from(fileGroups.values()).map(group => group.size);
+        const columnSizes = Array.from(fileGroups.values()).map((group) => group.size); // eslint-disable-line no-unused-vars
         columnPrefixes = Array.from(fileGroups.keys());
         detectedColumns = columnPrefixes.length;
         baseColumns = detectedColumns;
@@ -342,7 +359,7 @@ function groupFiles(files) {
                 }
             });
         });
-        
+
         // Store grouped files for backwards compatibility
         fileGroups.forEach((files, prefix) => {
             groupedFiles.set(prefix, Array.from(files.values()));
@@ -352,17 +369,17 @@ function groupFiles(files) {
         columnCount = Math.min(Math.max(minColumns, files.length), maxColumns);
         baseColumns = 0;
         detectedColumns = columnCount;
-        
+
         // Create column prefixes
         columnPrefixes = [];
         for (let i = 0; i < columnCount; i++) {
-            columnPrefixes.push(`column${i+1}`);
-            groupedFiles.set(`column${i+1}`, []);
+            columnPrefixes.push(`column${i + 1}`);
+            groupedFiles.set(`column${i + 1}`, []);
         }
-        
+
         // Initialize row count to 1 for arbitrary filenames
         rowCount = Math.ceil(files.length / columnCount);
-        
+
         // Initialize file matrix with proper size
         fileMatrix = [];
         for (let r = 0; r < rowCount; r++) {
@@ -371,16 +388,16 @@ function groupFiles(files) {
                 fileMatrix[r][c] = null;
             }
         }
-        
+
         // Distribute files across rows and columns
         files.forEach((file, index) => {
             const rowIndex = Math.floor(index / columnCount);
             const columnIndex = index % columnCount;
-            
+
             // Ensure we don't exceed matrix dimensions
             if (rowIndex < rowCount && columnIndex < columnCount) {
                 fileMatrix[rowIndex][columnIndex] = file;
-                
+
                 // Also add to groupedFiles for backward compatibility
                 const columnPrefix = columnPrefixes[columnIndex];
                 if (!groupedFiles.has(columnPrefix)) {
@@ -389,10 +406,10 @@ function groupFiles(files) {
                 groupedFiles.get(columnPrefix).push(file);
             }
         });
-        
+
         // Add a note about reordering for arbitrary filenames
-        const instructionEl = document.createElement('div');
-        instructionEl.className = 'reordering-instructions';
+        const instructionEl = document.createElement("div");
+        instructionEl.className = "reordering-instructions";
         instructionEl.innerHTML = `
             <div class="alert alert-info mt-2">
                 <i class="fas fa-info-circle"></i> 
@@ -401,142 +418,143 @@ function groupFiles(files) {
                 <strong>use the Add Row button to add new rows</strong> before uploading.
             </div>
         `;
-        
+
         // Insert the instructions above the preview
         preview.parentNode.insertBefore(instructionEl, preview);
     }
 
     updatePreview();
 }
-
+// eslint-disable-next-line no-unused-vars
 function detectColumnCount(files) {
     const prefixSet = new Set();
     const filenameRegex = /^(.+?)(\d+)\.([^.]+)$/;
-    
-    files.forEach(file => {
+
+    files.forEach((file) => {
         const match = file.name.match(filenameRegex);
         if (match) {
             prefixSet.add(match[1].toLowerCase());
         }
     });
-    
+
     return Math.max(minColumns, prefixSet.size);
 }
 
 function updatePreview() {
-    preview.innerHTML = '';
-    
+    preview.innerHTML = "";
+
     // Create top-level column controls
-    const columnControlsBar = document.createElement('div');
-    columnControlsBar.className = 'column-controls-bar';
-    
+    const columnControlsBar = document.createElement("div");
+    columnControlsBar.className = "column-controls-bar";
+
     // Add column headers with drag handles
     for (let colIndex = 0; colIndex < columnCount; colIndex++) {
-        const columnHeader = document.createElement('div');
-        columnHeader.className = 'column-header';
+        const columnHeader = document.createElement("div");
+        columnHeader.className = "column-header";
         columnHeader.dataset.columnIndex = colIndex;
-        columnHeader.dataset.columnPrefix = columnPrefixes[colIndex] || `column${colIndex+1}`;
+        columnHeader.dataset.columnPrefix =
+            columnPrefixes[colIndex] || `column${colIndex + 1}`;
         columnHeader.style.width = `calc(100% / ${columnCount})`;
-        
-        const dragHandle = document.createElement('div');
-        dragHandle.className = 'drag-handle';
+
+        const dragHandle = document.createElement("div");
+        dragHandle.className = "drag-handle";
         dragHandle.innerHTML = '<i class="fas fa-grip-lines"></i>';
-        dragHandle.title = 'Drag to reorder this column in all rows';
+        dragHandle.title = "Drag to reorder this column in all rows";
         dragHandle.draggable = true;
-        
-        const columnLabel = document.createElement('div');
-        columnLabel.className = 'column-label';
-        columnLabel.textContent = `Column ${colIndex+1}`;
-        
+
+        const columnLabel = document.createElement("div");
+        columnLabel.className = "column-label";
+        columnLabel.textContent = `Column ${colIndex + 1}`;
+
         // Add rename column button
-        const renameButton = document.createElement('button');
-        renameButton.className = 'btn btn-sm btn-secondary ms-1';
+        const renameButton = document.createElement("button");
+        renameButton.className = "btn btn-sm btn-secondary ms-1";
         renameButton.innerHTML = '<i class="fas fa-tag"></i>';
-        renameButton.title = 'Batch rename all images in this column';
+        renameButton.title = "Batch rename all images in this column";
         renameButton.onclick = () => openRenameColumnModal(colIndex);
-        
-        const removeButton = document.createElement('button');
-        removeButton.className = 'btn btn-sm btn-danger';
+
+        const removeButton = document.createElement("button");
+        removeButton.className = "btn btn-sm btn-danger";
         removeButton.innerHTML = '<i class="fas fa-times"></i>';
-        removeButton.title = 'Remove this column from all rows';
+        removeButton.title = "Remove this column from all rows";
         removeButton.onclick = () => removeColumn(colIndex);
         removeButton.disabled = columnCount <= minColumns;
-        
+
         columnHeader.appendChild(dragHandle);
         columnHeader.appendChild(columnLabel);
-        
+
         // Only add remove button if we have more than minimum columns
         if (columnCount > minColumns) {
             columnHeader.appendChild(removeButton);
         }
         columnHeader.appendChild(renameButton);
-        
+
         columnControlsBar.appendChild(columnHeader);
     }
-    
+
     preview.appendChild(columnControlsBar);
-    
+
     // Create rows
     for (let rowIndex = 0; rowIndex < rowCount; rowIndex++) {
-        const rowContainer = document.createElement('div');
-        rowContainer.className = 'row-container';
+        const rowContainer = document.createElement("div");
+        rowContainer.className = "row-container";
         rowContainer.dataset.rowIndex = rowIndex;
-        
+
         // Add row header with controls
-        const rowControls = document.createElement('div');
-        rowControls.className = 'row-controls';
-        
-        const rowLabel = document.createElement('div');
-        rowLabel.className = 'row-label';
+        const rowControls = document.createElement("div");
+        rowControls.className = "row-controls";
+
+        const rowLabel = document.createElement("div");
+        rowLabel.className = "row-label";
         rowLabel.textContent = `Row ${rowIndex + 1}`;
-        
-        const removeRowBtn = document.createElement('button');
-        removeRowBtn.className = 'btn btn-sm btn-danger';
+
+        const removeRowBtn = document.createElement("button");
+        removeRowBtn.className = "btn btn-sm btn-danger";
         removeRowBtn.innerHTML = '<i class="fas fa-trash"></i> Remove Row';
         removeRowBtn.onclick = () => removeRow(rowIndex);
         removeRowBtn.disabled = rowCount <= 1; // Disable if only one row
-        
+
         rowControls.appendChild(rowLabel);
         rowControls.appendChild(removeRowBtn);
         rowContainer.appendChild(rowControls);
-        
+
         // Create row content container
-        const rowColumnsContainer = document.createElement('div');
-        rowColumnsContainer.className = 'row-columns';
-        
+        const rowColumnsContainer = document.createElement("div");
+        rowColumnsContainer.className = "row-columns";
+
         // Add columns to this row
         for (let colIndex = 0; colIndex < columnCount; colIndex++) {
             const columnDiv = createColumnElement(rowIndex, colIndex);
             rowColumnsContainer.appendChild(columnDiv);
         }
-        
+
         rowContainer.appendChild(rowColumnsContainer);
         preview.appendChild(rowContainer);
     }
-    
+
     // Add drag-and-drop column reordering to the column headers
     enableColumnReordering();
 }
 
 // Helper function to create a column element
 function createColumnElement(rowIndex, colIndex) {
-    const columnPrefix = columnPrefixes[colIndex] || `column${colIndex+1}`;
-    const columnDiv = document.createElement('div');
-    columnDiv.className = 'comparison-column';
-    columnDiv.id = `column-${rowIndex}-${colIndex}`; 
+    const columnPrefix = columnPrefixes[colIndex] || `column${colIndex + 1}`; // eslint-disable-line no-unused-vars
+    const columnDiv = document.createElement("div");
+    columnDiv.className = "comparison-column";
+    columnDiv.id = `column-${rowIndex}-${colIndex}`;
     columnDiv.dataset.rowIndex = rowIndex;
     columnDiv.dataset.columnIndex = colIndex;
-    
+
     // Create a container for files in this column
-    const filesDiv = document.createElement('div');
+    const filesDiv = document.createElement("div");
     filesDiv.dataset.rowIndex = rowIndex;
     filesDiv.dataset.columnIndex = colIndex;
-    filesDiv.className = 'column-files';
+    filesDiv.className = "column-files";
     columnDiv.appendChild(filesDiv);
 
     // Create a drop zone for this specific cell
-    const cellDropZone = document.createElement('div');
-    cellDropZone.className = 'cell-drop-zone';
+    const cellDropZone = document.createElement("div");
+    cellDropZone.className = "cell-drop-zone";
     cellDropZone.dataset.rowIndex = rowIndex;
     cellDropZone.dataset.columnIndex = colIndex;
     cellDropZone.innerHTML = `
@@ -547,28 +565,32 @@ function createColumnElement(rowIndex, colIndex) {
     filesDiv.appendChild(cellDropZone);
 
     // Add file input for this cell
-    const cellFileInput = document.createElement('input');
-    cellFileInput.type = 'file';
-    cellFileInput.accept = 'image/*';
+    const cellFileInput = document.createElement("input");
+    cellFileInput.type = "file";
+    cellFileInput.accept = "image/*";
     cellFileInput.multiple = true; // Allow multiple file selection
-    cellFileInput.className = 'cell-file-input';
-    cellFileInput.style.display = 'none';
+    cellFileInput.className = "cell-file-input";
+    cellFileInput.style.display = "none";
     filesDiv.appendChild(cellFileInput);
 
     // Handle click on the cell upload button
-    const cellUploadBtn = cellDropZone.querySelector('.cell-upload-btn');
-    cellUploadBtn.addEventListener('click', (e) => {
+    const cellUploadBtn = cellDropZone.querySelector(".cell-upload-btn");
+    cellUploadBtn.addEventListener("click", (e) => {
         e.stopPropagation();
         cellFileInput.click(); // This will now allow multiple file selection
     });
 
     // Handle file selection for this specific cell
-    cellFileInput.addEventListener('change', (e) => {
+    cellFileInput.addEventListener("change", (e) => {
         if (e.target.files && e.target.files.length > 0) {
-            handleMultipleFilesForColumn(Array.from(e.target.files), rowIndex, colIndex);
+            handleMultipleFilesForColumn(
+                Array.from(e.target.files),
+                rowIndex,
+                colIndex,
+            );
         }
     });
-    
+
     // If we have a file in this position, display it
     if (fileMatrix && fileMatrix[rowIndex] && fileMatrix[rowIndex][colIndex]) {
         displayFilePreview(fileMatrix[rowIndex][colIndex], filesDiv);
@@ -576,7 +598,7 @@ function createColumnElement(rowIndex, colIndex) {
 
     // Add drag and drop event listeners for this cell
     setupCellDragAndDrop(cellDropZone);
-    
+
     return columnDiv;
 }
 
@@ -585,23 +607,23 @@ function displayFilePreview(file, container) {
     // Get row and column indices from container's data attributes
     const rowIndex = parseInt(container.dataset.rowIndex);
     const colIndex = parseInt(container.dataset.columnIndex);
-    
+
     if (!file || isNaN(rowIndex) || isNaN(colIndex)) return;
-    
+
     console.log(`Displaying preview for row ${rowIndex}, column ${colIndex}`);
-    
+
     // Clear any existing content in the container
-    container.innerHTML = '';
-    
+    container.innerHTML = "";
+
     // Create a drop zone for this cell (will be replaced with the file preview)
-    const cellDropZone = document.createElement('div');
-    cellDropZone.className = 'cell-drop-zone';
+    const cellDropZone = document.createElement("div");
+    cellDropZone.className = "cell-drop-zone";
     container.appendChild(cellDropZone);
-    
+
     const reader = new FileReader();
     reader.onload = (e) => {
-        const fileDiv = document.createElement('div');
-        fileDiv.className = 'file-preview';
+        const fileDiv = document.createElement("div");
+        fileDiv.className = "file-preview";
         fileDiv.innerHTML = `
             <img src="${e.target.result}" style="max-height: 100px;">
             <div class="file-label">${file.customName || file.name}</div>
@@ -611,33 +633,41 @@ function displayFilePreview(file, container) {
         `;
         container.appendChild(fileDiv);
         container.removeChild(cellDropZone); // Remove the drop zone now that we have a file preview
-        
+
         // Add remove button
-        const removeBtn = document.createElement('button');
-        removeBtn.className = 'btn btn-sm btn-danger remove-file-btn';
+        const removeBtn = document.createElement("button");
+        removeBtn.className = "btn btn-sm btn-danger remove-file-btn";
         removeBtn.innerHTML = '<i class="fas fa-times"></i>';
-        removeBtn.title = 'Remove this file';
+        removeBtn.title = "Remove this file";
         fileDiv.appendChild(removeBtn);
-        
+
         // Add event listener for replace button
-        const replaceBtn = fileDiv.querySelector('.replace-file-btn');
-        replaceBtn.addEventListener('click', (e) => {
+        const replaceBtn = fileDiv.querySelector(".replace-file-btn");
+        replaceBtn.addEventListener("click", (e) => {
             e.stopPropagation();
-            const rowIndex = parseInt(container.closest('.comparison-column').dataset.rowIndex);
-            const colIndex = parseInt(container.closest('.comparison-column').dataset.columnIndex);
+            const rowIndex = parseInt(
+                container.closest(".comparison-column").dataset.rowIndex,
+            );
+            const colIndex = parseInt(
+                container.closest(".comparison-column").dataset.columnIndex,
+            );
             // Create and trigger a file input for replacement
             triggerFileInputForReplacement(rowIndex, colIndex);
         });
-        
+
         // Add event listener for edit name button
-        const editNameBtn = fileDiv.querySelector('.edit-name-btn');
-        editNameBtn.addEventListener('click', (e) => {
+        const editNameBtn = fileDiv.querySelector(".edit-name-btn");
+        editNameBtn.addEventListener("click", (e) => {
             e.stopPropagation();
-            const rowIndex = parseInt(container.closest('.comparison-column').dataset.rowIndex);
-            const colIndex = parseInt(container.closest('.comparison-column').dataset.columnIndex);
-            const fileLabel = fileDiv.querySelector('.file-label');
+            const rowIndex = parseInt(
+                container.closest(".comparison-column").dataset.rowIndex,
+            );
+            const colIndex = parseInt(
+                container.closest(".comparison-column").dataset.columnIndex,
+            );
+            const fileLabel = fileDiv.querySelector(".file-label");
             const currentName = fileLabel.textContent;
-            
+
             // Replace label with input field
             fileLabel.innerHTML = `
                 <input type="text" class="name-edit-input" value="${currentName}">
@@ -646,23 +676,27 @@ function displayFilePreview(file, container) {
                     <button class="btn btn-sm btn-danger cancel-name-btn"><i class="fas fa-times"></i></button>
                 </div>
             `;
-            
+
             // Focus the input field
-            const input = fileLabel.querySelector('.name-edit-input');
+            const input = fileLabel.querySelector(".name-edit-input");
             input.focus();
             input.select();
-            
+
             setupNameEditHandlers(fileLabel, rowIndex, colIndex, currentName);
         });
-        
+
         // Handle remove button click
-        removeBtn.addEventListener('click', (e) => {
+        removeBtn.addEventListener("click", (e) => {
             e.stopPropagation();
-            const rowIndex = parseInt(container.closest('.comparison-column').dataset.rowIndex);
-            const colIndex = parseInt(container.closest('.comparison-column').dataset.columnIndex);
+            const rowIndex = parseInt(
+                container.closest(".comparison-column").dataset.rowIndex,
+            );
+            const colIndex = parseInt(
+                container.closest(".comparison-column").dataset.columnIndex,
+            );
             removeFileFromCell(rowIndex, colIndex);
         });
-        
+
         // Setup drag and drop for the newly created file preview
         setupImageCellDragAndDrop(fileDiv);
     };
@@ -672,14 +706,14 @@ function displayFilePreview(file, container) {
 // Function to trigger file input for replacement
 function triggerFileInputForReplacement(rowIndex, colIndex) {
     // Create a temporary file input
-    const tempFileInput = document.createElement('input');
-    tempFileInput.type = 'file';
-    tempFileInput.accept = 'image/*';
-    tempFileInput.style.display = 'none';
+    const tempFileInput = document.createElement("input");
+    tempFileInput.type = "file";
+    tempFileInput.accept = "image/*";
+    tempFileInput.style.display = "none";
     document.body.appendChild(tempFileInput);
-    
+
     // Add event listener for file selection
-    tempFileInput.addEventListener('change', (e) => {
+    tempFileInput.addEventListener("change", (e) => {
         if (e.target.files && e.target.files.length > 0) {
             const file = e.target.files[0];
             // Remove the old file first
@@ -690,19 +724,19 @@ function triggerFileInputForReplacement(rowIndex, colIndex) {
         // Remove the temporary input
         document.body.removeChild(tempFileInput);
     });
-    
+
     // Trigger the file input
     tempFileInput.click();
 }
 
 // Function to set up event handlers for name editing
 function setupNameEditHandlers(fileLabel, rowIndex, colIndex, originalName) {
-    const input = fileLabel.querySelector('.name-edit-input');
-    const saveBtn = fileLabel.querySelector('.save-name-btn');
-    const cancelBtn = fileLabel.querySelector('.cancel-name-btn');
-    
+    const input = fileLabel.querySelector(".name-edit-input");
+    const saveBtn = fileLabel.querySelector(".save-name-btn");
+    const cancelBtn = fileLabel.querySelector(".cancel-name-btn");
+
     // Save button handler
-    saveBtn.addEventListener('click', () => {
+    saveBtn.addEventListener("click", () => {
         const newName = input.value.trim();
         if (newName) {
             // Update the file matrix with custom name
@@ -710,7 +744,7 @@ function setupNameEditHandlers(fileLabel, rowIndex, colIndex, originalName) {
                 // Store the custom name in the file object
                 fileMatrix[rowIndex][colIndex].customName = newName;
             }
-            
+
             // Update the UI
             fileLabel.innerHTML = newName;
         } else {
@@ -718,18 +752,18 @@ function setupNameEditHandlers(fileLabel, rowIndex, colIndex, originalName) {
             fileLabel.innerHTML = originalName;
         }
     });
-    
+
     // Cancel button handler
-    cancelBtn.addEventListener('click', () => {
+    cancelBtn.addEventListener("click", () => {
         fileLabel.innerHTML = originalName;
     });
-    
+
     // Handle Enter key press
-    input.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
+    input.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
             e.preventDefault();
             saveBtn.click();
-        } else if (e.key === 'Escape') {
+        } else if (e.key === "Escape") {
             e.preventDefault();
             cancelBtn.click();
         }
@@ -739,34 +773,42 @@ function setupNameEditHandlers(fileLabel, rowIndex, colIndex, originalName) {
 // Function to handle multiple files being uploaded to a single column
 function handleMultipleFilesForColumn(files, rowIndex, colIndex) {
     if (!files || files.length === 0) return;
-    
+
     // Handle the first file in the current cell
     handleCellFileUpload(files[0], rowIndex, colIndex);
-    
+
     // If there are more files, create new rows for each additional file
     if (files.length > 1) {
         // Find empty cells in this column that we can use before creating new rows
         const emptyCellIndices = findEmptyCellsInColumn(colIndex);
         let newRowsNeeded = files.length - 1 - emptyCellIndices.length;
-        
+
         if (emptyCellIndices.length > 0) {
-            showToast(`Using ${Math.min(emptyCellIndices.length, files.length - 1)} existing empty cell(s) in column ${colIndex + 1}`, 'info', 3000);
+            showToast(
+                `Using ${Math.min(emptyCellIndices.length, files.length - 1)} existing empty cell(s) in column ${colIndex + 1}`,
+                "info",
+                3000,
+            );
         }
-        
+
         if (newRowsNeeded > 0) {
-            showToast(`Creating ${newRowsNeeded} new row(s) for additional images`, 'info', 3000);
+            showToast(
+                `Creating ${newRowsNeeded} new row(s) for additional images`,
+                "info",
+                3000,
+            );
         }
-        
+
         // First use existing empty cells
         let fileIndex = 1; // Start with the second file (first one is already handled)
-        
+
         // Use existing empty cells first
         for (let i = 0; i < emptyCellIndices.length && fileIndex < files.length; i++) {
             const emptyRowIndex = emptyCellIndices[i];
             handleCellFileUpload(files[fileIndex], emptyRowIndex, colIndex);
             fileIndex++;
         }
-        
+
         // Then create new rows if needed
         while (fileIndex < files.length) {
             if (rowCount < maxRows) {
@@ -775,34 +817,37 @@ function handleMultipleFilesForColumn(files, rowIndex, colIndex) {
                 for (let c = 0; c < columnCount; c++) {
                     fileMatrix[rowCount][c] = null;
                 }
-                
+
                 // Place the file in the same column but new row
                 fileMatrix[rowCount][colIndex] = files[fileIndex];
-                
+
                 // Add to selected files set
                 selectedFiles.add(files[fileIndex]);
-                
+
                 // Increment row count
                 rowCount++;
                 fileIndex++;
             } else {
-                showToast(`Maximum of ${maxRows} rows reached. Some images were not added.`, 'warning');
+                showToast(
+                    `Maximum of ${maxRows} rows reached. Some images were not added.`,
+                    "warning",
+                );
                 break;
             }
         }
-        
+
         // Update the UI to show the new rows with files
         updatePreview();
-        
+
         // Show success message
-        showToast(`Added ${files.length} images to column ${colIndex + 1}`, 'success');
+        showToast(`Added ${files.length} images to column ${colIndex + 1}`, "success");
     }
 }
 
 // Helper function to find empty cells in a specific column
 function findEmptyCellsInColumn(colIndex) {
     const emptyCells = [];
-    
+
     // Skip the first row if that's where the initial upload is happening
     for (let r = 0; r < rowCount; r++) {
         // Check if this cell is empty
@@ -810,7 +855,7 @@ function findEmptyCellsInColumn(colIndex) {
             emptyCells.push(r);
         }
     }
-    
+
     return emptyCells;
 }
 
@@ -824,17 +869,19 @@ function handleCellFileUpload(file, rowIndex, colIndex) {
         }
     }
     fileMatrix[rowIndex][colIndex] = file;
-    
+
     // Add to selected files set
     selectedFiles.add(file);
-    
+
     // Update the UI
-    const cellDropZone = document.querySelector(`.comparison-column[data-row-index="${rowIndex}"][data-column-index="${colIndex}"] .column-files`);
+    const cellDropZone = document.querySelector(
+        `.comparison-column[data-row-index="${rowIndex}"][data-column-index="${colIndex}"] .column-files`,
+    );
     if (cellDropZone) {
         displayFilePreview(file, cellDropZone);
-        
+
         // Setup drag and drop for the newly created file preview
-        const fileDiv = cellDropZone.querySelector('.file-preview');
+        const fileDiv = cellDropZone.querySelector(".file-preview");
         if (fileDiv) {
             setupImageCellDragAndDrop(fileDiv);
         }
@@ -845,7 +892,7 @@ function handleCellFileUpload(file, rowIndex, colIndex) {
 function removeFileFromCell(rowIndex, colIndex) {
     if (fileMatrix[rowIndex] && fileMatrix[rowIndex][colIndex]) {
         const file = fileMatrix[rowIndex][colIndex];
-        
+
         // Remove from selected files if it's not used elsewhere
         let fileUsedElsewhere = false;
         for (let r = 0; r < fileMatrix.length; r++) {
@@ -859,10 +906,10 @@ function removeFileFromCell(rowIndex, colIndex) {
         if (!fileUsedElsewhere) {
             selectedFiles.delete(file);
         }
-        
+
         // Clear the cell
         fileMatrix[rowIndex][colIndex] = null;
-        
+
         // Update the UI
         updatePreview();
     }
@@ -871,42 +918,48 @@ function removeFileFromCell(rowIndex, colIndex) {
 // Setup drag and drop for a specific cell
 function setupCellDragAndDrop(cellDropZone) {
     let rowIndex, colIndex;
-    
+
     // Try to get indices directly from the cell drop zone
     rowIndex = parseInt(cellDropZone.dataset.rowIndex);
     colIndex = parseInt(cellDropZone.dataset.columnIndex);
-    
+
     // Validate indices
     if (isNaN(rowIndex) || isNaN(colIndex)) {
-        console.error('Invalid row or column index for cell drop zone');
+        console.error("Invalid row or column index for cell drop zone");
         return;
     }
 
-    cellDropZone.addEventListener('dragover', (e) => {
+    cellDropZone.addEventListener("dragover", (e) => {
         e.preventDefault();
         e.stopPropagation();
-        cellDropZone.classList.add('cell-dragover');
+        cellDropZone.classList.add("cell-dragover");
     });
 
-    cellDropZone.addEventListener('dragleave', () => {
-        cellDropZone.classList.remove('cell-dragover');
+    cellDropZone.addEventListener("dragleave", () => {
+        cellDropZone.classList.remove("cell-dragover");
     });
 
-    cellDropZone.addEventListener('drop', (e) => {
+    cellDropZone.addEventListener("drop", (e) => {
         e.preventDefault();
         e.stopPropagation();
-        cellDropZone.classList.remove('cell-dragover');
-        
+        cellDropZone.classList.remove("cell-dragover");
+
         if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
             // Handle multiple files being dropped
-            handleMultipleFilesForColumn(Array.from(e.dataTransfer.files), rowIndex, colIndex);
+            handleMultipleFilesForColumn(
+                Array.from(e.dataTransfer.files),
+                rowIndex,
+                colIndex,
+            );
         }
     });
-    
+
     // Make the entire cell clickable to trigger file upload
-    cellDropZone.addEventListener('click', (e) => {
+    cellDropZone.addEventListener("click", (e) => {
         e.preventDefault();
-        const cellFileInput = document.querySelector(`.comparison-column[data-row-index="${rowIndex}"][data-column-index="${colIndex}"] .cell-file-input`);
+        const cellFileInput = document.querySelector(
+            `.comparison-column[data-row-index="${rowIndex}"][data-column-index="${colIndex}"] .cell-file-input`,
+        );
         if (cellFileInput) {
             cellFileInput.click();
         }
@@ -916,9 +969,9 @@ function setupCellDragAndDrop(cellDropZone) {
 // Setup drag and drop for a cell that already has an image
 function setupImageCellDragAndDrop(fileDiv) {
     let rowIndex, colIndex;
-    
+
     // Try to get indices from the closest parent elements
-    const columnElement = fileDiv.closest('.comparison-column');
+    const columnElement = fileDiv.closest(".comparison-column");
     if (columnElement) {
         rowIndex = parseInt(columnElement.dataset.rowIndex);
         colIndex = parseInt(columnElement.dataset.columnIndex);
@@ -929,26 +982,26 @@ function setupImageCellDragAndDrop(fileDiv) {
     }
 
     if (isNaN(rowIndex) || isNaN(colIndex)) {
-        console.error('Invalid row or column index');
+        console.error("Invalid row or column index");
         return;
     }
 
-    fileDiv.addEventListener('dragover', (e) => {
+    fileDiv.addEventListener("dragover", (e) => {
         e.preventDefault();
         e.stopPropagation();
-        e.dataTransfer.dropEffect = 'copy';
-        fileDiv.classList.add('file-dragover');
+        e.dataTransfer.dropEffect = "copy";
+        fileDiv.classList.add("file-dragover");
     });
 
-    fileDiv.addEventListener('dragleave', () => {
-        fileDiv.classList.remove('file-dragover');
+    fileDiv.addEventListener("dragleave", () => {
+        fileDiv.classList.remove("file-dragover");
     });
 
-    fileDiv.addEventListener('drop', (e) => {
+    fileDiv.addEventListener("drop", (e) => {
         e.preventDefault();
         e.stopPropagation();
-        fileDiv.classList.remove('file-dragover');
-        
+        fileDiv.classList.remove("file-dragover");
+
         if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
             const file = e.dataTransfer.files[0]; // Take only the first file
             // Remove the old file first
@@ -957,12 +1010,12 @@ function setupImageCellDragAndDrop(fileDiv) {
             handleCellFileUpload(file, rowIndex, colIndex);
         }
     });
-    
+
     // Make the image clickable to trigger file replacement
-    const img = fileDiv.querySelector('img');
+    const img = fileDiv.querySelector("img");
     if (img) {
         img.title = "Click to replace this image";
-        img.addEventListener('click', (e) => {
+        img.addEventListener("click", (e) => {
             e.stopPropagation();
             triggerFileInputForReplacement(rowIndex, colIndex);
         });
@@ -971,55 +1024,55 @@ function setupImageCellDragAndDrop(fileDiv) {
 
 // Function to enable column reordering via drag and drop
 function enableColumnReordering() {
-    const columnHeaders = document.querySelectorAll('.column-header');
-    
-    columnHeaders.forEach(header => {
-        const dragHandle = header.querySelector('.drag-handle');
+    const columnHeaders = document.querySelectorAll(".column-header");
+
+    columnHeaders.forEach((header) => {
+        const dragHandle = header.querySelector(".drag-handle");
         if (!dragHandle) return;
-        
+
         // Drag start event
-        dragHandle.addEventListener('dragstart', (e) => {
+        dragHandle.addEventListener("dragstart", (e) => {
             dragSrcColumn = header;
             draggedColumnIndex = parseInt(header.dataset.columnIndex);
-            header.classList.add('dragging');
-            e.dataTransfer.effectAllowed = 'move';
+            header.classList.add("dragging");
+            e.dataTransfer.effectAllowed = "move";
             // Required for Firefox
-            e.dataTransfer.setData('text/plain', header.dataset.columnIndex);
-            preview.classList.add('reordering');
+            e.dataTransfer.setData("text/plain", header.dataset.columnIndex);
+            preview.classList.add("reordering");
         });
-        
+
         // Drag end event
-        dragHandle.addEventListener('dragend', (e) => {
-            header.classList.remove('dragging');
+        dragHandle.addEventListener("dragend", () => {
+            header.classList.remove("dragging");
             dragSrcColumn = null;
             draggedColumnIndex = -1;
-            preview.classList.remove('reordering');
-            
+            preview.classList.remove("reordering");
+
             // Remove all drag-over classes
-            document.querySelectorAll('.drag-over').forEach(el => {
-                el.classList.remove('drag-over');
+            document.querySelectorAll(".drag-over").forEach((el) => {
+                el.classList.remove("drag-over");
             });
         });
-        
+
         // Make the entire header a drop target
-        header.addEventListener('dragover', (e) => {
+        header.addEventListener("dragover", (e) => {
             e.preventDefault();
             if (!dragSrcColumn || header === dragSrcColumn) return;
-            header.classList.add('drag-over');
+            header.classList.add("drag-over");
         });
-        
-        header.addEventListener('dragleave', (e) => {
-            header.classList.remove('drag-over');
+
+        header.addEventListener("dragleave", () => {
+            header.classList.remove("drag-over");
         });
-        
-        header.addEventListener('drop', (e) => {
+
+        header.addEventListener("drop", (e) => {
             e.preventDefault();
-            header.classList.remove('drag-over');
-            
+            header.classList.remove("drag-over");
+
             if (!dragSrcColumn || header === dragSrcColumn) return;
-            
+
             const targetIndex = parseInt(header.dataset.columnIndex);
-            
+
             // Perform the column reordering
             reorderColumns(draggedColumnIndex, targetIndex);
         });
@@ -1028,33 +1081,33 @@ function enableColumnReordering() {
 
 function reorderColumns(fromIndex, toIndex) {
     if (fromIndex === toIndex) return;
-    
+
     console.log(`Reordering column from ${fromIndex} to ${toIndex}`);
-    
+
     // Save the column prefixes change
     const movedPrefix = columnPrefixes[fromIndex];
     columnPrefixes.splice(fromIndex, 1);
     columnPrefixes.splice(toIndex, 0, movedPrefix);
-    
+
     // Reorder files in the file matrix for ALL rows
     for (let r = 0; r < fileMatrix.length; r++) {
         if (!fileMatrix[r]) continue;
-        
+
         // Save the column of files we're moving
         const filesInMovedColumn = fileMatrix[r][fromIndex];
-        
+
         // Remove the column
         fileMatrix[r].splice(fromIndex, 1);
-        
+
         // Insert at the new position
         fileMatrix[r].splice(toIndex, 0, filesInMovedColumn);
     }
-    
+
     // Also update the legacy groupedFiles for backwards compatibility
     if (groupedFiles.size > 0) {
         const entries = Array.from(groupedFiles.entries());
         const sortedEntries = [];
-        
+
         // Reorder the entries according to the new column order
         for (let i = 0; i < columnPrefixes.length; i++) {
             const prefix = columnPrefixes[i];
@@ -1063,31 +1116,32 @@ function reorderColumns(fromIndex, toIndex) {
                 sortedEntries.push(entry);
             }
         }
-        
+
         // Recreate groupedFiles with the new order
         groupedFiles = new Map(sortedEntries);
     }
-    
-    console.log('New column order:', columnPrefixes);
-    
+
+    console.log("New column order:", columnPrefixes);
+
     // Update the UI
     updatePreview();
 }
 
 // Function to add a new row
+// eslint-disable-next-line no-unused-vars
 function addRow() {
     if (rowCount >= maxRows) {
         showError(`Maximum ${maxRows} rows allowed`);
         return;
     }
-    
+
     // Add a new row to our data structure
     fileMatrix[rowCount] = [];
     for (let c = 0; c < columnCount; c++) {
         fileMatrix[rowCount][c] = null;
     }
     rowCount++;
-    
+
     // Update the UI to show the new row
     updatePreview();
     console.log(`Added row, now have ${rowCount} rows`);
@@ -1096,14 +1150,14 @@ function addRow() {
 // Function to remove a row
 function removeRow(rowIndex) {
     if (rowCount <= 1) {
-        showError('Cannot remove the last row');
+        showError("Cannot remove the last row");
         return;
     }
-    
+
     // Remove the row from our data structure
     fileMatrix.splice(rowIndex, 1);
     rowCount--;
-    
+
     // Update the UI
     updatePreview();
     console.log(`Removed row ${rowIndex + 1}, now have ${rowCount} rows`);
@@ -1115,11 +1169,11 @@ function removeRow(rowIndex) {
  */
 function openRenameColumnModal(columnIndex) {
     // Check if we already have a modal, remove it if it exists
-    let existingModal = document.getElementById('renameColumnModal');
+    let existingModal = document.getElementById("rename-column-modal");
     if (existingModal) {
         document.body.removeChild(existingModal);
     }
-    
+
     // Count how many images are in this column
     let imageCount = 0;
     for (let r = 0; r < fileMatrix.length; r++) {
@@ -1127,29 +1181,29 @@ function openRenameColumnModal(columnIndex) {
             imageCount++;
         }
     }
-    
+
     if (imageCount === 0) {
-        showToast('No images in this column to rename', 'warning');
+        showToast("No images in this column to rename", "warning");
         return;
     }
-    
+
     // Create modal element
-    const modal = document.createElement('div');
-    modal.id = 'renameColumnModal';
-    modal.className = 'modal fade';
-    modal.tabIndex = '-1';
-    modal.setAttribute('aria-labelledby', 'renameColumnModalLabel');
-    modal.setAttribute('aria-hidden', 'true');
-    
+    const modal = document.createElement("div");
+    modal.id = "rename-column-modal";
+    modal.className = "modal fade";
+    modal.tabIndex = "-1";
+    modal.setAttribute("aria-labelledby", "rename-column-modal-label");
+    modal.setAttribute("aria-hidden", "true");
+
     // Get existing naming pattern if any
-    const existingPattern = columnCustomNames[columnIndex] || '';
-    
+    const existingPattern = columnCustomNames[columnIndex] || "";
+
     // Create modal content
     modal.innerHTML = `
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="renameColumnModalLabel">Rename Column ${columnIndex + 1}</h5>
+                    <h5 class="modal-title" id="rename-column-modal-label">Rename Column ${columnIndex + 1}</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
@@ -1185,7 +1239,7 @@ function openRenameColumnModal(columnIndex) {
                     </div>
                     <div class="preview-section">
                         <h6>Preview:</h6>
-                        <div id="namePreview" class="p-2 bg-dark rounded">
+                        <div id="name-preview" class="p-2 bg-dark rounded">
                             <code>Shot-1, Shot-2, ...</code>
                         </div>
                     </div>
@@ -1197,54 +1251,58 @@ function openRenameColumnModal(columnIndex) {
             </div>
         </div>
     `;
-    
+
     // Add modal to body
     document.body.appendChild(modal);
-    
+
     // Initialize Bootstrap modal
     const modalInstance = new bootstrap.Modal(modal);
     modalInstance.show();
-    
+
     // Set up event listeners for preview updates
-    const baseNameInput = document.getElementById('baseNameInput');
+    const baseNameInput = document.getElementById("baseNameInput");
     const numberingOptions = document.querySelectorAll('input[name="numberingOption"]');
-    const namePreview = document.getElementById('namePreview');
-    
+    const namePreview = document.getElementById("name-preview");
+
     function updatePreview() {
-        const baseName = baseNameInput.value.trim() || 'Shot';
-        let numberingOption = 'append';
-        
+        const baseName = baseNameInput.value.trim() || "Shot";
+        let numberingOption = "append";
+
         for (const option of numberingOptions) {
             if (option.checked) {
                 numberingOption = option.value;
                 break;
             }
         }
-        
-        let previewText = '';
-        if (numberingOption === 'append') {
+
+        let previewText = "";
+        if (numberingOption === "append") {
             previewText = `${baseName}-1, ${baseName}-2, ${baseName}-3, ...`;
-        } else if (numberingOption === 'prepend') {
+        } else if (numberingOption === "prepend") {
             previewText = `1-${baseName}, 2-${baseName}, 3-${baseName}, ...`;
         } else {
             previewText = `${baseName}, ${baseName}, ${baseName}, ...`;
         }
-        
+
         namePreview.innerHTML = `<code>${previewText}</code>`;
     }
-    
+
     // Update preview on input changes
-    baseNameInput.addEventListener('input', updatePreview);
-    numberingOptions.forEach(option => {
-        option.addEventListener('change', updatePreview);
+    baseNameInput.addEventListener("input", updatePreview);
+    numberingOptions.forEach((option) => {
+        option.addEventListener("change", updatePreview);
     });
-    
+
     // Initial preview update
     updatePreview();
-    
+
     // Apply button click handler
-    document.getElementById('applyRenameBtn').addEventListener('click', () => {
-        applyColumnRename(columnIndex, baseNameInput.value.trim(), getSelectedNumberingOption());
+    document.getElementById("applyRenameBtn").addEventListener("click", () => {
+        applyColumnRename(
+            columnIndex,
+            baseNameInput.value.trim(),
+            getSelectedNumberingOption(),
+        );
         modalInstance.hide();
     });
 }
@@ -1260,7 +1318,7 @@ function getSelectedNumberingOption() {
             return option.value;
         }
     }
-    return 'append'; // Default
+    return "append"; // Default
 }
 
 /**
@@ -1273,44 +1331,44 @@ function applyColumnRename(columnIndex, baseName, numberingOption) {
     if (!baseName) {
         baseName = `Column${columnIndex + 1}`;
     }
-    
+
     // Store the naming pattern for this column
     columnCustomNames[columnIndex] = baseName;
-    
+
     // Count images in the column
     let imageCount = 0;
     for (let r = 0; r < fileMatrix.length; r++) {
         if (fileMatrix[r] && fileMatrix[r][columnIndex]) {
-            imageCount++;
+            imageCount++; // eslint-disable-line no-unused-vars
         }
     }
-    
+
     // Apply custom names to all files in the column
     let renamedCount = 0;
     for (let r = 0; r < fileMatrix.length; r++) {
         if (fileMatrix[r] && fileMatrix[r][columnIndex]) {
             const file = fileMatrix[r][columnIndex];
             let customName;
-            
-            if (numberingOption === 'append') {
+
+            if (numberingOption === "append") {
                 customName = `${baseName}-${r + 1}`;
-            } else if (numberingOption === 'prepend') {
+            } else if (numberingOption === "prepend") {
                 customName = `${r + 1}-${baseName}`;
             } else {
                 customName = baseName;
             }
-            
+
             // Store the custom name in the file object
             file.customName = customName;
             renamedCount++;
         }
     }
-    
+
     // Update the UI to show the new names
     updatePreview();
-    
+
     // Show success message
-    showToast(`Renamed ${renamedCount} images in column ${columnIndex + 1}`, 'success');
+    showToast(`Renamed ${renamedCount} images in column ${columnIndex + 1}`, "success");
 }
 
 /**
@@ -1318,20 +1376,14 @@ function applyColumnRename(columnIndex, baseName, numberingOption) {
  * @returns {boolean} True if validation passes, false otherwise
  */
 function validateMetadata() {
-    const comparisonName = comparisonNameInput.value.trim();
-    
-    // Remove the validation for empty comparison name
-    // The server will generate a random name if none is provided
-    // This allows the random name generation to work
-    
     // Only validate if show name toggle is checked but no name provided
     // Check if show name is required but empty
     if (showNameToggle.checked && !showNameInput.value.trim()) {
-        showToast('Please enter a show/film name or uncheck the option', 'warning');
+        showToast("Please enter a show/film name or uncheck the option", "warning");
         showNameInput.focus();
         return false;
     }
-    
+
     return true;
 }
 
@@ -1339,44 +1391,48 @@ function getMetadata() {
     return {
         name: comparisonNameInput.value.trim(),
         show_name: showNameInput.value.trim(),
-        expiration_type: expirationToggle.checked ? getSelectedExpirationType() : 'from_last_access',
+        expiration_type: expirationToggle.checked
+            ? getSelectedExpirationType()
+            : "from_last_access",
         expiration_days: expirationToggle.checked ? getSelectedExpirationDays() : 7,
         tags: tagsInput.value.trim(),
-        never_expire: !expirationToggle.checked
+        never_expire: !expirationToggle.checked,
     };
 }
 
 function getSelectedExpirationType() {
-    const expirationTypeRadios = document.querySelectorAll('input[name="expiration-type"]');
+    const expirationTypeRadios = document.querySelectorAll(
+        'input[name="expiration-type"]',
+    );
     for (const radio of expirationTypeRadios) {
         if (radio.checked) {
             return radio.value;
         }
     }
-    return 'from_last_access'; // Default to 'from_last_access'
+    return "from_last_access"; // Default to 'from_last_access'
 }
 
 function getSelectedExpirationDays() {
-    const expirationDaysSelect = document.getElementById('expiration-days');
+    const expirationDaysSelect = document.getElementById("expiration-days");
     return parseInt(expirationDaysSelect.value) || 7; // Default to 7 if parsing fails
 }
 
 function clearMetadata() {
-    comparisonNameInput.value = '';
-    showNameInput.value = '';
-    document.getElementById('expiration-last-access').checked = true;
-    document.getElementById('expiration-days').value = '7';
-    tagsInput.value = '';
+    comparisonNameInput.value = "";
+    showNameInput.value = "";
+    document.getElementById("expiration-last-access").checked = true;
+    document.getElementById("expiration-days").value = "7";
+    tagsInput.value = "";
 }
 
-document.getElementById('uploadButton').addEventListener('click', async () => {
+document.getElementById("upload-button").addEventListener("click", async () => {
     if (uploadInProgress) {
-        showToast('Upload already in progress', 'warning');
+        showToast("Upload already in progress", "warning");
         return;
     }
 
     if (selectedFiles.size === 0) {
-        showError('Please select or drag some images first');
+        showError("Please select or drag some images first");
         return;
     }
 
@@ -1385,19 +1441,19 @@ document.getElementById('uploadButton').addEventListener('click', async () => {
     }
 
     if (selectedFiles.size > 120) {
-        showError('Maximum 120 files allowed');
+        showError("Maximum 120 files allowed");
         return;
     }
 
     if (columnCount < minColumns) {
-        showError('Minimum number of columns required');
+        showError("Minimum number of columns required");
         return;
     }
 
     uploadInProgress = true;
-    const uploadButton = document.getElementById('uploadButton');
-    const progressBarContainer = document.createElement('div');
-    progressBarContainer.className = 'progress-bar-container';
+    const uploadButton = document.getElementById("upload-button");
+    const progressBarContainer = document.createElement("div");
+    progressBarContainer.className = "progress-bar-container";
     progressBarContainer.innerHTML = `
         <div class="progress">
             <div class="progress-bar" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
@@ -1405,31 +1461,37 @@ document.getElementById('uploadButton').addEventListener('click', async () => {
         <div class="progress-text">Starting upload...</div>
     `;
     uploadButton.parentElement.appendChild(progressBarContainer);
-    
+
     uploadButton.disabled = true;
-    uploadButton.textContent = 'Uploading...';
+    uploadButton.textContent = "Uploading...";
 
     const metadata = getMetadata();
     const comparisonFormData = new FormData();
-    comparisonFormData.append('name', metadata.name);
-    comparisonFormData.append('show_name', metadata.show_name);
-    comparisonFormData.append('expiration_type', metadata.expiration_type);
-    comparisonFormData.append('expiration_enabled', expirationToggle.checked ? "true" : "false");
-    comparisonFormData.append('expiration_days', metadata.expiration_days);
-    comparisonFormData.append('tags', metadata.tags);
-    comparisonFormData.append('total_rows', rowCount);
-    comparisonFormData.append('total_columns', columnCount);
+    comparisonFormData.append("name", metadata.name);
+    comparisonFormData.append("show_name", metadata.show_name);
+    comparisonFormData.append("expiration_type", metadata.expiration_type);
+    comparisonFormData.append(
+        "expiration_enabled",
+        expirationToggle.checked ? "true" : "false",
+    );
+    comparisonFormData.append("expiration_days", metadata.expiration_days);
+    comparisonFormData.append("tags", metadata.tags);
+    comparisonFormData.append("total_rows", rowCount);
+    comparisonFormData.append("total_columns", columnCount);
 
     try {
         // 1. Create the comparison
-        const comparisonResponse = await fetch('/api/v1/comparison', {
-            method: 'POST',
-            body: comparisonFormData
+        const comparisonResponse = await fetch("/api/v1/comparison", {
+            method: "POST",
+            body: comparisonFormData,
         });
 
         if (!comparisonResponse.ok) {
             const errorData = await comparisonResponse.json();
-            throw new Error(errorData.error || `Failed to create comparison: ${comparisonResponse.statusText}`);
+            throw new Error(
+                errorData.error ||
+                    `Failed to create comparison: ${comparisonResponse.statusText}`,
+            );
         }
 
         const { comparison_id } = await comparisonResponse.json();
@@ -1445,24 +1507,27 @@ document.getElementById('uploadButton').addEventListener('click', async () => {
         });
 
         const totalFiles = filesToUpload.length;
-        const progressBar = progressBarContainer.querySelector('.progress-bar');
-        const progressText = progressBarContainer.querySelector('.progress-text');
+        const progressBar = progressBarContainer.querySelector(".progress-bar");
+        const progressText = progressBarContainer.querySelector(".progress-text");
 
         for (let i = 0; i < totalFiles; i++) {
             const { file, row, column } = filesToUpload[i];
             const imageFormData = new FormData();
-            imageFormData.append('file', file);
-            imageFormData.append('row', row);
-            imageFormData.append('column', column);
-            imageFormData.append('original_filename', file.name);
+            imageFormData.append("file", file);
+            imageFormData.append("row", row);
+            imageFormData.append("column", column);
+            imageFormData.append("original_filename", file.name);
             if (file.customName) {
-                imageFormData.append('custom_name', file.customName);
+                imageFormData.append("custom_name", file.customName);
             }
 
-            const imageResponse = await fetch(`/api/v1/comparison/${comparison_id}/image`, {
-                method: 'POST',
-                body: imageFormData
-            });
+            const imageResponse = await fetch(
+                `/api/v1/comparison/${comparison_id}/image`,
+                {
+                    method: "POST",
+                    body: imageFormData,
+                },
+            );
 
             if (!imageResponse.ok) {
                 throw new Error(`Failed to upload ${file.name}`);
@@ -1471,49 +1536,56 @@ document.getElementById('uploadButton').addEventListener('click', async () => {
             const progress = Math.round(((i + 1) / totalFiles) * 100);
             progressBar.style.width = `${progress}%`;
             progressBar.textContent = `${progress}%`;
-            progressBar.setAttribute('aria-valuenow', progress);
+            progressBar.setAttribute("aria-valuenow", progress);
             progressText.textContent = `Uploading ${i + 1} of ${totalFiles}: ${file.name}`;
         }
 
-        showSuccess('Upload successful! Redirecting...');
+        showSuccess("Upload successful! Redirecting...");
         clearMetadata();
         window.location.href = `/compare/${comparison_id}`;
-
     } catch (error) {
-        console.error('Upload failed:', error);
-        showError('Upload failed: ' + error.message);
+        console.error("Upload failed:", error);
+        showError("Upload failed: " + error.message);
         progressBarContainer.remove(); // Clean up progress bar on failure
     } finally {
         uploadInProgress = false;
         uploadButton.disabled = false;
-        uploadButton.textContent = 'Compare Images';
+        uploadButton.textContent = "Compare Images";
     }
 });
 
 // Call this after the page loads
-window.addEventListener('DOMContentLoaded', function() {
-    document.getElementById('uploadButton').style.display = 'block';
+window.addEventListener("DOMContentLoaded", function () {
+    document.getElementById("upload-button").style.display = "block";
     // Initialize the first row in the file matrix
     fileMatrix[0] = [];
     for (let i = 0; i < columnCount; i++) {
         fileMatrix[0][i] = null;
     }
-        
+
     // Initialize with empty columns
     for (let i = 0; i < columnCount; i++) {
-        columnPrefixes.push(`column${i+1}`);
+        columnPrefixes.push(`column${i + 1}`);
     }
     updatePreview(); // Initialize with empty cells
-    
+
     // Initialize tooltips
-    if (typeof bootstrap !== 'undefined') {
+    if (typeof bootstrap !== "undefined") {
         const tooltips = document.querySelectorAll('[data-bs-toggle="tooltip"]');
-        tooltips.forEach(tooltip => new bootstrap.Tooltip(tooltip));
+        tooltips.forEach((tooltip) => new bootstrap.Tooltip(tooltip));
     }
-    
+
     // Test toast notification system
     setTimeout(() => {
-        showToast('Upload form ready. Drag and drop images or click to select files.', 'success', 3000);
-        showToast('Tip: You can upload multiple images to a column at once - they will fill empty cells or create new rows', 'info', 5000);
+        showToast(
+            "Upload form ready. Drag and drop images or click to select files.",
+            "success",
+            3000,
+        );
+        showToast(
+            "Tip: You can upload multiple images to a column at once - they will fill empty cells or create new rows",
+            "info",
+            5000,
+        );
     }, 500);
 });

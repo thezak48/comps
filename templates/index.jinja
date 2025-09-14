@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% extends "base.jinja" %}
 
 {% block title %}Image Comparison | Comps{% endblock %}
 
@@ -126,11 +126,11 @@
         />
     </div>
     <div class="column-management d-flex">
-        <button id="addRowBtn" class="btn btn-secondary mb-3 me-2" onclick="addRow()">
+        <button id="add-row-btn" class="btn btn-secondary mb-3 me-2" onclick="addRow()">
             <i class="fas fa-plus"></i> Add Comparison <i class="fa fa-arrow-down"></i>
         </button>
         <button
-                id="addColumnBtn"
+                id="add-column-btn"
                 class="btn btn-secondary mb-3 me-2"
                 onclick="addColumn()"
         >
@@ -140,7 +140,7 @@
     <div id="preview">
         <!-- Preview content will be generated dynamically -->
     </div>
-    <button id="uploadButton" class="btn btn-primary">
+    <button id="upload-button" class="btn btn-primary">
         <i class="fa fa-compare"></i> Compare Images
     </button>
 </div>
