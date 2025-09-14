@@ -5,219 +5,219 @@
 {% block content %}
 <div class="admin-container">
     <div class="container-fluid px-4" style="max-width: 100vw">
-    <h2 class="text-light mt-4 mb-4" style="font-size: 2.5rem">
-        Metrics Dashboard
-    </h2>
-    <div
-        class="metrics-grid"
-        style="
+        <h2 class="text-light mt-4 mb-4" style="font-size: 2.5rem">
+            Metrics Dashboard
+        </h2>
+        <div
+                class="metrics-grid"
+                style="
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
         gap: 2.5rem;
         margin-bottom: 2.5rem;
         "
-    >
-        <div
-        class="card text-bg-dark h-100 shadow p-3 text-center"
-        style="border-left: 6px solid #0d6efd"
         >
-        <div class="mb-2"><i class="fa fa-users fa-2x text-primary"></i></div>
-        <div class="fw-bold text-secondary">Total Users</div>
-        <div class="display-4 fw-bold text-primary">
-            {{ metrics.total_users }}
-        </div>
-        </div>
-        <div
-        class="card text-bg-dark h-100 shadow p-3 text-center"
-        style="border-left: 6px solid #198754"
-        >
-        <div class="mb-2"><i class="fa fa-table fa-2x text-success"></i></div>
-        <div class="fw-bold text-secondary">Total Comparisons</div>
-        <div class="display-4 fw-bold text-success">
-            {{ metrics.total_comparisons }}
-        </div>
-        </div>
-        <div
-        class="card text-bg-dark h-100 shadow p-3 text-center"
-        style="border-left: 6px solid #ffc107"
-        >
-        <div class="mb-2"><i class="fa fa-image fa-2x text-warning"></i></div>
-        <div class="fw-bold text-secondary">Total Images</div>
-        <div class="display-4 fw-bold text-warning">
-            {{ metrics.total_images }}
-        </div>
-        </div>
-        <div
-        class="card text-bg-dark h-100 shadow p-3 text-center"
-        style="border-left: 6px solid #6f42c1"
-        >
-        <div class="mb-2">
-            <i class="fa fa-hdd fa-2x" style="color: #b39ddb"></i>
-        </div>
-        <div class="fw-bold text-secondary">Total Image Size</div>
-        <div class="display-6 fw-bold" style="color: #b39ddb">
-            {{ metrics.total_images_humansize }}
-        </div>
-        </div>
-        <div
-        class="card text-bg-dark h-100 shadow p-3 text-center"
-        style="border-left: 6px solid #0dcaf0"
-        >
-        <div class="mb-2"><i class="fa fa-user-clock fa-2x text-info"></i></div>
-        <div class="fw-bold text-secondary">Active Users (last 7 days)</div>
-        <div class="display-5 fw-bold text-info">
-            {{ metrics.active_users_7d }}
-        </div>
-        </div>
-        <div
-        class="card text-bg-dark h-100 shadow p-3 text-center"
-        style="border-left: 6px solid #dc3545"
-        >
-        <div class="mb-2">
-            <i class="fa fa-calendar-plus fa-2x text-danger"></i>
-        </div>
-        <div class="fw-bold text-secondary">
-            Comparisons Created (last 7 days)
-        </div>
-        <div class="display-5 fw-bold text-danger">
-            {{ metrics.comparisons_7d }}
-        </div>
-        </div>
-    </div>
-    <div class="row g-4 mt-2 mb-4">
-        <div class="col-md-12">
-        <div class="card text-bg-dark shadow h-100 mb-4">
-            <div class="card-body">
-            <h5 class="card-title">Users Registered Per Day (last 14 days)</h5>
-            <canvas id="usersChart" height="80"></canvas>
+            <div
+                    class="card text-bg-dark h-100 shadow p-3 text-center"
+                    style="border-left: 6px solid #0d6efd"
+            >
+                <div class="mb-2"><i class="fa fa-users fa-2x text-primary"></i></div>
+                <div class="fw-bold text-secondary">Total Users</div>
+                <div class="display-4 fw-bold text-primary">
+                    {{ metrics.total_users }}
+                </div>
+            </div>
+            <div
+                    class="card text-bg-dark h-100 shadow p-3 text-center"
+                    style="border-left: 6px solid #198754"
+            >
+                <div class="mb-2"><i class="fa fa-table fa-2x text-success"></i></div>
+                <div class="fw-bold text-secondary">Total Comparisons</div>
+                <div class="display-4 fw-bold text-success">
+                    {{ metrics.total_comparisons }}
+                </div>
+            </div>
+            <div
+                    class="card text-bg-dark h-100 shadow p-3 text-center"
+                    style="border-left: 6px solid #ffc107"
+            >
+                <div class="mb-2"><i class="fa fa-image fa-2x text-warning"></i></div>
+                <div class="fw-bold text-secondary">Total Images</div>
+                <div class="display-4 fw-bold text-warning">
+                    {{ metrics.total_images }}
+                </div>
+            </div>
+            <div
+                    class="card text-bg-dark h-100 shadow p-3 text-center"
+                    style="border-left: 6px solid #6f42c1"
+            >
+                <div class="mb-2">
+                    <i class="fa fa-hdd fa-2x" style="color: #b39ddb"></i>
+                </div>
+                <div class="fw-bold text-secondary">Total Image Size</div>
+                <div class="display-6 fw-bold" style="color: #b39ddb">
+                    {{ metrics.total_images_humansize }}
+                </div>
+            </div>
+            <div
+                    class="card text-bg-dark h-100 shadow p-3 text-center"
+                    style="border-left: 6px solid #0dcaf0"
+            >
+                <div class="mb-2"><i class="fa fa-user-clock fa-2x text-info"></i></div>
+                <div class="fw-bold text-secondary">Active Users (last 7 days)</div>
+                <div class="display-5 fw-bold text-info">
+                    {{ metrics.active_users_7d }}
+                </div>
+            </div>
+            <div
+                    class="card text-bg-dark h-100 shadow p-3 text-center"
+                    style="border-left: 6px solid #dc3545"
+            >
+                <div class="mb-2">
+                    <i class="fa fa-calendar-plus fa-2x text-danger"></i>
+                </div>
+                <div class="fw-bold text-secondary">
+                    Comparisons Created (last 7 days)
+                </div>
+                <div class="display-5 fw-bold text-danger">
+                    {{ metrics.comparisons_7d }}
+                </div>
             </div>
         </div>
-        </div>
-        <div class="col-md-12">
-        <div class="card text-bg-dark shadow h-100 mb-4">
-            <div class="card-body">
-            <h5 class="card-title">Comparisons Created Per Day (last 14 days)</h5>
-            <canvas id="comparisonsChart" height="80"></canvas>
+        <div class="row g-4 mt-2 mb-4">
+            <div class="col-md-12">
+                <div class="card text-bg-dark shadow h-100 mb-4">
+                    <div class="card-body">
+                        <h5 class="card-title">Users Registered Per Day (last 14 days)</h5>
+                        <canvas id="usersChart" height="80"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-12">
+                <div class="card text-bg-dark shadow h-100 mb-4">
+                    <div class="card-body">
+                        <h5 class="card-title">Comparisons Created Per Day (last 14 days)</h5>
+                        <canvas id="comparisonsChart" height="80"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-12">
+                <div class="card text-bg-dark shadow h-100 mb-4">
+                    <div class="card-body">
+                        <h5 class="card-title">Images Uploaded Per Day (last 14 days)</h5>
+                        <canvas id="imagesChart" height="80"></canvas>
+                    </div>
+                </div>
             </div>
         </div>
-        </div>
-        <div class="col-md-12">
-        <div class="card text-bg-dark shadow h-100 mb-4">
-            <div class="card-body">
-            <h5 class="card-title">Images Uploaded Per Day (last 14 days)</h5>
-            <canvas id="imagesChart" height="80"></canvas>
-            </div>
-        </div>
-        </div>
-    </div>
     </div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-  // Use Jinja tojson filter for safe JS injection
-  const dateLabels = {{ metrics.date_labels | tojson }};
-  const usersPerDay = {{ metrics.users_per_day | tojson }};
-  const comparisonsPerDay = {{ metrics.comparisons_per_day | tojson }};
-  const imagesPerDay = {{ metrics.images_per_day | tojson }};
+    // Use Jinja tojson filter for safe JS injection
+    const dateLabels = {{ metrics.date_labels | tojson }};
+    const usersPerDay = {{ metrics.users_per_day | tojson }};
+    const comparisonsPerDay = {{ metrics.comparisons_per_day | tojson }};
+    const imagesPerDay = {{ metrics.images_per_day | tojson }};
 
-  // Users Registered Per Day (Line Chart)
-  new Chart(document.getElementById('usersChart').getContext('2d'), {
-      type: 'line',
-      data: {
-          labels: dateLabels,
-          datasets: [{
-              label: 'Users Registered',
-              data: usersPerDay,
-              backgroundColor: 'rgba(13,110,253,0.2)',
-              borderColor: 'rgba(13,110,253,1)',
-              borderWidth: 2,
-              fill: true,
-              tension: 0.3
-          }]
-      },
-      options: {
-          responsive: true,
-          plugins: {legend: {display: false}},
-          scales: {
-              y: {
-                  beginAtZero: true,
-                  ticks: {
-                      callback: function(value) {
-                          if (Number.isInteger(value)) {
-                              return value;
-                          }
-                          return '';
-                      }
-                  }
-              }
-          }
-      }
-  });
-  // Comparisons Created Per Day (Line Chart)
-  new Chart(document.getElementById('comparisonsChart').getContext('2d'), {
-      type: 'line',
-      data: {
-          labels: dateLabels,
-          datasets: [{
-              label: 'Comparisons Created',
-              data: comparisonsPerDay,
-              backgroundColor: 'rgba(25,135,84,0.2)',
-              borderColor: 'rgba(25,135,84,1)',
-              borderWidth: 2,
-              fill: true,
-              tension: 0.3
-          }]
-      },
-      options: {
-          responsive: true,
-          plugins: {legend: {display: false}},
-          scales: {
-              y: {
-                  beginAtZero: true,
-                  ticks: {
-                      callback: function(value) {
-                          if (Number.isInteger(value)) {
-                              return value;
-                          }
-                          return '';
-                      }
-                  }
-              }
-          }
-      }
-  });
-  // Images Uploaded Per Day (Line Chart)
-  new Chart(document.getElementById('imagesChart').getContext('2d'), {
-      type: 'line',
-      data: {
-          labels: dateLabels,
-          datasets: [{
-              label: 'Images Uploaded',
-              data: imagesPerDay,
-              backgroundColor: 'rgba(255,193,7,0.2)',
-              borderColor: 'rgba(255,193,7,1)',
-              borderWidth: 2,
-              fill: true,
-              tension: 0.3
-          }]
-      },
-      options: {
-          responsive: true,
-          plugins: {legend: {display: false}},
-          scales: {
-              y: {
-                  beginAtZero: true,
-                  ticks: {
-                      callback: function(value) {
-                          if (Number.isInteger(value)) {
-                              return value;
-                          }
-                          return '';
-                      }
-                  }
-              }
-          }
-      }
-  });
+    // Users Registered Per Day (Line Chart)
+    new Chart(document.getElementById('usersChart').getContext('2d'), {
+        type: 'line',
+        data: {
+            labels: dateLabels,
+            datasets: [{
+                label: 'Users Registered',
+                data: usersPerDay,
+                backgroundColor: 'rgba(13,110,253,0.2)',
+                borderColor: 'rgba(13,110,253,1)',
+                borderWidth: 2,
+                fill: true,
+                tension: 0.3
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {legend: {display: false}},
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            if (Number.isInteger(value)) {
+                                return value;
+                            }
+                            return '';
+                        }
+                    }
+                }
+            }
+        }
+    });
+    // Comparisons Created Per Day (Line Chart)
+    new Chart(document.getElementById('comparisonsChart').getContext('2d'), {
+        type: 'line',
+        data: {
+            labels: dateLabels,
+            datasets: [{
+                label: 'Comparisons Created',
+                data: comparisonsPerDay,
+                backgroundColor: 'rgba(25,135,84,0.2)',
+                borderColor: 'rgba(25,135,84,1)',
+                borderWidth: 2,
+                fill: true,
+                tension: 0.3
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {legend: {display: false}},
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            if (Number.isInteger(value)) {
+                                return value;
+                            }
+                            return '';
+                        }
+                    }
+                }
+            }
+        }
+    });
+    // Images Uploaded Per Day (Line Chart)
+    new Chart(document.getElementById('imagesChart').getContext('2d'), {
+        type: 'line',
+        data: {
+            labels: dateLabels,
+            datasets: [{
+                label: 'Images Uploaded',
+                data: imagesPerDay,
+                backgroundColor: 'rgba(255,193,7,0.2)',
+                borderColor: 'rgba(255,193,7,1)',
+                borderWidth: 2,
+                fill: true,
+                tension: 0.3
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {legend: {display: false}},
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            if (Number.isInteger(value)) {
+                                return value;
+                            }
+                            return '';
+                        }
+                    }
+                }
+            }
+        }
+    });
 </script>
 {% endblock %}

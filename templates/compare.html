@@ -4,253 +4,253 @@
 
 {% block extra_nav_1 %}
 <div class="navbar-text metadata-container d-none d-md-block">
-  <a class="nav-link d-inline-block" href="#" id="shareBBCodeBtn">
-    <i class="fa fa-share-alt"></i> Share BBCode
-  </a>
-  <div class="dropdown d-inline-block">
-    <button
-      class="btn btn-secondary dropdown-toggle"
-      type="button"
-      id="rowDropdown"
-      data-bs-toggle="dropdown"
-    >
-      Comparison: <span id="currentRow">1</span>/<span id="totalRows">
+    <a class="nav-link d-inline-block" href="#" id="shareBBCodeBtn">
+        <i class="fa fa-share-alt"></i> Share BBCode
+    </a>
+    <div class="dropdown d-inline-block">
+        <button
+                class="btn btn-secondary dropdown-toggle"
+                type="button"
+                id="rowDropdown"
+                data-bs-toggle="dropdown"
+        >
+            Comparison: <span id="currentRow">1</span>/<span id="totalRows">
         {{ total_rows }}
       </span>
-    </button>
-    <div class="dropdown-menu" aria-labelledby="rowDropdown">
-      {% for row in range(dropdown_rows) %}
-      <a class="dropdown-item" href="#" data-row="{{ row }}">{{ row + 1 }}</a>
-      {% endfor %}
-    </div>
-  </div>
-  <div class="dropdown d-inline-block ms-2">
-    <button
-      class="btn btn-secondary dropdown-toggle"
-      type="button"
-      id="columnDropdown"
-      data-bs-toggle="dropdown"
-    >
-      Image <span id="currentColumn">1</span>/{{ total_columns }}:
-      <span id="currentImageInfo"></span>
-    </button>
-    <div class="dropdown-menu" aria-labelledby="columnDropdown">
-      {% for column in range(total_columns) %}
-      <a class="dropdown-item" href="#" data-column="{{ column }}"
-        >Image {{ column + 1 }}/{{ total_columns }}: {{ image_names[column] }}
-        [{{ image_sizes[column] }}]</a
-      >
-      {% endfor %}
+        </button>
+        <div class="dropdown-menu" aria-labelledby="rowDropdown">
+            {% for row in range(dropdown_rows) %}
+            <a class="dropdown-item" href="#" data-row="{{ row }}">{{ row + 1 }}</a>
+            {% endfor %}
+        </div>
     </div>
     <div class="dropdown d-inline-block ms-2">
-      <select id="imageRendering" class="btn btn-secondary dropdown-toggle">
-        <option value="off">Image Rendering: Off</option>
-        <option value="auto">Image Rendering: Auto</option>
-        <option value="smooth">Image Rendering: Smooth</option>
-        <option value="crisp-edges">Image Rendering: Crisp</option>
-        <option value="pixelated">Image Rendering: Pixel</option>
-      </select>
+        <button
+                class="btn btn-secondary dropdown-toggle"
+                type="button"
+                id="columnDropdown"
+                data-bs-toggle="dropdown"
+        >
+            Image <span id="currentColumn">1</span>/{{ total_columns }}:
+            <span id="currentImageInfo"></span>
+        </button>
+        <div class="dropdown-menu" aria-labelledby="columnDropdown">
+            {% for column in range(total_columns) %}
+            <a class="dropdown-item" href="#" data-column="{{ column }}"
+            >Image {{ column + 1 }}/{{ total_columns }}: {{ image_names[column] }}
+                [{{ image_sizes[column] }}]</a
+            >
+            {% endfor %}
+        </div>
+        <div class="dropdown d-inline-block ms-2">
+            <select id="imageRendering" class="btn btn-secondary dropdown-toggle">
+                <option value="off">Image Rendering: Off</option>
+                <option value="auto">Image Rendering: Auto</option>
+                <option value="smooth">Image Rendering: Smooth</option>
+                <option value="crisp-edges">Image Rendering: Crisp</option>
+                <option value="pixelated">Image Rendering: Pixel</option>
+            </select>
+        </div>
     </div>
-  </div>
-  {% if metadata %}
-  <span class="comparison-name">{{ metadata.name }}</span>
-  <div class="tags d-inline-block">
-    {% for tag in metadata.tags %}
-    <span class="badge bg-secondary">{{ tag }}</span>
-    {% endfor %}
-  </div>
-  {% if metadata.never_expire %}
-  <div class="expiration-info">
+    {% if metadata %}
+    <span class="comparison-name">{{ metadata.name }}</span>
+    <div class="tags d-inline-block">
+        {% for tag in metadata.tags %}
+        <span class="badge bg-secondary">{{ tag }}</span>
+        {% endfor %}
+    </div>
+    {% if metadata.never_expire %}
+    <div class="expiration-info">
     <span class="badge bg-success">
       <i class="fa fa-infinity"></i> Never Expires
     </span>
-  </div>
-  {% else %}
-  <div class="expiration-info">
+    </div>
+    {% else %}
+    <div class="expiration-info">
     <span class="badge bg-info">
       Expires: {{ expiration_date }} ({{ expiration_days }} days {{ "from last
       access" if expiration_type == "from_last_access" else "from creation" }})
     </span>
-  </div>
-  {% endif %} {% endif %}
+    </div>
+    {% endif %} {% endif %}
 </div>
 <div
-  class="d-flex flex-column justify-content-end align-items-end d-none d-md-block"
+        class="d-flex flex-column justify-content-end align-items-end d-none d-md-block"
 >
-  <div class="form-check form-switch d-flex align-items-center gap-2 ps-0">
-    <label class="form-check-label" for="toggleFit"> Fit to Screen </label>
-    <input
-      class="form-check-input m-0"
-      type="checkbox"
-      role="switch"
-      id="toggleFit"
-    />
-    <label class="form-check-label" for="toggleFit"> Original Size </label>
-  </div>
-  <div class="form-check form-switch">
-    <input
-      class="form-check-input"
-      type="checkbox"
-      role="switch"
-      id="toggleBorder"
-    />
-    <label class="form-check-label" for="toggleBorder">Show Border</label>
-  </div>
+    <div class="form-check form-switch d-flex align-items-center gap-2 ps-0">
+        <label class="form-check-label" for="toggleFit"> Fit to Screen </label>
+        <input
+                class="form-check-input m-0"
+                type="checkbox"
+                role="switch"
+                id="toggleFit"
+        />
+        <label class="form-check-label" for="toggleFit"> Original Size </label>
+    </div>
+    <div class="form-check form-switch">
+        <input
+                class="form-check-input"
+                type="checkbox"
+                role="switch"
+                id="toggleBorder"
+        />
+        <label class="form-check-label" for="toggleBorder">Show Border</label>
+    </div>
 </div>
 {% endblock %}
 
 {% block extra_nav_2 %}
 
 <div class="collapse navbar-collapse" id="navbar">
-  <div class="d-md-none mt-3 mobile-controls">
-    <div class="dropdown d-block mb-2">
-      <button
-        class="btn btn-secondary dropdown-toggle w-100"
-        type="button"
-        id="mobileRowDropdown"
-        data-bs-toggle="dropdown"
-      >
-        Comparison: <span id="mobileCurrentRow">1</span>/<span
-          id="mobileTotalRows"
-        >
+    <div class="d-md-none mt-3 mobile-controls">
+        <div class="dropdown d-block mb-2">
+            <button
+                    class="btn btn-secondary dropdown-toggle w-100"
+                    type="button"
+                    id="mobileRowDropdown"
+                    data-bs-toggle="dropdown"
+            >
+                Comparison: <span id="mobileCurrentRow">1</span>/<span
+                    id="mobileTotalRows"
+            >
           {{ total_rows }}
         </span>
-      </button>
-      <div class="dropdown-menu w-100" aria-labelledby="mobileRowDropdown">
-        {% for row in range(dropdown_rows) %}
-        <a class="dropdown-item" href="#" data-row="{{ row }}">{{ row + 1 }}</a>
-        {% endfor %}
-      </div>
-    </div>
+            </button>
+            <div class="dropdown-menu w-100" aria-labelledby="mobileRowDropdown">
+                {% for row in range(dropdown_rows) %}
+                <a class="dropdown-item" href="#" data-row="{{ row }}">{{ row + 1 }}</a>
+                {% endfor %}
+            </div>
+        </div>
 
-    <div class="dropdown d-block mb-2">
-      <button
-        class="btn btn-secondary dropdown-toggle w-100"
-        type="button"
-        id="mobileColumnDropdown"
-        data-bs-toggle="dropdown"
-      >
-        Image <span id="mobileCurrentColumn">1</span>/{{ total_columns }}:
-        <span id="mobileCurrentImageInfo"></span>
-      </button>
-      <ul class="dropdown-menu w-100" aria-labelledby="mobileColumnDropdown">
-        {% for column in range(total_columns) %}
-        <a class="dropdown-item" href="#" data-column="{{ column }}">
-          Image {{ column + 1 }}/{{ total_columns }}: {{ image_names[column] }}
-          [{{ image_sizes[column] }}]
-        </a>
-        {% endfor %}
-      </ul>
-    </div>
+        <div class="dropdown d-block mb-2">
+            <button
+                    class="btn btn-secondary dropdown-toggle w-100"
+                    type="button"
+                    id="mobileColumnDropdown"
+                    data-bs-toggle="dropdown"
+            >
+                Image <span id="mobileCurrentColumn">1</span>/{{ total_columns }}:
+                <span id="mobileCurrentImageInfo"></span>
+            </button>
+            <ul class="dropdown-menu w-100" aria-labelledby="mobileColumnDropdown">
+                {% for column in range(total_columns) %}
+                <a class="dropdown-item" href="#" data-column="{{ column }}">
+                    Image {{ column + 1 }}/{{ total_columns }}: {{ image_names[column] }}
+                    [{{ image_sizes[column] }}]
+                </a>
+                {% endfor %}
+            </ul>
+        </div>
 
-    <div
-      class="form-check form-switch d-flex align-items-center justify-content-between mb-2"
-    >
-      <label class="form-check-label" for="mobileToggleFit"
-        >Fit to Screen</label
-      >
-      <input
-        class="form-check-input m-0"
-        type="checkbox"
-        role="switch"
-        id="mobileToggleFit"
-      />
-      <label class="form-check-label" for="mobileToggleFit"
-        >Original Size</label
-      >
-    </div>
+        <div
+                class="form-check form-switch d-flex align-items-center justify-content-between mb-2"
+        >
+            <label class="form-check-label" for="mobileToggleFit"
+            >Fit to Screen</label
+            >
+            <input
+                    class="form-check-input m-0"
+                    type="checkbox"
+                    role="switch"
+                    id="mobileToggleFit"
+            />
+            <label class="form-check-label" for="mobileToggleFit"
+            >Original Size</label
+            >
+        </div>
 
-    <div
-      class="form-check form-switch d-flex align-items-center justify-content-between mb-2"
-    >
-      <label class="form-check-label" for="mobileToggleBorder"
-        >Show Border</label
-      >
-      <input
-        class="form-check-input"
-        type="checkbox"
-        role="switch"
-        id="mobileToggleBorder"
-      />
-    </div>
+        <div
+                class="form-check form-switch d-flex align-items-center justify-content-between mb-2"
+        >
+            <label class="form-check-label" for="mobileToggleBorder"
+            >Show Border</label
+            >
+            <input
+                    class="form-check-input"
+                    type="checkbox"
+                    role="switch"
+                    id="mobileToggleBorder"
+            />
+        </div>
 
-    <div class="dropdown d-inline-block ms-2">
-      <select
-        id="mobileImageRendering"
-        class="btn btn-secondary dropdown-toggle"
-      >
-        <option value="off">Rendering: Off</option>
-        <option value="auto">Rendering: Auto</option>
-        <option value="smooth">Rendering: Smooth</option>
-        <option value="crisp-edges">Rendering: Crisp</option>
-        <option value="pixelated">Rendering: Pixel</option>
-      </select>
-    </div>
+        <div class="dropdown d-inline-block ms-2">
+            <select
+                    id="mobileImageRendering"
+                    class="btn btn-secondary dropdown-toggle"
+            >
+                <option value="off">Rendering: Off</option>
+                <option value="auto">Rendering: Auto</option>
+                <option value="smooth">Rendering: Smooth</option>
+                <option value="crisp-edges">Rendering: Crisp</option>
+                <option value="pixelated">Rendering: Pixel</option>
+            </select>
+        </div>
 
-    <a href="#" id="mobileShareBBCodeBtn" class="btn btn-secondary w-100 mb-2"
-      ><i class="fa fa-share-alt"></i> Share BBCode</a
-    >
-  </div>
+        <a href="#" id="mobileShareBBCodeBtn" class="btn btn-secondary w-100 mb-2"
+        ><i class="fa fa-share-alt"></i> Share BBCode</a
+        >
+    </div>
 </div>
 {% endblock %}
 
 {% block content %}
 <div class="comparison-container">
-  <div class="image-viewer fit-mode" id="imageViewer">
-    <div class="image-container">
-      <img
-        id="currentImage"
-        src="{{ url_for('uploads', path=images[0]) }}"
-        alt="Comparison image"
-        class="comparison-image fit"
-      />
+    <div class="image-viewer fit-mode" id="imageViewer">
+        <div class="image-container">
+            <img
+                    id="currentImage"
+                    src="{{ url_for('uploads', path=images[0]) }}"
+                    alt="Comparison image"
+                    class="comparison-image fit"
+            />
+        </div>
     </div>
-  </div>
 </div>
 
 <div
-  class="modal fade"
-  id="bbcodeModal"
-  tabindex="-1"
-  aria-labelledby="bbcodeModalLabel"
-  aria-hidden="true"
+        class="modal fade"
+        id="bbcodeModal"
+        tabindex="-1"
+        aria-labelledby="bbcodeModalLabel"
+        aria-hidden="true"
 >
-  <div class="modal-dialog modal-lg">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="bbcodeModalLabel">
-          Share Comparison (BBCode)
-        </h5>
-        <button
-          type="button"
-          class="btn-close"
-          data-bs-dismiss="modal"
-          aria-label="Close"
-        ></button>
-      </div>
-      <div class="modal-body">
-        <p>Copy the BBCode below to share this comparison:</p>
-        <textarea
-          id="bbcodeText"
-          class="form-control"
-          rows="10"
-          readonly
-        ></textarea>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-          Close
-        </button>
-        <button type="button" class="btn btn-primary" id="copyBBCodeBtn">
-          <i class="fa fa-copy"></i> Copy to Clipboard
-        </button>
-      </div>
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="bbcodeModalLabel">
+                    Share Comparison (BBCode)
+                </h5>
+                <button
+                        type="button"
+                        class="btn-close"
+                        data-bs-dismiss="modal"
+                        aria-label="Close"
+                ></button>
+            </div>
+            <div class="modal-body">
+                <p>Copy the BBCode below to share this comparison:</p>
+                <textarea
+                        id="bbcodeText"
+                        class="form-control"
+                        rows="10"
+                        readonly
+                ></textarea>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    Close
+                </button>
+                <button type="button" class="btn btn-primary" id="copyBBCodeBtn">
+                    <i class="fa fa-copy"></i> Copy to Clipboard
+                </button>
+            </div>
+        </div>
     </div>
-  </div>
 </div>
 
 <script>
-  const compareData = { imageUrls: {{ images|tojson|safe }}, totalColumns: {{ total_columns }}, totalRows: {{ total_rows }}, imageNames: {{ image_names|tojson|safe }}, imageSizes: {{ image_sizes|tojson|safe }} };
+    const compareData = { imageUrls: {{ images|tojson|safe }}, totalColumns: {{ total_columns }}, totalRows: {{ total_rows }}, imageNames: {{ image_names|tojson|safe }}, imageSizes: {{ image_sizes|tojson|safe }} };
 </script>
 <script src="/static/js/compare.js"></script>
 {% endblock %}
