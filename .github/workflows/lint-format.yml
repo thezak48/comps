@@ -1,0 +1,35 @@
+name: Lint and Format Check
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+      - name: Install Python dev dependencies
+        run: |
+          python -m venv .venv
+          source .venv/bin/activate
+          pip install -r requirements-dev.txt
+      - name: Install Node.js dependencies
+        run: npm install
+      - name: Run Python formatters/linters
+        run: |
+          source .venv/bin/activate
+          black --check .
+          isort --check-only .
+          flake8 .
+          djlint templates/ --check --profile=jinja
+      - name: Run JS/CSS formatters/linters
+        run: npm run check

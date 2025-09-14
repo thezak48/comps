@@ -1,0 +1,17 @@
+[project]
+name = "comps"
+version = "0.1.0"
+description = "Comps: open source self-hostable version of Slowpoke Pics"
+authors = [
+	{ name = "thezak48" }
+]
+
+requires-python = ">=3.13"
+
+[tool.black]
+line-length = 88
+target-version = ['py38']
+include = '\.pyi?$'
+exclude = '''
+/(\.|venv|env|.venv|static|templates|migrations|node_modules)/
+'''

@@ -1,0 +1,6 @@
+{
+	"profile": "jinja",
+	"indent": 4,
+	"max_line_length": 120,
+	"exclude": "static/*,venv/*,env/*"
+}
