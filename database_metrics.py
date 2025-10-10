@@ -3,7 +3,7 @@ def get_metrics():
     import sqlite3
     from datetime import datetime, timedelta
 
-    DB_PATH = os.getenv('DB_PATH', 'comparisons.db')
+    DB_PATH = os.getenv("DB_PATH", "comparisons.db")
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     metrics = {}
@@ -30,17 +30,15 @@ def get_metrics():
     # --- Date-based metrics for last 14 days ---
     days = 14
     today = datetime.now().date()
-    date_labels = [
-        (today - timedelta(days=i)).strftime("%Y-%m-%d") for i in reversed(range(days))
-    ]
+    date_labels = [(today - timedelta(days=i)).strftime("%Y-%m-%d") for i in reversed(range(days))]
 
     # Users registered per day
     c.execute(
-        f"""
+        """
         SELECT DATE(created_at), COUNT(*) FROM users
         WHERE created_at >= ?
         GROUP BY DATE(created_at)
-    """,
+        """,
         ((today - timedelta(days=days - 1)).strftime("%Y-%m-%d"),),
     )
     user_counts = dict(c.fetchall())
@@ -48,11 +46,11 @@ def get_metrics():
 
     # Comparisons created per day
     c.execute(
-        f"""
+        """
         SELECT DATE(created_at), COUNT(*) FROM comparisons
         WHERE created_at >= ?
         GROUP BY DATE(created_at)
-    """,
+        """,
         ((today - timedelta(days=days - 1)).strftime("%Y-%m-%d"),),
     )
     comp_counts = dict(c.fetchall())
@@ -60,13 +58,13 @@ def get_metrics():
 
     # Images uploaded per day (by image_positions join comparisons for date)
     c.execute(
-        f"""
+        """
         SELECT DATE(c.created_at), COUNT(ip.filename)
         FROM image_positions ip
         JOIN comparisons c ON ip.comparison_id = c.id
         WHERE c.created_at >= ?
         GROUP BY DATE(c.created_at)
-    """,
+        """,
         ((today - timedelta(days=days - 1)).strftime("%Y-%m-%d"),),
     )
     img_counts = dict(c.fetchall())
@@ -88,6 +86,7 @@ def get_metrics():
 
     conn.close()
     return metrics
+
 
 def format_bytes(bytes):
     if bytes < 1024:

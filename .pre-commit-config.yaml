@@ -1,0 +1,51 @@
+repos:
+  - repo: https://github.com/psf/black
+    rev: 25.1.0
+    hooks:
+      - id: black
+        language_version: python3
+  - repo: https://github.com/PyCQA/isort
+    rev: 6.0.1
+    hooks:
+      - id: isort
+        language_version: python3
+  - repo: https://github.com/pycqa/flake8
+    rev: 7.3.0
+    hooks:
+      - id: flake8
+        language_version: python3
+  - repo: https://github.com/Riverside-Healthcare/djLint
+    rev: v1.36.4
+    hooks:
+      - id: djlint
+        name: djLint (Jinja)
+        entry: djlint --profile=jinja --reformat --check
+        language: python
+        types: [jinja]
+        files: templates/.*\.jinja$
+  - repo: local
+    hooks:
+      - id: prettier-check-static
+        name: Prettier Check (static js/css)
+        entry: npm run prettier:check --
+        language: system
+        types: [css, javascript]
+        files: static/(js|css)/.*\.(js|css)$
+      - id: prettier-format-static
+        name: Prettier Format (static js/css)
+        entry: npm run prettier:format --
+        language: system
+        types: [css, javascript]
+        files: static/(js|css)/.*\.(js|css)$
+      - id: eslint-static
+        name: ESLint (static js)
+        entry: npm run lint:js --
+        language: system
+        types: [javascript]
+        files: static/js/.*\.js$
+      - id: stylelint-static
+        name: Stylelint (static css)
+        entry: npm run lint:css --
+        language: system
+        types: [css]
+        files: static/css/.*\.css$

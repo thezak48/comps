@@ -1,0 +1,7 @@
+# Development requirements for formatting and linting
+black
+isort
+flake8
+djlint
+pre-commit
+setuptools

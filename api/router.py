@@ -8,32 +8,40 @@ from pathlib import Path
 from typing import List, Optional
 
 import aiofiles
-from fastapi import (APIRouter, Depends, File, Form, HTTPException, Request,
-                     UploadFile)
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse
 from fastapi.security import APIKeyCookie, OAuth2PasswordRequestForm
 
 import auth
-from database import (create_comparison, delete_comparison, get_comparison,
-                      store_image_metadata, store_image_position,
-                      update_image_custom_name, update_last_accessed)
+from database import (
+    create_comparison,
+    delete_comparison,
+    get_comparison,
+    store_image_metadata,
+    store_image_position,
+    update_image_custom_name,
+    update_last_accessed,
+)
 
-from .models import (ComparisonCreate, ComparisonDetail, ComparisonResponse,
-                     CustomNameUpdate)
+from .models import (
+    ComparisonCreate,
+    ComparisonDetail,
+    ComparisonResponse,
+    CustomNameUpdate,
+)
 
 router = APIRouter(prefix="/api/v1", tags=["api"])
 
-# Environment variables
-# Constants
 MAX_ROWS = 200
 
-UPLOADS_PATH = os.getenv('UPLOADS_PATH', 'uploads')
-DB_PATH = os.getenv('DB_PATH', 'comparisons.db')
+UPLOADS_PATH = os.getenv("UPLOADS_PATH", "uploads")
+DB_PATH = os.getenv("DB_PATH", "comparisons.db")
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 cookie_sec = APIKeyCookie(name="session")
+
 
 # Random name generator for comparisons
 def generate_random_name():
@@ -42,23 +50,64 @@ def generate_random_name():
     Format: [Adjective] [Noun]
     """
     adjectives = [
-        "Amazing", "Brilliant", "Curious", "Dazzling", "Elegant", "Fantastic", 
-        "Graceful", "Harmonious", "Incredible", "Jubilant", "Keen", "Luminous", 
-        "Majestic", "Noble", "Optimistic", "Peaceful", "Quaint", "Radiant", 
-        "Serene", "Tranquil", "Unique", "Vibrant", "Wonderful", "Zealous"
+        "Amazing",
+        "Brilliant",
+        "Curious",
+        "Dazzling",
+        "Elegant",
+        "Fantastic",
+        "Graceful",
+        "Harmonious",
+        "Incredible",
+        "Jubilant",
+        "Keen",
+        "Luminous",
+        "Majestic",
+        "Noble",
+        "Optimistic",
+        "Peaceful",
+        "Quaint",
+        "Radiant",
+        "Serene",
+        "Tranquil",
+        "Unique",
+        "Vibrant",
+        "Wonderful",
+        "Zealous",
     ]
-    
+
     nouns = [
-        "Aurora", "Breeze", "Cascade", "Diamond", "Echo", "Fountain", "Galaxy", 
-        "Horizon", "Island", "Journey", "Kaleidoscope", "Lagoon", "Mountain", 
-        "Nebula", "Ocean", "Panorama", "Quest", "Rainbow", "Sunset", "Treasure", 
-        "Universe", "Valley", "Waterfall", "Zenith"
+        "Aurora",
+        "Breeze",
+        "Cascade",
+        "Diamond",
+        "Echo",
+        "Fountain",
+        "Galaxy",
+        "Horizon",
+        "Island",
+        "Journey",
+        "Kaleidoscope",
+        "Lagoon",
+        "Mountain",
+        "Nebula",
+        "Ocean",
+        "Panorama",
+        "Quest",
+        "Rainbow",
+        "Sunset",
+        "Treasure",
+        "Universe",
+        "Valley",
+        "Waterfall",
+        "Zenith",
     ]
-    
+
     adjective = random.choice(adjectives)
     noun = random.choice(nouns)
-    
+
     return f"{adjective} {noun}"
+
 
 @router.post("/login")
 async def api_login(form_data: OAuth2PasswordRequestForm = Depends()):
@@ -77,11 +126,12 @@ async def api_login(form_data: OAuth2PasswordRequestForm = Depends()):
     access_token = auth.create_access_token(data={"sub": str(user["id"])})
     return {"access_token": access_token, "token_type": "bearer"}
 
+
 @router.get("/comparisons", response_model=List[ComparisonResponse])
 async def list_comparisons():
     """
     List all available comparisons.
-    
+
     Returns a list of all comparisons with their basic metadata including:
     - ID, name, and show name
     - Tags
@@ -92,26 +142,30 @@ async def list_comparisons():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     c = conn.cursor()
-    
-    c.execute('SELECT id, name, show_name, total_rows, total_columns, expiration_type, expiration_days, created_at, last_accessed FROM comparisons ORDER BY created_at DESC')
+
+    c.execute(
+        "SELECT id, name, show_name, total_rows, total_columns, expiration_type, expiration_days, created_at, last_accessed "  # noqa: E501
+        "FROM comparisons ORDER BY created_at DESC"
+    )
     comparisons = []
-    
+
     for row in c.fetchall():
-        comparison_id = row['id']
-        c.execute('SELECT tag FROM tags WHERE comparison_id = ?', (comparison_id,))
+        comparison_id = row["id"]
+        c.execute("SELECT tag FROM tags WHERE comparison_id = ?", (comparison_id,))
         tags = [tag_row[0] for tag_row in c.fetchall()]
-        
+
         comparison = dict(row)
-        comparison['tags'] = tags
+        comparison["tags"] = tags
         comparisons.append(comparison)
-    
+
     conn.close()
     return comparisons
+
 
 @router.post("/comparisons", response_model=ComparisonResponse, status_code=201)
 async def create_new_comparison(
     comparison_data: ComparisonCreate,
-    user: Optional[dict] = Depends(auth.get_optional_user)
+    user: Optional[dict] = Depends(auth.get_optional_user),
 ):
     """
     Create a new comparison.
@@ -123,10 +177,10 @@ async def create_new_comparison(
     - Expiration settings
     """
     comparison_id = str(uuid.uuid4())
-    
+
     # Use a random name if none is provided
     name = comparison_data.name or generate_random_name()
-    
+
     # Get user ID if a user is authenticated
     user_id = user["id"] if user else None
 
@@ -134,13 +188,13 @@ async def create_new_comparison(
     metadata = {
         "total_columns": comparison_data.total_columns,
         "total_rows": min(comparison_data.total_rows, MAX_ROWS),
-        "never_expire": user["never_expire_comparisons"] if user else False
+        "never_expire": user["never_expire_comparisons"] if user else False,
     }
-    
+
     # Create comparison directory
     comparison_dir = Path(UPLOADS_PATH) / comparison_id
     comparison_dir.mkdir(exist_ok=True, parents=True)
-    
+
     # Store in database
     create_comparison(
         comparison_id=comparison_id,
@@ -148,9 +202,9 @@ async def create_new_comparison(
         show_name=comparison_data.show_name,
         tags=comparison_data.tags,
         metadata=metadata,
-        user_id=user_id
+        user_id=user_id,
     )
-    
+
     # Return the response
     return ComparisonResponse(
         id=comparison_id,
@@ -161,7 +215,7 @@ async def create_new_comparison(
         total_columns=metadata["total_columns"],
         created_at=datetime.utcnow().isoformat(),
         last_accessed=datetime.utcnow().isoformat(),
-        never_expire=metadata["never_expire"]
+        never_expire=metadata["never_expire"],
     )
 
 
@@ -169,67 +223,71 @@ async def create_new_comparison(
 async def get_comparison_detail(comparison_id: str):
     """
     Get detailed information about a specific comparison.
-    
+
     Returns comprehensive information about the comparison including:
     - Basic metadata (ID, name, show name, tags)
     - Grid dimensions (rows and columns)
     - Expiration settings
     - Creation and last accessed timestamps
     - Complete list of images with their positions and metadata
-    
+
     This endpoint also updates the last_accessed timestamp for the comparison.
     """
     # Update last accessed timestamp
     update_last_accessed(comparison_id)
-    
+
     # Get comparison data
     comparison_data = get_comparison(comparison_id)
     if not comparison_data:
         raise HTTPException(status_code=404, detail="Comparison not found")
-    
+
     # Get image positions and metadata
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    
-    c.execute('''
-        SELECT ip.filename, ip.column_position, ip.row_number, 
+
+    c.execute(
+        """
+        SELECT ip.filename, ip.column_position, ip.row_number,
                im.original_filename, im.image_size, im.custom_name
         FROM image_positions ip
-        LEFT JOIN image_metadata im ON ip.comparison_id = im.comparison_id AND ip.filename = im.filename
+        LEFT JOIN image_metadata im
+            ON ip.comparison_id = im.comparison_id
+            AND ip.filename = im.filename
         WHERE ip.comparison_id = ?
         ORDER BY ip.row_number ASC, ip.column_position ASC
-    ''', (comparison_id,))
-    
+        """,
+        (comparison_id,),
+    )
+
     images = []
     for row in c.fetchall():
         filename, column, row_num, original_filename, image_size, custom_name = row
-        images.append({
-            "filename": filename,
-            "original_filename": original_filename,
-            "custom_name": custom_name,
-            "image_size": image_size,
-            "row": row_num,
-            "column": column
-        })
-    
+        images.append(
+            {
+                "filename": filename,
+                "original_filename": original_filename,
+                "custom_name": custom_name,
+                "image_size": image_size,
+                "row": row_num,
+                "column": column,
+            }
+        )
+
     conn.close()
-    
+
     # Add images to the response
     comparison_data["images"] = images
     return comparison_data
 
+
 @router.put("/comparisons/{comparison_id}/images/{filename}", status_code=200)
-async def update_image_metadata(
-    comparison_id: str,
-    filename: str,
-    update_data: CustomNameUpdate
-):
+async def update_image_metadata(comparison_id: str, filename: str, update_data: CustomNameUpdate):
     """
     Update image metadata.
-    
+
     Currently supports updating:
     - Custom name for the image
-    
+
     The custom name can be used to provide a more descriptive label for the image
     that will be displayed in the UI.
     """
@@ -237,21 +295,25 @@ async def update_image_metadata(
     comparison_data = get_comparison(comparison_id)
     if not comparison_data:
         raise HTTPException(status_code=404, detail="Comparison not found")
-    
+
     # Check if file exists
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    c.execute('SELECT filename FROM image_metadata WHERE comparison_id = ? AND filename = ?', 
-              (comparison_id, filename))
+    c.execute(
+        "SELECT filename FROM image_metadata WHERE comparison_id = ? AND filename = ?",
+        (comparison_id, filename),
+    )
     if not c.fetchone():
         conn.close()
         raise HTTPException(status_code=404, detail="Image not found")
     conn.close()
-    
+
     # Update custom name
     update_image_custom_name(comparison_id, filename, update_data.custom_name)
-    
+
     return {"message": "Image metadata updated successfully"}
+
+
 @router.delete("/delete-comparison/{comparison_id}")
 async def delete_user_comparison(comparison_id: str, request: Request):
     """Delete a comparison owned by the current user"""
@@ -265,14 +327,14 @@ async def delete_user_comparison(comparison_id: str, request: Request):
     # Check if the comparison exists and belongs to the user
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    c.execute('SELECT user_id FROM comparisons WHERE id = ?', (comparison_id,))
+    c.execute("SELECT user_id FROM comparisons WHERE id = ?", (comparison_id,))
     result = c.fetchone()
     conn.close()
 
     if not result or result[0] != user["id"]:
         return JSONResponse(
             status_code=403,
-            content={"error": "You don't have permission to delete this comparison"}
+            content={"error": "You don't have permission to delete this comparison"},
         )
 
     # Delete the comparison
@@ -281,10 +343,10 @@ async def delete_user_comparison(comparison_id: str, request: Request):
     except OSError as e:
         logger.error("Error deleting comparison %s files: %s", comparison_id, e)
         return JSONResponse(
-            status_code=500,
-            content={"error": "Failed to delete comparison files."}
+            status_code=500, content={"error": "Failed to delete comparison files."}
         )
     return JSONResponse(content={"message": "Comparison deleted successfully"})
+
 
 @router.post("/comparison")
 async def api_create_comparison(
@@ -296,7 +358,7 @@ async def api_create_comparison(
     expiration_days: int = Form(7),
     tags: Optional[str] = Form(None),
     total_rows: int = Form(1),
-    total_columns: int = Form(2)
+    total_columns: int = Form(2),
 ):
     """
     Creates a new comparison record and returns its ID.
@@ -307,18 +369,18 @@ async def api_create_comparison(
     user_id = user["id"] if user else None
     logger.info(
         "Create comparison request from user: %s",
-        user['username'] if user else 'anonymous'
+        user["username"] if user else "anonymous",
     )
 
     comparison_id = str(uuid.uuid4())
 
-    if not name or name.strip() == '':
+    if not name or name.strip() == "":
         name = generate_random_name()
         logger.info("No name provided, generated random name: %s", name)
 
     tag_list = []
     if tags and tags.strip():
-        tag_list = [tag.strip() for tag in tags.split(',') if tag.strip()]
+        tag_list = [tag.strip() for tag in tags.split(",") if tag.strip()]
 
     never_expire = None
     if user:
@@ -332,7 +394,7 @@ async def api_create_comparison(
         "total_columns": total_columns,
         "expiration_type": expiration_type,
         "expiration_days": expiration_days,
-        "never_expire": never_expire
+        "never_expire": never_expire,
     }
 
     create_comparison(
@@ -341,7 +403,7 @@ async def api_create_comparison(
         show_name=show_name,
         tags=tag_list,
         metadata=metadata,
-        user_id=user_id
+        user_id=user_id,
     )
 
     return JSONResponse(content={"comparison_id": comparison_id})
@@ -354,14 +416,17 @@ async def api_upload_image(
     row: int = Form(...),
     column: int = Form(...),
     original_filename: str = Form(...),
-    custom_name: Optional[str] = Form(None)
+    custom_name: Optional[str] = Form(None),
 ):
     """
     Uploads a single image to an existing comparison.
     """
     logger.info(
         "Uploading image %s to comparison %s at (%s, %s)",
-        original_filename, comparison_id, row, column
+        original_filename,
+        comparison_id,
+        row,
+        column,
     )
 
     comparison = get_comparison(comparison_id)

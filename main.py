@@ -2,6 +2,7 @@
 FastAPI application for Comps.
 Handles file uploads, comparison viewing, and database operations.
 """
+
 # Standard library imports
 import asyncio
 import logging
@@ -11,7 +12,6 @@ import sqlite3
 from datetime import datetime, timedelta
 from pathlib import Path
 
-# Third-party imports
 from fastapi import FastAPI, Form, HTTPException, Request, status
 from fastapi.openapi.utils import get_openapi
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
@@ -22,9 +22,14 @@ from pydantic import BaseModel
 
 import auth
 from api.router import router as api_router
-from database import (delete_comparison, get_comparison,
-                      get_expired_comparisons, get_user_comparisons, init_db,
-                      update_last_accessed)
+from database import (
+    delete_comparison,
+    get_comparison,
+    get_expired_comparisons,
+    get_user_comparisons,
+    init_db,
+    update_last_accessed,
+)
 from database_metrics import get_metrics
 
 
@@ -35,17 +40,57 @@ def generate_random_name():
     Format: [Adjective] [Noun]
     """
     adjectives = [
-        "Amazing", "Brilliant", "Curious", "Dazzling", "Elegant", "Fantastic", 
-        "Graceful", "Harmonious", "Incredible", "Jubilant", "Keen", "Luminous", 
-        "Majestic", "Noble", "Optimistic", "Peaceful", "Quaint", "Radiant", 
-        "Serene", "Tranquil", "Unique", "Vibrant", "Wonderful", "Zealous"
+        "Amazing",
+        "Brilliant",
+        "Curious",
+        "Dazzling",
+        "Elegant",
+        "Fantastic",
+        "Graceful",
+        "Harmonious",
+        "Incredible",
+        "Jubilant",
+        "Keen",
+        "Luminous",
+        "Majestic",
+        "Noble",
+        "Optimistic",
+        "Peaceful",
+        "Quaint",
+        "Radiant",
+        "Serene",
+        "Tranquil",
+        "Unique",
+        "Vibrant",
+        "Wonderful",
+        "Zealous",
     ]
 
     nouns = [
-        "Aurora", "Breeze", "Cascade", "Diamond", "Echo", "Fountain", "Galaxy", 
-        "Horizon", "Island", "Journey", "Kaleidoscope", "Lagoon", "Mountain", 
-        "Nebula", "Ocean", "Panorama", "Quest", "Rainbow", "Sunset", "Treasure", 
-        "Universe", "Valley", "Waterfall", "Zenith"
+        "Aurora",
+        "Breeze",
+        "Cascade",
+        "Diamond",
+        "Echo",
+        "Fountain",
+        "Galaxy",
+        "Horizon",
+        "Island",
+        "Journey",
+        "Kaleidoscope",
+        "Lagoon",
+        "Mountain",
+        "Nebula",
+        "Ocean",
+        "Panorama",
+        "Quest",
+        "Rainbow",
+        "Sunset",
+        "Treasure",
+        "Universe",
+        "Valley",
+        "Waterfall",
+        "Zenith",
     ]
 
     adjective = random.choice(adjectives)
@@ -53,13 +98,14 @@ def generate_random_name():
 
     return f"{adjective} {noun}"
 
+
 # Create FastAPI app with custom OpenAPI settings
 app = FastAPI(
     title="Comps API",
     description="API for managing image comparisons",
     version="1.0.0",
     docs_url=None,  # Disable default docs
-    redoc_url=None  # Disable default redoc
+    redoc_url=None,  # Disable default redoc
 )
 
 # Configure logging
@@ -71,9 +117,9 @@ cookie_sec = APIKeyCookie(name="session")
 background_tasks = set()
 
 # Get configuration from environment
-DB_PATH = os.getenv('DB_PATH', 'comparisons.db')
-UPLOADS_PATH = os.getenv('UPLOADS_PATH', 'uploads')
-RETENTION_DAYS = int(os.getenv('RETENTION_DAYS', '7'))
+DB_PATH = os.getenv("DB_PATH", "comparisons.db")
+UPLOADS_PATH = os.getenv("UPLOADS_PATH", "uploads")
+RETENTION_DAYS = int(os.getenv("RETENTION_DAYS", "7"))
 
 # Ensure directories exist
 Path(UPLOADS_PATH).mkdir(parents=True, exist_ok=True)
@@ -90,6 +136,7 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 app.mount("/uploads", StaticFiles(directory=UPLOADS_PATH), name="uploads")
 templates = Jinja2Templates(directory="templates")
 
+
 # Custom OpenAPI schema
 def custom_openapi():
     """Generate a custom OpenAPI schema."""
@@ -104,7 +151,9 @@ def custom_openapi():
     app.openapi_schema = openapi_schema
     return app.openapi_schema
 
+
 app.openapi = custom_openapi
+
 
 # Custom Swagger UI route with dark mode
 @app.get("/api/docs", include_in_schema=False)
@@ -114,16 +163,18 @@ async def custom_swagger_ui_html():
         "swagger_ui.html", {"request": Request(scope={"type": "http"})}
     )
 
+
 # Serve OpenAPI schema
 @app.get("/openapi.json", include_in_schema=False)
 async def get_open_api_endpoint():
     """Serve the OpenAPI schema as a JSON response."""
     return JSONResponse(app.openapi())
 
+
 # Background task for cleanup
 async def cleanup_old_comparisons():
     """
-    Periodically check for and delete comparisons that haven't been accessed 
+    Periodically check for and delete comparisons that haven't been accessed
     in more than RETENTION_DAYS days
     """
     while True:
@@ -135,7 +186,7 @@ async def cleanup_old_comparisons():
             columns = [col[1] for col in c.fetchall()]
             conn.close()
 
-            if 'last_accessed' in columns:
+            if "last_accessed" in columns:
                 logger.info("Starting cleanup of comparisons older than %s days", RETENTION_DAYS)
                 try:
                     expired_ids = get_expired_comparisons(RETENTION_DAYS)
@@ -148,14 +199,17 @@ async def cleanup_old_comparisons():
                                 delete_comparison(comparison_id, UPLOADS_PATH)
                             except OSError as e:
                                 logger.error(
-                                    "Error deleting comparison %s: %s", comparison_id, str(e)
+                                    "Error deleting comparison %s: %s",
+                                    comparison_id,
+                                    str(e),
                                 )
                     else:
                         logger.info("No expired comparisons found")
                 except sqlite3.OperationalError as e:
                     if "no such column" in str(e):
                         logger.warning(
-                            "Skipping cleanup: %s. Migrations may not be complete.", str(e)
+                            "Skipping cleanup: %s. Migrations may not be complete.",
+                            str(e),
                         )
                     else:
                         logger.error("Error in cleanup task: %s", str(e))
@@ -168,6 +222,7 @@ async def cleanup_old_comparisons():
             logger.error("Error in cleanup task: %s", str(e))
             # If there's an error, wait a bit before trying again
             await asyncio.sleep(3600)  # 1 hour in seconds
+
 
 @app.on_event("startup")
 async def start_cleanup_task():
@@ -191,7 +246,7 @@ async def start_cleanup_task():
             # Check if last_accessed column exists in comparisons table
             c.execute("PRAGMA table_info(comparisons)")
             columns = [col[1] for col in c.fetchall()]
-            if 'last_accessed' not in columns:
+            if "last_accessed" not in columns:
                 logger.warning(
                     "Database schema is missing expected columns. Migrations may not be complete."
                 )
@@ -205,10 +260,12 @@ async def start_cleanup_task():
     except sqlite3.Error as e:
         logger.error("Error checking database state: %s", str(e))
 
+
 @app.get("/health")
 async def health_check():
     """Health check endpoint for monitoring"""
     return {"status": "healthy"}
+
 
 @app.get("/login")
 async def login_page(request: Request):
@@ -218,7 +275,8 @@ async def login_page(request: Request):
     if user:
         return RedirectResponse(url="/")
 
-    return templates.TemplateResponse("login.html", {"request": request})
+    return templates.TemplateResponse("login.jinja", {"request": request})
+
 
 @app.post("/login")
 async def login(request: Request):
@@ -229,8 +287,8 @@ async def login(request: Request):
 
     if not username or not invitation_code:
         return templates.TemplateResponse(
-            "login.html",
-            {"request": request, "error": "Username and invitation code are required"}
+            "login.jinja",
+            {"request": request, "error": "Username and invitation code are required"},
         )
 
     # Try to authenticate
@@ -241,8 +299,8 @@ async def login(request: Request):
         user = auth.register_user(username, invitation_code)
         if not user:
             return templates.TemplateResponse(
-                "login.html",
-                {"request": request, "error": "Invalid username or invitation code"}
+                "login.jinja",
+                {"request": request, "error": "Invalid username or invitation code"},
             )
 
     # Create access token
@@ -256,10 +314,11 @@ async def login(request: Request):
         value=access_token,
         httponly=True,
         max_age=60 * 60 * 24 * 7,  # 1 week
-        samesite="lax"
+        samesite="lax",
     )
 
     return response
+
 
 @app.get("/logout")
 async def logout():
@@ -267,6 +326,7 @@ async def logout():
     response = RedirectResponse(url="/")
     response.delete_cookie(key="session")
     return response
+
 
 # Admin metrics page
 @app.get("/admin/metrics", response_class=HTMLResponse)
@@ -277,9 +337,9 @@ async def admin_metrics_page(request: Request):
 
     metrics = get_metrics()
     return templates.TemplateResponse(
-        "metrics.html",
-        {"request": request, "user": user, "metrics": metrics}
+        "metrics.jinja", {"request": request, "user": user, "metrics": metrics}
     )
+
 
 @app.get("/admin", response_class=HTMLResponse)
 async def admin_page(request: Request):
@@ -298,9 +358,10 @@ async def admin_page(request: Request):
         "request": request,
         "user": user,
         "invitation_codes": invitation_codes,
-        "all_users": all_users
+        "all_users": all_users,
     }
-    return templates.TemplateResponse("admin.html", context)
+    return templates.TemplateResponse("admin.jinja", context)
+
 
 @app.post("/admin/create-invitation")
 async def create_invitation(request: Request):
@@ -318,10 +379,13 @@ async def create_invitation(request: Request):
     # Redirect back to admin page
     return RedirectResponse(url="/admin", status_code=303)
 
+
 class UserAdminUpdate(BaseModel):
     """Pydantic model for updating a user's admin status."""
+
     user_id: int
     is_admin: bool
+
 
 @app.post("/admin/user/set-admin")
 async def set_user_admin_status(request: Request, update: UserAdminUpdate):
@@ -332,6 +396,7 @@ async def set_user_admin_status(request: Request, update: UserAdminUpdate):
 
     auth.set_admin_status(update.user_id, update.is_admin)
     return RedirectResponse(url="/admin", status_code=status.HTTP_303_SEE_OTHER)
+
 
 @app.get("/account", response_class=HTMLResponse)
 async def account_page(request: Request):
@@ -344,7 +409,7 @@ async def account_page(request: Request):
     api_keys = auth.get_user_api_keys(user["id"])
 
     return templates.TemplateResponse(
-        "account.html",
+        "account.jinja",
         {
             "request": request,
             "user": user,
@@ -353,6 +418,7 @@ async def account_page(request: Request):
             "api_keys": api_keys,
         },
     )
+
 
 @app.post("/account/api-keys/create")
 async def create_api_key_endpoint(request: Request, key_name: str = Form(...)):
@@ -380,14 +446,17 @@ async def delete_api_key_endpoint(request: Request, key_id: int):
     if success:
         return JSONResponse(content={"message": "API Key deleted successfully."})
     else:
-        return JSONResponse(status_code=404, content={"error": "Key not found or you do not have permission to delete it."})
+        return JSONResponse(
+            status_code=404,
+            content={"error": "Key not found or you do not have permission to delete it."},
+        )
 
 
 @app.get("/compare/{comparison_id}")
 async def view_comparison(request: Request, comparison_id: str):
     """
     View a comparison by its ID.
-    
+
     Retrieves the comparison data, updates the last accessed timestamp,
     and renders the comparison template with all necessary data.
     """
@@ -400,24 +469,25 @@ async def view_comparison(request: Request, comparison_id: str):
     # Get comparison data
     comparison = get_comparison(comparison_id)
     if not comparison:
-        return JSONResponse(
-            status_code=404,
-            content={"error": "Comparison not found"}
-        )
+        return JSONResponse(status_code=404, content={"error": "Comparison not found"})
 
     # Get image positions
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     c = conn.cursor()
 
-    c.execute('''
-        SELECT ip.filename, ip.row_number, ip.column_position, 
+    c.execute(
+        """
+        SELECT ip.filename, ip.row_number, ip.column_position,
                im.original_filename, im.image_size, im.custom_name
         FROM image_positions ip
-        LEFT JOIN image_metadata im ON ip.comparison_id = im.comparison_id AND ip.filename = im.filename
+        LEFT JOIN image_metadata im
+        ON ip.comparison_id = im.comparison_id AND ip.filename = im.filename
         WHERE ip.comparison_id = ?
         ORDER BY ip.row_number, ip.column_position
-    ''', (comparison_id,))
+    """,
+        (comparison_id,),
+    )
 
     images = []
     image_names = []
@@ -426,38 +496,39 @@ async def view_comparison(request: Request, comparison_id: str):
     for row in c.fetchall():
         images.append(f"{comparison_id}/{row['filename']}")
         # Use custom name if available, otherwise use original filename
-        image_names.append(row['custom_name'] or row['original_filename'])
-        image_sizes.append(row['image_size'])
+        image_names.append(row["custom_name"] or row["original_filename"])
+        image_sizes.append(row["image_size"])
 
     conn.close()
 
     # Calculate expiration date
-    expiration_date = datetime.now() + timedelta(days=comparison.get('expiration_days', 7))
-    never_expires = comparison.get('never_expire', False)
+    expiration_date = datetime.now() + timedelta(days=comparison.get("expiration_days", 7))
+    never_expires = comparison.get("never_expire", False)
 
     # Calculate the number of rows to show in dropdown (max 20)
-    dropdown_rows = min(comparison.get('total_rows', 1), 20)
+    dropdown_rows = min(comparison.get("total_rows", 1), 20)
 
     context = {
         "request": request,
         "user": user,
         "images": images,
         "metadata": comparison,
-        "total_rows": comparison.get('total_rows', 1),
-        "total_columns": comparison.get('total_columns', 2),
+        "total_rows": comparison.get("total_rows", 1),
+        "total_columns": comparison.get("total_columns", 2),
         "image_names": image_names,
         "image_sizes": image_sizes,
-        "expiration_date": expiration_date.strftime('%Y-%m-%d'),
-        "expiration_days": comparison.get('expiration_days', 7), 
-        "expiration_type": comparison.get('expiration_type', 'from_last_access'), 
+        "expiration_date": expiration_date.strftime("%Y-%m-%d"),
+        "expiration_days": comparison.get("expiration_days", 7),
+        "expiration_type": comparison.get("expiration_type", "from_last_access"),
         "never_expire": never_expires,
-        "dropdown_rows": dropdown_rows
+        "dropdown_rows": dropdown_rows,
     }
 
-    return templates.TemplateResponse("compare.html", context)
+    return templates.TemplateResponse("compare.jinja", context)
+
 
 @app.get("/")
 async def home(request: Request):
     """Render the home page with upload form."""
     user = await auth.get_optional_user(request)
-    return templates.TemplateResponse("index.html", {"request": request, "user": user})
+    return templates.TemplateResponse("index.jinja", {"request": request, "user": user})
