@@ -1,10 +1,11 @@
 """Add image metadata table"""
+from db import autoincrement_pk_sql
 
 def upgrade(cursor):
     # Create image_metadata table
-    cursor.execute('''
+    cursor.execute(f'''
         CREATE TABLE IF NOT EXISTS image_metadata (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id {autoincrement_pk_sql()},
             comparison_id TEXT NOT NULL,
             filename TEXT NOT NULL,
             original_filename TEXT,

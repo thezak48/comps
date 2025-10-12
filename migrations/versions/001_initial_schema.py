@@ -1,15 +1,16 @@
 """Initial database schema migration"""
 from datetime import datetime
+from db import autoincrement_pk_sql, bool_default
 
 def upgrade(cursor):
     # Create migrations version table
-    cursor.execute('''
+    cursor.execute(f'''
         CREATE TABLE IF NOT EXISTS migrations (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id {autoincrement_pk_sql()},
             version TEXT NOT NULL,
             name TEXT NOT NULL,
             applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            success BOOLEAN DEFAULT 0
+            success BOOLEAN {bool_default(False)}
         )
     ''')
     
@@ -26,9 +27,9 @@ def upgrade(cursor):
     ''')
     
     # Create tags table
-    cursor.execute('''
+    cursor.execute(f'''
         CREATE TABLE IF NOT EXISTS tags (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id {autoincrement_pk_sql()},
             comparison_id TEXT,
             tag TEXT,
             FOREIGN KEY (comparison_id) REFERENCES comparisons (id)

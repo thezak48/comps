@@ -1,7 +1,6 @@
 import logging
 import os
 import random
-import sqlite3
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -22,6 +21,7 @@ from database import (
     update_image_custom_name,
     update_last_accessed,
 )
+from db import query, query_dicts
 
 from .models import (
     ComparisonCreate,
@@ -35,10 +35,7 @@ router = APIRouter(prefix="/api/v1", tags=["api"])
 MAX_ROWS = 200
 
 UPLOADS_PATH = os.getenv("UPLOADS_PATH", "uploads")
-DB_PATH = os.getenv("DB_PATH", "comparisons.db")
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 cookie_sec = APIKeyCookie(name="session")
 
@@ -139,26 +136,20 @@ async def list_comparisons():
     - Expiration settings
     - Creation and last accessed timestamps
     """
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    c = conn.cursor()
-
-    c.execute(
-        "SELECT id, name, show_name, total_rows, total_columns, expiration_type, expiration_days, created_at, last_accessed "  # noqa: E501
-        "FROM comparisons ORDER BY created_at DESC"
+    rows = query_dicts(
+        (
+            "SELECT id, name, show_name, total_rows, total_columns, "
+            "expiration_type, expiration_days, created_at, last_accessed "
+            "FROM comparisons ORDER BY created_at DESC"
+        )
     )
     comparisons = []
-
-    for row in c.fetchall():
+    for row in rows:
         comparison_id = row["id"]
-        c.execute("SELECT tag FROM tags WHERE comparison_id = ?", (comparison_id,))
-        tags = [tag_row[0] for tag_row in c.fetchall()]
-
-        comparison = dict(row)
-        comparison["tags"] = tags
-        comparisons.append(comparison)
-
-    conn.close()
+        tag_rows = query("SELECT tag FROM tags WHERE comparison_id = ?", (comparison_id,))
+        tags = [t[0] for t in tag_rows]
+        row["tags"] = tags
+        comparisons.append(row)
     return comparisons
 
 
@@ -242,10 +233,7 @@ async def get_comparison_detail(comparison_id: str):
         raise HTTPException(status_code=404, detail="Comparison not found")
 
     # Get image positions and metadata
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-
-    c.execute(
+    rows = query(
         """
         SELECT ip.filename, ip.column_position, ip.row_number,
                im.original_filename, im.image_size, im.custom_name
@@ -260,7 +248,7 @@ async def get_comparison_detail(comparison_id: str):
     )
 
     images = []
-    for row in c.fetchall():
+    for row in rows:
         filename, column, row_num, original_filename, image_size, custom_name = row
         images.append(
             {
@@ -272,8 +260,6 @@ async def get_comparison_detail(comparison_id: str):
                 "column": column,
             }
         )
-
-    conn.close()
 
     # Add images to the response
     comparison_data["images"] = images
@@ -297,16 +283,12 @@ async def update_image_metadata(comparison_id: str, filename: str, update_data: 
         raise HTTPException(status_code=404, detail="Comparison not found")
 
     # Check if file exists
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute(
+    rows = query(
         "SELECT filename FROM image_metadata WHERE comparison_id = ? AND filename = ?",
         (comparison_id, filename),
     )
-    if not c.fetchone():
-        conn.close()
+    if not rows:
         raise HTTPException(status_code=404, detail="Image not found")
-    conn.close()
 
     # Update custom name
     update_image_custom_name(comparison_id, filename, update_data.custom_name)
@@ -325,11 +307,8 @@ async def delete_user_comparison(comparison_id: str, request: Request):
         return JSONResponse(status_code=401, content={"error": "Authentication required"})
 
     # Check if the comparison exists and belongs to the user
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute("SELECT user_id FROM comparisons WHERE id = ?", (comparison_id,))
-    result = c.fetchone()
-    conn.close()
+    rows = query("SELECT user_id FROM comparisons WHERE id = ?", (comparison_id,))
+    result = rows[0] if rows else None
 
     if not result or result[0] != user["id"]:
         return JSONResponse(
@@ -436,7 +415,8 @@ async def api_upload_image(
     comparison_dir = Path(UPLOADS_PATH) / comparison_id
     comparison_dir.mkdir(parents=True, exist_ok=True)
 
-    file_ext = Path(file.filename).suffix
+    safe_name = file.filename or ""
+    file_ext = Path(safe_name).suffix
     unique_filename = f"{uuid.uuid4()}{file_ext}"
     file_path = comparison_dir / unique_filename
 

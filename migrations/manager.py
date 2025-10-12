@@ -1,10 +1,10 @@
 import os
-import sqlite3
 import importlib
 import logging
 from pathlib import Path
 from datetime import datetime
 
+from db import autoincrement_pk_sql, bool_default, connect, execute, query_one, cursor_adapter
 logger = logging.getLogger(__name__)
 
 class MigrationManager:
@@ -14,14 +14,11 @@ class MigrationManager:
         
     def get_current_version(self):
         """Get the current database version"""
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            try:
-                cursor.execute('SELECT version FROM migrations ORDER BY id DESC LIMIT 1')
-                result = cursor.fetchone()
-                return result[0] if result else None
-            except sqlite3.OperationalError:
-                return None
+        try:
+            row = query_one('SELECT version FROM migrations ORDER BY id DESC LIMIT 1')
+            return row[0] if row else None
+        except Exception:
+            return None
 
     def get_available_migrations(self):
         """Get list of available migration files"""
@@ -36,45 +33,54 @@ class MigrationManager:
         """Apply a single migration"""
         module_name = f"migrations.versions.{migration_path.stem}"
         migration = importlib.import_module(module_name)
-        
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            try:
-                # Create migrations table if it doesn't exist
-                cursor.execute('''
+        try:
+            # Create migrations table if it doesn't exist (backend-specific PK)
+            execute(
+                f'''
                     CREATE TABLE IF NOT EXISTS migrations (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        id {autoincrement_pk_sql()},
                         version TEXT NOT NULL,
                         name TEXT NOT NULL,
                         applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        success BOOLEAN DEFAULT 0
+                        success BOOLEAN {bool_default(False)}
                     )
-                ''')
-                
-                # Apply migration
-                migration.upgrade(cursor)
-                
-                # Record successful migration
-                cursor.execute(
+                '''
+            )
+
+            # For Postgres, ensure the success column has a valid boolean default
+            try:
+                with connect() as (conn, cursor):
+                    cursor.execute("ALTER TABLE migrations ALTER COLUMN success SET DEFAULT FALSE")
+                    conn.commit()
+            except Exception:
+                # Ignore if not Postgres or already correct
+                pass
+
+            # Apply migration using a disposable connection/cursor
+            with cursor_adapter() as (conn, ac):
+                migration.upgrade(ac)
+                ac.execute(
                     'INSERT INTO migrations (version, name, success) VALUES (?, ?, ?)',
                     (version, migration_path.stem, True)
                 )
                 conn.commit()
-                logger.info(f"Successfully applied migration: {version}")
-                return True
-            except Exception as e:
-                logger.error(f"Failed to apply migration {version}: {str(e)}")
-                conn.rollback()
-                return False
+            logger.info("Successfully applied migration: %s", version)
+            return True
+        except Exception as e:
+            logger.error("Failed to apply migration %s: %s", version, str(e))
+            return False
 
     def migrate(self, db_path=None):
         """Run all pending migrations"""
         self.db_path = db_path or os.getenv('DB_PATH', 'comparisons.db')
+        # Ensure adapter picks up the intended SQLite path
+        if db_path:
+            os.environ['DB_PATH'] = str(db_path)
         current = self.get_current_version()
         available = self.get_available_migrations()
         
         for version, migration_path in available:
             if not current or version > current:
-                logger.info(f"Applying migration: {version}")
+                logger.info("Applying migration: %s", version)
                 if not self.apply_migration(version, migration_path):
                     break

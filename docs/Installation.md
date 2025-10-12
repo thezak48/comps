@@ -35,3 +35,16 @@ docker-compose up -d
    uvicorn main:app --host 0.0.0.0 --port 8000
    ```
 5. Access the application at http://localhost:8000
+
+## Database configuration
+
+By default, Comps uses SQLite and stores data in `comparisons.db`.
+
+To use PostgreSQL instead:
+
+- Install dependencies: psycopg (included in requirements.txt)
+- Set environment variables:
+  - `DB_BACKEND=postgres`
+  - `DATABASE_URL=postgresql://user:pass@host:5432/dbname`
+
+Migrations are applied automatically at startup.
