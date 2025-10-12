@@ -47,6 +47,49 @@ def _convert_placeholders(sql: str) -> str:
 
 
 @contextmanager
+def cursor_adapter():
+    """Yield a connection and a cursor that auto-convert placeholders.
+
+    Use this when you need a raw cursor but still want portable '?' placeholders.
+    Yields: (conn, cursor)
+    """
+    with connect() as (conn, cursor):
+
+        class AdapterCursor:
+            def __init__(self, real):
+                self._c = real
+
+            def execute(self, sql, params=None):
+                sql_conv = _convert_placeholders(sql)
+                if params is None:
+                    return self._c.execute(sql_conv)
+                return self._c.execute(sql_conv, params)
+
+            def executemany(self, sql, seq_of_params):
+                sql_conv = _convert_placeholders(sql)
+                return self._c.executemany(sql_conv, seq_of_params)
+
+            def fetchone(self):
+                return self._c.fetchone()
+
+            def fetchall(self):
+                return self._c.fetchall()
+
+            @property
+            def rowcount(self):
+                return self._c.rowcount
+
+            @property
+            def lastrowid(self):
+                return getattr(self._c, "lastrowid", None)
+
+            def __getattr__(self, item):
+                return getattr(self._c, item)
+
+        yield conn, AdapterCursor(cursor)
+
+
+@contextmanager
 def connect(dict_rows: bool = False):
     """Context manager yielding a DB connection and cursor.
 

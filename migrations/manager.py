@@ -4,7 +4,7 @@ import logging
 from pathlib import Path
 from datetime import datetime
 
-from db import autoincrement_pk_sql, bool_default, connect, execute, query_one
+from db import autoincrement_pk_sql, bool_default, connect, execute, query_one, cursor_adapter
 logger = logging.getLogger(__name__)
 
 class MigrationManager:
@@ -57,50 +57,17 @@ class MigrationManager:
                 pass
 
             # Apply migration using a disposable connection/cursor
-            with connect() as (conn, cursor):
-                # Wrap cursor to translate placeholders on Postgres
-                class AdapterCursor:
-                    def __init__(self, real):
-                        self._c = real
-
-                    def execute(self, sql, params=None):
-                        from db import _convert_placeholders
-
-                        sql_conv = _convert_placeholders(sql)
-                        if params is None:
-                            return self._c.execute(sql_conv)
-                        return self._c.execute(sql_conv, params)
-
-                    def executemany(self, sql, seq_of_params):
-                        from db import _convert_placeholders
-
-                        sql_conv = _convert_placeholders(sql)
-                        return self._c.executemany(sql_conv, seq_of_params)
-
-                    def fetchone(self):
-                        return self._c.fetchone()
-
-                    def fetchall(self):
-                        return self._c.fetchall()
-
-                    @property
-                    def rowcount(self):
-                        return self._c.rowcount
-
-                    def __getattr__(self, item):
-                        return getattr(self._c, item)
-
-                ac = AdapterCursor(cursor)
+            with cursor_adapter() as (conn, ac):
                 migration.upgrade(ac)
                 ac.execute(
                     'INSERT INTO migrations (version, name, success) VALUES (?, ?, ?)',
                     (version, migration_path.stem, True)
                 )
                 conn.commit()
-            logger.info(f"Successfully applied migration: {version}")
+            logger.info("Successfully applied migration: %s", version)
             return True
         except Exception as e:
-            logger.error(f"Failed to apply migration {version}: {str(e)}")
+            logger.error("Failed to apply migration %s: %s", version, str(e))
             return False
 
     def migrate(self, db_path=None):
@@ -114,6 +81,6 @@ class MigrationManager:
         
         for version, migration_path in available:
             if not current or version > current:
-                logger.info(f"Applying migration: {version}")
+                logger.info("Applying migration: %s", version)
                 if not self.apply_migration(version, migration_path):
                     break

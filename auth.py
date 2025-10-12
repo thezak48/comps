@@ -28,53 +28,24 @@ cookie_sec = APIKeyCookie(name="session")
 api_key_header = APIKeyHeader(name="Authorization", auto_error=False)
 
 
-from db import connect  # noqa: E402
+from db import cursor_adapter  # noqa: E402
+
+
+# --- Small utilities to avoid duplication ---
+def _fmt_dt(v: Any) -> str:
+    """Format a datetime-like value as a string consistently across backends."""
+    try:
+        return v.strftime("%Y-%m-%d %H:%M:%S") if hasattr(v, "strftime") else str(v)
+    except Exception:
+        return str(v)
 
 
 @contextmanager
 def get_db_cursor() -> Generator[Any, None, None]:
     """Context manager for a database cursor (backend-agnostic)."""
-    with connect() as (conn, cursor):
-        # Wrap cursor to translate '?' placeholders on Postgres
-        class AdapterCursor:
-            def __init__(self, real):
-                self._c = real
-
-            def execute(self, sql, params=None):
-                from db import _convert_placeholders  # local import to avoid cycles
-
-                sql_conv = _convert_placeholders(sql)
-                if params is None:
-                    return self._c.execute(sql_conv)
-                return self._c.execute(sql_conv, params)
-
-            def executemany(self, sql, seq_of_params):
-                from db import _convert_placeholders
-
-                sql_conv = _convert_placeholders(sql)
-                return self._c.executemany(sql_conv, seq_of_params)
-
-            def fetchone(self):
-                return self._c.fetchone()
-
-            def fetchall(self):
-                return self._c.fetchall()
-
-            @property
-            def rowcount(self):
-                return self._c.rowcount
-
-            @property
-            def lastrowid(self):
-                # psycopg3: lastrowid is None for non-SQLite; keep attribute if present
-                return getattr(self._c, "lastrowid", None)
-
-            def __getattr__(self, item):
-                return getattr(self._c, item)
-
-        ac = AdapterCursor(cursor)
+    with cursor_adapter() as (conn, cur):
         try:
-            yield ac
+            yield cur
             conn.commit()
         except Exception:
             conn.rollback()
@@ -238,16 +209,10 @@ def get_user_invitation_codes(user_id: int) -> list:
         )
         codes = cursor.fetchall()
 
-        def _to_str_dt(v):
-            try:
-                return v.strftime("%Y-%m-%d %H:%M:%S") if hasattr(v, "strftime") else str(v)
-            except Exception:
-                return str(v)
-
         return [
             {
                 "code": row[0],
-                "created_at": _to_str_dt(row[1]),
+                "created_at": _fmt_dt(row[1]),
                 "used_by": row[2],
                 "is_used": bool(row[3]),
             }
@@ -276,19 +241,13 @@ def get_all_users() -> list:
         )
         rows = cursor.fetchall()
 
-        def _to_str_dt(v):
-            try:
-                return v.strftime("%Y-%m-%d %H:%M:%S") if hasattr(v, "strftime") else str(v)
-            except Exception:
-                return str(v)
-
         users = [
             {
                 "id": row[0],
                 "username": row[1],
                 "is_admin": bool(row[2]),
                 "is_super_admin": bool(row[3]),
-                "created_at": _to_str_dt(row[4]),
+                "created_at": _fmt_dt(row[4]),
             }
             for row in rows
         ]
@@ -332,19 +291,13 @@ def get_user_api_keys(user_id: int) -> list:
         )
         rows = cursor.fetchall()
 
-        def _to_str_dt(v):
-            try:
-                return v.strftime("%Y-%m-%d %H:%M:%S") if hasattr(v, "strftime") else str(v)
-            except Exception:
-                return str(v)
-
         return [
             {
                 "id": row[0],
                 "key_name": row[1],
                 "key_prefix": row[2],
-                "created_at": _to_str_dt(row[3]),
-                "last_used_at": (_to_str_dt(row[4]) if row[4] is not None else None),
+                "created_at": _fmt_dt(row[3]),
+                "last_used_at": (_fmt_dt(row[4]) if row[4] is not None else None),
             }
             for row in rows
         ]
