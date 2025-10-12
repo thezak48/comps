@@ -1,4 +1,5 @@
 """Add last_accessed column and expiration settings to comparisons table"""
+from db import backend_name
 
 def upgrade(cursor):
     # Add last_accessed column to comparisons table

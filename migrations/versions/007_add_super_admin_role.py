@@ -10,24 +10,36 @@ Create Date: 2025-07-13 12:00:00
 revision = '007'
 down_revision = '006_add_user_authentication'
 
+from db import bool_default, backend_name
+
 def upgrade(cursor):
     """Add is_super_admin column and set the first admin as super admin"""
-    try:
-        # Add is_super_admin column to users table
-        cursor.execute('ALTER TABLE users ADD COLUMN is_super_admin BOOLEAN DEFAULT 0')
-        
-        # Find the first user (who is the admin) and make them a super admin
-        cursor.execute('UPDATE users SET is_super_admin = 1 WHERE id = 1')
-        
-    except Exception as e:
-        # This might fail if the column already exists, which is fine for development.
-        # For a real production environment, more careful checks would be needed.
-        print(f"Could not add is_super_admin column, it might already exist: {e}")
+    # Add is_super_admin column to users table (idempotent per backend)
+    if backend_name() == "postgres":
+        cursor.execute(
+            f"""
+            ALTER TABLE users
+            ADD COLUMN IF NOT EXISTS is_super_admin BOOLEAN {bool_default(False)}
+            """
+        )
+    else:
+        # SQLite: check current schema first to avoid exception on re-run
+        cursor.execute("PRAGMA table_info(users)")
+        cols = [row[1] for row in cursor.fetchall()]
+        if 'is_super_admin' not in cols:
+            cursor.execute(
+                f"""
+                ALTER TABLE users ADD COLUMN is_super_admin BOOLEAN {bool_default(False)}
+                """
+            )
+
+    # Make the first user a super admin (use boolean value, not integer)
+    cursor.execute('UPDATE users SET is_super_admin = ? WHERE id = ?', (True, 1))
 
 
-def downgrade(cursor):
-    """Remove is_super_admin column"""
-    # SQLite doesn't easily support dropping columns.
-    # A more complex migration with table recreation would be needed for a true downgrade.
-    # For this project, we will leave this empty.
-    pass
+def downgrade(_cursor):
+    """No-op downgrade.
+
+    SQLite doesn't easily support dropping columns. A true downgrade would
+    require table recreation, which we intentionally skip here.
+    """

@@ -8,7 +8,6 @@ import asyncio
 import logging
 import os
 import random
-import sqlite3
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -31,6 +30,7 @@ from database import (
     update_last_accessed,
 )
 from database_metrics import get_metrics
+from db import backend_name, connect, query_dicts
 
 
 # Random name generator for comparisons
@@ -179,46 +179,26 @@ async def cleanup_old_comparisons():
     """
     while True:
         try:
-            # Check if last_accessed column exists
-            conn = sqlite3.connect(DB_PATH)
-            c = conn.cursor()
-            c.execute("PRAGMA table_info(comparisons)")
-            columns = [col[1] for col in c.fetchall()]
-            conn.close()
-
-            if "last_accessed" in columns:
-                logger.info("Starting cleanup of comparisons older than %s days", RETENTION_DAYS)
-                try:
-                    expired_ids = get_expired_comparisons(RETENTION_DAYS)
-
-                    if expired_ids:
-                        logger.info("Found %s expired comparisons to delete", len(expired_ids))
-                        for comparison_id in expired_ids:
-                            try:
-                                logger.info("Deleting comparison %s", comparison_id)
-                                delete_comparison(comparison_id, UPLOADS_PATH)
-                            except OSError as e:
-                                logger.error(
-                                    "Error deleting comparison %s: %s",
-                                    comparison_id,
-                                    str(e),
-                                )
-                    else:
-                        logger.info("No expired comparisons found")
-                except sqlite3.OperationalError as e:
-                    if "no such column" in str(e):
-                        logger.warning(
-                            "Skipping cleanup: %s. Migrations may not be complete.",
+            logger.info("Starting cleanup of comparisons older than %s days", RETENTION_DAYS)
+            expired_ids = get_expired_comparisons(RETENTION_DAYS)
+            if expired_ids:
+                logger.info("Found %s expired comparisons to delete", len(expired_ids))
+                for comparison_id in expired_ids:
+                    try:
+                        logger.info("Deleting comparison %s", comparison_id)
+                        delete_comparison(comparison_id, UPLOADS_PATH)
+                    except OSError as e:
+                        logger.error(
+                            "Error deleting comparison %s: %s",
+                            comparison_id,
                             str(e),
                         )
-                    else:
-                        logger.error("Error in cleanup task: %s", str(e))
             else:
-                logger.info("Skipping cleanup: last_accessed column not found in database")
+                logger.info("No expired comparisons found")
 
             # Run once a day
             await asyncio.sleep(86400)  # 24 hours in seconds
-        except (sqlite3.Error, OSError) as e:
+        except OSError as e:
             logger.error("Error in cleanup task: %s", str(e))
             # If there's an error, wait a bit before trying again
             await asyncio.sleep(3600)  # 1 hour in seconds
@@ -232,32 +212,11 @@ async def start_cleanup_task():
     background_tasks.add(task)
 
     # Check if database migrations are complete
+    # Best-effort schema presence check
     try:
-        conn = sqlite3.connect(DB_PATH)
-        c = conn.cursor()
-
-        # Check if the migrations table exists and has entries
-        c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='migrations'")
-        if not c.fetchone():
-            logger.warning(
-                "Migrations table does not exist. Database may not be properly initialized."
-            )
-        else:
-            # Check if last_accessed column exists in comparisons table
-            c.execute("PRAGMA table_info(comparisons)")
-            columns = [col[1] for col in c.fetchall()]
-            if "last_accessed" not in columns:
-                logger.warning(
-                    "Database schema is missing expected columns. Migrations may not be complete."
-                )
-                logger.warning(
-                    "The application may not function correctly until migrations are completed."
-                )
-
-        logger.info("Database initialized successfully")
-
-        conn.close()
-    except sqlite3.Error as e:
+        rows = query_dicts("SELECT 1 as ok")
+        logger.info("Database initialized successfully (%s)", backend_name())
+    except Exception as e:
         logger.error("Error checking database state: %s", str(e))
 
 
@@ -472,11 +431,7 @@ async def view_comparison(request: Request, comparison_id: str):
         return JSONResponse(status_code=404, content={"error": "Comparison not found"})
 
     # Get image positions
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    c = conn.cursor()
-
-    c.execute(
+    rows = query_dicts(
         """
         SELECT ip.filename, ip.row_number, ip.column_position,
                im.original_filename, im.image_size, im.custom_name
@@ -493,13 +448,11 @@ async def view_comparison(request: Request, comparison_id: str):
     image_names = []
     image_sizes = []
 
-    for row in c.fetchall():
+    for row in rows:
         images.append(f"{comparison_id}/{row['filename']}")
         # Use custom name if available, otherwise use original filename
-        image_names.append(row["custom_name"] or row["original_filename"])
-        image_sizes.append(row["image_size"])
-
-    conn.close()
+        image_names.append(row.get("custom_name") or row.get("original_filename"))
+        image_sizes.append(row.get("image_size"))
 
     # Calculate expiration date
     expiration_date = datetime.now() + timedelta(days=comparison.get("expiration_days", 7))

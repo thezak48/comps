@@ -9,9 +9,10 @@ def upgrade(cursor):
 
 def downgrade(cursor):
     # Create a new table without the custom_name column
-    cursor.execute('''
+    from db import autoincrement_pk_sql
+    cursor.execute(f'''
         CREATE TABLE image_metadata_backup (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id {autoincrement_pk_sql()},
             comparison_id TEXT NOT NULL,
             filename TEXT NOT NULL,
             original_filename TEXT,

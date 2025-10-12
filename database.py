@@ -1,10 +1,10 @@
 import os
 import shutil
-import sqlite3
 from datetime import datetime, timedelta
 from typing import List, Optional
 
 from migrations.manager import MigrationManager
+from db import backend_name, connect, execute, query, query_one
 
 DB_PATH = os.getenv("DB_PATH", "comparisons.db")
 
@@ -23,10 +23,11 @@ def create_comparison(
     metadata: dict,
     user_id: Optional[int] = None,
 ):
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-
-    c.execute(
+    # Insert
+    never_expire_initial = False
+    if metadata.get("never_expire") is not None:
+        never_expire_initial = bool(metadata.get("never_expire"))
+    execute(
         """
         INSERT INTO comparisons (
             id, name, show_name, total_rows, total_columns,
@@ -41,69 +42,55 @@ def create_comparison(
             metadata.get("total_columns", 2),
             metadata.get("expiration_type", "from_last_access"),
             int(metadata.get("expiration_days", 7)),
-            0,
+            never_expire_initial,
         ),
     )
 
     # Set default expiration based on metadata
     if metadata.get("never_expire") is not None:
-        c.execute(
+        execute(
             "UPDATE comparisons SET never_expire = ? WHERE id = ?",
-            (1 if metadata.get("never_expire") else 0, comparison_id),
+            (bool(metadata.get("never_expire")), comparison_id),
         )
 
     # If user is authenticated, associate the comparison with them
     # and set never_expire if applicable
     if user_id is not None:
-        c.execute("UPDATE comparisons SET user_id = ? WHERE id = ?", (user_id, comparison_id))
-        c.execute("SELECT never_expire_comparisons FROM users WHERE id = ?", (user_id,))
-        user_never_expire_setting = c.fetchone()
+        execute("UPDATE comparisons SET user_id = ? WHERE id = ?", (user_id, comparison_id))
+        row = query_one("SELECT never_expire_comparisons FROM users WHERE id = ?", (user_id,))
+        user_never_expire_setting = row
         if user_never_expire_setting and user_never_expire_setting[0]:
             # If the user's setting is to never expire,
             # and the comparison isn't explicitly set to expire
             if metadata.get("never_expire") is None or metadata.get("never_expire") is True:
-                c.execute(
-                    "UPDATE comparisons SET never_expire = 1 WHERE id = ?",
-                    (comparison_id,),
+                execute(
+                    "UPDATE comparisons SET never_expire = ? WHERE id = ?",
+                    (True, comparison_id),
                 )
 
     if tags:
         for tag in tags:
-            c.execute(
+            execute(
                 "INSERT INTO tags (comparison_id, tag) VALUES (?, ?)",
                 (comparison_id, tag),
             )
 
-    conn.commit()
-    conn.close()
 
 
 def update_last_accessed(comparison_id: str):
     """Update the last_accessed timestamp for a comparison"""
     try:
-        conn = sqlite3.connect(DB_PATH)
-        c = conn.cursor()
-
-        # Check if last_accessed column exists
-        c.execute("PRAGMA table_info(comparisons)")
-        columns = [col[1] for col in c.fetchall()]
-
-        if "last_accessed" in columns:
-            c.execute(
-                "UPDATE comparisons SET last_accessed = CURRENT_TIMESTAMP WHERE id = ?",
-                (comparison_id,),
-            )
+        # PRAGMA not portable; attempt update and ignore if column missing
+        execute(
+            "UPDATE comparisons SET last_accessed = CURRENT_TIMESTAMP WHERE id = ?",
+            (comparison_id,),
+        )
     except Exception as e:
         print(f"Error updating last_accessed: {str(e)}")
-    conn.commit()
-    conn.close()
 
 
 def get_comparison(comparison_id: str):
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-
-    c.execute(
+    rows = query(
         """
         SELECT id, name, show_name, total_rows, total_columns,
                expiration_type, expiration_days, created_at, last_accessed
@@ -111,18 +98,17 @@ def get_comparison(comparison_id: str):
         """,
         (comparison_id,),
     )
-    comparison = c.fetchone()
+    comparison = rows[0] if rows else None
 
     if comparison:
-        c.execute("SELECT tag FROM tags WHERE comparison_id = ?", (comparison_id,))
-        tags = [row[0] for row in c.fetchall()]
+        tag_rows = query("SELECT tag FROM tags WHERE comparison_id = ?", (comparison_id,))
+        tags = [row[0] for row in tag_rows]
 
         # Get user information if available
-        c.execute(
+        user_info = query_one(
             "SELECT user_id, never_expire FROM comparisons WHERE id = ?",
             (comparison_id,),
         )
-        user_info = c.fetchone()
         user_id, never_expire = user_info if user_info else (None, 0)
 
         return {
@@ -145,47 +131,51 @@ def get_comparison(comparison_id: str):
 
 def get_user_comparisons(user_id: int) -> List[dict]:
     """Get all comparisons created by a specific user."""
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-
-    c.execute(
-        "SELECT id, name, show_name, created_at, last_accessed,"
-        "never_expire FROM comparisons WHERE user_id = ? ORDER BY last_accessed DESC",
+    rows = query(
+        "SELECT id, name, show_name, created_at, last_accessed, never_expire FROM comparisons WHERE user_id = ? ORDER BY last_accessed DESC",
         (user_id,),
     )
 
     comparisons = []
-    for row in c.fetchall():
+    for row in rows:
+        def _to_str_dt(v):
+            try:
+                return v.strftime("%Y-%m-%d %H:%M:%S") if hasattr(v, "strftime") else str(v)
+            except Exception:
+                return str(v)
         comparisons.append(
             {
                 "id": row[0],
                 "name": row[1],
                 "show_name": row[2],
-                "created_at": row[3],
-                "last_accessed": row[4],
+                "created_at": _to_str_dt(row[3]),
+                "last_accessed": (_to_str_dt(row[4]) if row[4] is not None else None),
                 "never_expire": bool(row[5]),
             }
         )
-
-    conn.close()
     return comparisons
 
 
 def store_image_position(comparison_id: str, filename: str, row_number: int, column_position: int):
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-
-    c.execute(
-        """
-        INSERT OR REPLACE INTO image_positions (
-            comparison_id, filename, row_number, column_position
-        ) VALUES (?, ?, ?, ?)
-        """,
-        (comparison_id, filename, row_number, column_position),
-    )
-
-    conn.commit()
-    conn.close()
+    # Emulate SQLite's INSERT OR REPLACE in Postgres by delete + insert
+    if backend_name() == "postgres":
+        execute(
+            "DELETE FROM image_positions WHERE comparison_id = ? AND filename = ? AND row_number = ? AND column_position = ?",
+            (comparison_id, filename, row_number, column_position),
+        )
+        execute(
+            "INSERT INTO image_positions (comparison_id, filename, row_number, column_position) VALUES (?, ?, ?, ?)",
+            (comparison_id, filename, row_number, column_position),
+        )
+    else:
+        execute(
+            """
+            INSERT OR REPLACE INTO image_positions (
+                comparison_id, filename, row_number, column_position
+            ) VALUES (?, ?, ?, ?)
+            """,
+            (comparison_id, filename, row_number, column_position),
+        )
 
 
 def store_image_metadata(
@@ -200,59 +190,26 @@ def store_image_metadata(
         original_filename: The original filename as uploaded by the user
         image_size: The size of the image (formatted string)
     """
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-
-    # Check if the table exists (should be created by migrations)
-    c.execute(
-        """
-        SELECT name FROM sqlite_master WHERE type='table' AND name='image_metadata'
-    """
-    )
-    if not c.fetchone():
-        # Create table if it doesn't exist (fallback)
-        c.execute(
-            """
-            CREATE TABLE IF NOT EXISTS image_metadata (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                comparison_id TEXT NOT NULL,
-                filename TEXT NOT NULL,
-                original_filename TEXT,
-                image_size TEXT,
-                custom_name TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (comparison_id) REFERENCES comparisons (id)
-            )
-        """
+    # Store the metadata (table expected from migrations)
+    if backend_name() == "postgres":
+        # Replace existing row for same (comparison_id, filename)
+        execute(
+            "DELETE FROM image_metadata WHERE comparison_id = ? AND filename = ?",
+            (comparison_id, filename),
         )
-
-        # Create indices for performance
-        c.execute(
-            """
-            CREATE INDEX IF NOT EXISTS idx_image_metadata_comparison
-            ON image_metadata(comparison_id)
-        """
+        execute(
+            "INSERT INTO image_metadata (comparison_id, filename, original_filename, image_size) VALUES (?, ?, ?, ?)",
+            (comparison_id, filename, original_filename, image_size),
         )
-
-        c.execute(
+    else:
+        execute(
             """
-            CREATE INDEX IF NOT EXISTS idx_image_metadata_filename
-            ON image_metadata(filename)
-        """
+            INSERT OR REPLACE INTO image_metadata (
+                comparison_id, filename, original_filename, image_size
+            ) VALUES (?, ?, ?, ?)
+            """,
+            (comparison_id, filename, original_filename, image_size),
         )
-
-    # Store the metadata
-    c.execute(
-        """
-        INSERT OR REPLACE INTO image_metadata (
-            comparison_id, filename, original_filename, image_size
-        ) VALUES (?, ?, ?, ?)
-        """,
-        (comparison_id, filename, original_filename, image_size),
-    )
-
-    conn.commit()
-    conn.close()
 
 
 def update_image_custom_name(comparison_id: str, filename: str, custom_name: str):
@@ -264,16 +221,10 @@ def update_image_custom_name(comparison_id: str, filename: str, custom_name: str
         filename: The UUID-based filename in the filesystem
         custom_name: The custom name provided by the user
     """
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-
-    c.execute(
+    execute(
         "UPDATE image_metadata SET custom_name = ? WHERE comparison_id = ? AND filename = ?",
         (custom_name, comparison_id, filename),
     )
-
-    conn.commit()
-    conn.close()
 
 
 def get_expired_comparisons(retention_days: int):
@@ -286,78 +237,67 @@ def get_expired_comparisons(retention_days: int):
     Returns:
         List of comparison IDs that are older than the retention period
     """
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
     expired_ids = []
 
     try:
-        # Check if expiration columns exist
-        c.execute("PRAGMA table_info(comparisons)")
-        columns = [col[1] for col in c.fetchall()]
-
-        if (
-            "last_accessed" in columns
-            and "expiration_type" in columns
-            and "expiration_days" in columns
-        ):
-            # Get all comparisons with their expiration settings
-            c.execute(
-                """
-                SELECT id, expiration_type, expiration_days, created_at,
-                       last_accessed, never_expire
-                FROM comparisons
-                """
+        # Get all comparisons with their expiration settings; if columns missing, will error and fall back
+        comparisons = query(
+            """
+            SELECT id, expiration_type, expiration_days, created_at,
+                   last_accessed, never_expire
+            FROM comparisons
+            """
+        )
+        print(f"Checking for expired comparisons with retention_days={retention_days}")
+        print(f"Found {len(comparisons)} comparisons to check for expiration")
+        current_time = datetime.now()
+        for (
+            comp_id,
+            exp_type,
+            exp_days,
+            created_at,
+            last_accessed,
+            never_expire,
+        ) in comparisons:
+            # Use comparison's own expiration days if available, otherwise use default
+            days = exp_days if exp_days is not None else retention_days
+            print(
+                f"Checking comparison {comp_id}: type={exp_type}, days={days}, created={created_at}, last_accessed={last_accessed}"  # noqa: E501
             )
-            comparisons = c.fetchall()
 
-            print(f"Checking for expired comparisons with retention_days={retention_days}")
-            print(f"Found {len(comparisons)} comparisons to check for expiration")
-            current_time = datetime.now()
-            for (
-                comp_id,
-                exp_type,
-                exp_days,
-                created_at,
-                last_accessed,
-                never_expire,
-            ) in comparisons:
-                # Use comparison's own expiration days if available, otherwise use default
-                days = exp_days if exp_days is not None else retention_days
-                print(
-                    f"Checking comparison {comp_id}: type={exp_type}, days={days}, created={created_at}, last_accessed={last_accessed}"  # noqa: E501
+            # Check if this comparison is marked as never expire
+            if never_expire:
+                print(f"  Comparison {comp_id} is marked as never expire, skipping")
+                continue
+
+            if exp_type == "from_creation" and created_at:
+                # Support both string and datetime types across backends
+                created_dt = (
+                    created_at if isinstance(created_at, datetime) else datetime.strptime(created_at, "%Y-%m-%d %H:%M:%S")
                 )
-
-                # Check if this comparison is marked as never expire
-                if never_expire:
-                    print(f"  Comparison {comp_id} is marked as never expire, skipping")
-                    continue
-
-                if exp_type == "from_creation" and created_at:
-                    cutoff_date = datetime.strptime(created_at, "%Y-%m-%d %H:%M:%S") + timedelta(
-                        days=days
-                    )
-                    print(
-                        f"  From creation: cutoff={cutoff_date}, current={current_time}, expired={current_time > cutoff_date}"  # noqa: E501
-                    )
-                    if current_time > cutoff_date:
-                        expired_ids.append(comp_id)
-                elif exp_type == "from_last_access" and last_accessed:
-                    cutoff_date = datetime.strptime(last_accessed, "%Y-%m-%d %H:%M:%S") + timedelta(
-                        days=days
-                    )
-                    print(
-                        f"  From last access: cutoff={cutoff_date}, current={current_time}, expired={current_time > cutoff_date}"  # noqa: E501
-                    )
-                    if current_time > cutoff_date:
-                        expired_ids.append(comp_id)
-        else:
-            # If column doesn't exist, return empty list
-            expired_ids = []
+                cutoff_date = created_dt + timedelta(
+                    days=days
+                )
+                print(
+                    f"  From creation: cutoff={cutoff_date}, current={current_time}, expired={current_time > cutoff_date}"  # noqa: E501
+                )
+                if current_time > cutoff_date:
+                    expired_ids.append(comp_id)
+            elif exp_type == "from_last_access" and last_accessed:
+                last_dt = (
+                    last_accessed if isinstance(last_accessed, datetime) else datetime.strptime(last_accessed, "%Y-%m-%d %H:%M:%S")
+                )
+                cutoff_date = last_dt + timedelta(
+                    days=days
+                )
+                print(
+                    f"  From last access: cutoff={cutoff_date}, current={current_time}, expired={current_time > cutoff_date}"  # noqa: E501
+                )
+                if current_time > cutoff_date:
+                    expired_ids.append(comp_id)
     except Exception as e:
         print(f"Error getting expired comparisons: {str(e)}")
         expired_ids = []
-    finally:
-        conn.close()
     return expired_ids
 
 
@@ -369,17 +309,11 @@ def delete_comparison(comparison_id: str, uploads_path: str):
         comparison_id: The UUID of the comparison to delete
         uploads_path: Path to the uploads directory
     """
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-
     # Delete all related records
-    c.execute("DELETE FROM image_positions WHERE comparison_id = ?", (comparison_id,))
-    c.execute("DELETE FROM image_metadata WHERE comparison_id = ?", (comparison_id,))
-    c.execute("DELETE FROM tags WHERE comparison_id = ?", (comparison_id,))
-    c.execute("DELETE FROM comparisons WHERE id = ?", (comparison_id,))
-
-    conn.commit()
-    conn.close()
+    execute("DELETE FROM image_positions WHERE comparison_id = ?", (comparison_id,))
+    execute("DELETE FROM image_metadata WHERE comparison_id = ?", (comparison_id,))
+    execute("DELETE FROM tags WHERE comparison_id = ?", (comparison_id,))
+    execute("DELETE FROM comparisons WHERE id = ?", (comparison_id,))
 
     # Delete the comparison directory and all files
     comparison_dir = os.path.join(uploads_path, comparison_id)

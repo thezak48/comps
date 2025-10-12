@@ -1,31 +1,32 @@
+from db import query, query_one
+
+
 def get_metrics():
     import os
-    import sqlite3
     from datetime import datetime, timedelta
-
-    DB_PATH = os.getenv("DB_PATH", "comparisons.db")
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
     metrics = {}
     # Total users
-    c.execute("SELECT COUNT(*) FROM users")
-    metrics["total_users"] = c.fetchone()[0]
+    row = query_one("SELECT COUNT(*) FROM users")
+    metrics["total_users"] = row[0] if row else 0
     # Total comparisons
-    c.execute("SELECT COUNT(*) FROM comparisons")
-    metrics["total_comparisons"] = c.fetchone()[0]
+    row = query_one("SELECT COUNT(*) FROM comparisons")
+    metrics["total_comparisons"] = row[0] if row else 0
     # Total images
-    c.execute("SELECT COUNT(*) FROM image_positions")
-    metrics["total_images"] = c.fetchone()[0]
+    row = query_one("SELECT COUNT(*) FROM image_positions")
+    metrics["total_images"] = row[0] if row else 0
     # Active users (last 7 days)
     week_ago = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d %H:%M:%S")
-    c.execute(
+    row = query_one(
         "SELECT COUNT(DISTINCT user_id) FROM comparisons WHERE created_at >= ?",
         (week_ago,),
     )
-    metrics["active_users_7d"] = c.fetchone()[0]
+    metrics["active_users_7d"] = row[0] if row else 0
     # Comparisons created in last 7 days
-    c.execute("SELECT COUNT(*) FROM comparisons WHERE created_at >= ?", (week_ago,))
-    metrics["comparisons_7d"] = c.fetchone()[0]
+    row = query_one(
+        "SELECT COUNT(*) FROM comparisons WHERE created_at >= ?",
+        (week_ago,),
+    )
+    metrics["comparisons_7d"] = row[0] if row else 0
 
     # --- Date-based metrics for last 14 days ---
     days = 14
@@ -33,7 +34,7 @@ def get_metrics():
     date_labels = [(today - timedelta(days=i)).strftime("%Y-%m-%d") for i in reversed(range(days))]
 
     # Users registered per day
-    c.execute(
+    user_rows = query(
         """
         SELECT DATE(created_at), COUNT(*) FROM users
         WHERE created_at >= ?
@@ -41,11 +42,11 @@ def get_metrics():
         """,
         ((today - timedelta(days=days - 1)).strftime("%Y-%m-%d"),),
     )
-    user_counts = dict(c.fetchall())
+    user_counts = dict(user_rows)
     metrics["users_per_day"] = [user_counts.get(date, 0) for date in date_labels]
 
     # Comparisons created per day
-    c.execute(
+    comp_rows = query(
         """
         SELECT DATE(created_at), COUNT(*) FROM comparisons
         WHERE created_at >= ?
@@ -53,11 +54,11 @@ def get_metrics():
         """,
         ((today - timedelta(days=days - 1)).strftime("%Y-%m-%d"),),
     )
-    comp_counts = dict(c.fetchall())
+    comp_counts = dict(comp_rows)
     metrics["comparisons_per_day"] = [comp_counts.get(date, 0) for date in date_labels]
 
     # Images uploaded per day (by image_positions join comparisons for date)
-    c.execute(
+    img_rows = query(
         """
         SELECT DATE(c.created_at), COUNT(ip.filename)
         FROM image_positions ip
@@ -67,7 +68,7 @@ def get_metrics():
         """,
         ((today - timedelta(days=days - 1)).strftime("%Y-%m-%d"),),
     )
-    img_counts = dict(c.fetchall())
+    img_counts = dict(img_rows)
     metrics["images_per_day"] = [img_counts.get(date, 0) for date in date_labels]
 
     metrics["date_labels"] = date_labels
@@ -84,7 +85,6 @@ def get_metrics():
     metrics["total_images_size_bytes"] = total_size
     metrics["total_images_humansize"] = format_bytes(total_size)
 
-    conn.close()
     return metrics
 
 

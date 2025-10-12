@@ -1,0 +1,49 @@
+version: "3.8"
+
+services:
+  db:
+    image: postgres:16
+    container_name: comps-postgres
+    environment:
+      - POSTGRES_USER=comps
+      - POSTGRES_PASSWORD=compspass
+      - POSTGRES_DB=comps
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U comps -d comps"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  comps:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: comps
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - DB_BACKEND=postgres
+      - DATABASE_URL=postgresql://comps:compspass@db:5432/comps
+      - UPLOADS_PATH=/data/uploads
+      - ADMIN_INVITATION_CODE=your-secure-admin-code
+    volumes:
+      - ./config:/config
+      - ./data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+    driver: local

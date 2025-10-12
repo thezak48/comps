@@ -6,7 +6,6 @@ Handles user authentication, invitation codes, and session management.
 import hashlib
 import os
 import secrets
-import sqlite3
 from contextlib import contextmanager
 from datetime import datetime, timedelta
 from typing import Any, Dict, Generator, Optional
@@ -29,22 +28,57 @@ cookie_sec = APIKeyCookie(name="session")
 api_key_header = APIKeyHeader(name="Authorization", auto_error=False)
 
 
+from db import connect, execute, query, query_one
+
+
 @contextmanager
-def get_db_cursor() -> Generator[sqlite3.Cursor, None, None]:
-    """Context manager for a database cursor."""
-    conn = None
-    try:
-        conn = sqlite3.connect(DB_PATH)
-        yield conn.cursor()
-        conn.commit()
-    except sqlite3.Error as e:
-        print(f"Database error: {e}")
-        if conn:
+def get_db_cursor() -> Generator[Any, None, None]:
+    """Context manager for a database cursor (backend-agnostic)."""
+    with connect() as (conn, cursor):
+        # Wrap cursor to translate '?' placeholders on Postgres
+        class AdapterCursor:
+            def __init__(self, real):
+                self._c = real
+
+            def execute(self, sql, params=None):
+                from db import _convert_placeholders  # local import to avoid cycles
+
+                sql_conv = _convert_placeholders(sql)
+                if params is None:
+                    return self._c.execute(sql_conv)
+                return self._c.execute(sql_conv, params)
+
+            def executemany(self, sql, seq_of_params):
+                from db import _convert_placeholders
+
+                sql_conv = _convert_placeholders(sql)
+                return self._c.executemany(sql_conv, seq_of_params)
+
+            def fetchone(self):
+                return self._c.fetchone()
+
+            def fetchall(self):
+                return self._c.fetchall()
+
+            @property
+            def rowcount(self):
+                return self._c.rowcount
+
+            @property
+            def lastrowid(self):
+                # psycopg3: lastrowid is None for non-SQLite; keep attribute if present
+                return getattr(self._c, "lastrowid", None)
+
+            def __getattr__(self, item):
+                return getattr(self._c, item)
+
+        ac = AdapterCursor(cursor)
+        try:
+            yield ac
+            conn.commit()
+        except Exception:
             conn.rollback()
-        raise
-    finally:
-        if conn:
-            conn.close()
+            raise
 
 
 def hash_invitation_code(code: str) -> str:
@@ -88,26 +122,26 @@ def register_user(username: str, invitation_code: str) -> Optional[Dict[str, Any
                 INSERT INTO users (username, invitation_code_hash, never_expire_comparisons)
                 VALUES (?, ?, ?)
                 """,
-                (username, code_hash, 1),
+                (username, code_hash, True),
             )
-            user_id = cursor.lastrowid
-
+            # Fetch the inserted user's id in a backend-agnostic way
             cursor.execute(
-                """
-                UPDATE invitation_codes SET is_used = 1, used_by = ? WHERE code = ?
-                """,
-                (user_id, invitation_code),
-            )
-
-            cursor.execute(
-                """
-                SELECT id, username, is_admin, never_expire_comparisons FROM users WHERE id = ?
-                """,
-                (user_id,),
+                "SELECT id, username, is_admin, never_expire_comparisons FROM users WHERE username = ?",
+                (username,),
             )
             user = cursor.fetchone()
 
+        # Perform follow-up updates after we have the user row
         if user:
+            user_id = user[0]
+            with get_db_cursor() as cursor:
+                cursor.execute(
+                    """
+                    UPDATE invitation_codes SET is_used = ?, used_by = ? WHERE code = ?
+                    """,
+                    (True, user_id, invitation_code),
+                )
+
             return {
                 "id": user[0],
                 "username": user[1],
@@ -115,7 +149,7 @@ def register_user(username: str, invitation_code: str) -> Optional[Dict[str, Any
                 "never_expire_comparisons": bool(user[3]),
             }
         return None
-    except sqlite3.Error as e:
+    except Exception as e:
         print(f"Database error during registration: {e}")
         return None
 
@@ -184,7 +218,7 @@ async def get_current_user_from_token(token: str) -> Optional[Dict[str, Any]]:
                 "is_super_admin": bool(user[4]),
             }
         return None
-    except (JWTError, sqlite3.Error):
+    except (JWTError, Exception):
         return None
 
 
@@ -193,18 +227,24 @@ def get_user_invitation_codes(user_id: int) -> list:
     with get_db_cursor() as cursor:
         cursor.execute(
             """
-            SELECT code, created_at, used_by
+            SELECT code, created_at, used_by, is_used
             FROM invitation_codes WHERE created_by = ?
             ORDER BY created_at DESC
             """,
             (user_id,),
         )
         codes = cursor.fetchall()
+        def _to_str_dt(v):
+            try:
+                return v.strftime("%Y-%m-%d %H:%M:%S") if hasattr(v, "strftime") else str(v)
+            except Exception:
+                return str(v)
         return [
             {
                 "code": row[0],
-                "created_at": row[1],
-                "is_used": bool(row[2]),
+                "created_at": _to_str_dt(row[1]),
+                "used_by": row[2],
+                "is_used": bool(row[3]),
             }
             for row in codes
         ]
@@ -212,12 +252,12 @@ def get_user_invitation_codes(user_id: int) -> list:
 
 def is_admin(user: dict) -> bool:
     """Check if a user is an admin"""
-    return user and user.get("is_admin", False)
+    return bool(user and user.get("is_admin", False))
 
 
 def is_super_admin(user: dict) -> bool:
     """Check if a user is a super admin"""
-    return user and user.get("is_super_admin", False)
+    return bool(user and user.get("is_super_admin", False))
 
 
 def get_all_users() -> list:
@@ -229,15 +269,21 @@ def get_all_users() -> list:
             FROM users ORDER BY created_at DESC
             """
         )
+        rows = cursor.fetchall()
+        def _to_str_dt(v):
+            try:
+                return v.strftime("%Y-%m-%d %H:%M:%S") if hasattr(v, "strftime") else str(v)
+            except Exception:
+                return str(v)
         users = [
             {
                 "id": row[0],
                 "username": row[1],
                 "is_admin": bool(row[2]),
                 "is_super_admin": bool(row[3]),
-                "created_at": row[4],
+                "created_at": _to_str_dt(row[4]),
             }
-            for row in cursor.fetchall()
+            for row in rows
         ]
     return users
 
@@ -277,16 +323,21 @@ def get_user_api_keys(user_id: int) -> list:
             """,
             (user_id,),
         )
-        keys = cursor.fetchall()
+        rows = cursor.fetchall()
+        def _to_str_dt(v):
+            try:
+                return v.strftime("%Y-%m-%d %H:%M:%S") if hasattr(v, "strftime") else str(v)
+            except Exception:
+                return str(v)
         return [
             {
                 "id": row[0],
                 "key_name": row[1],
                 "key_prefix": row[2],
-                "created_at": row[3],
-                "last_used_at": row[4],
+                "created_at": _to_str_dt(row[3]),
+                "last_used_at": (_to_str_dt(row[4]) if row[4] is not None else None),
             }
-            for row in keys
+            for row in rows
         ]
 
 
