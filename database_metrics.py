@@ -4,6 +4,7 @@ from db import query, query_one
 def get_metrics():
     import os
     from datetime import datetime, timedelta
+
     metrics = {}
     # Total users
     row = query_one("SELECT COUNT(*) FROM users")

@@ -8,9 +8,7 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 def _is_postgres() -> bool:
     url = os.getenv("DATABASE_URL") or os.getenv("DB_URL") or ""
     backend = os.getenv("DB_BACKEND", "").lower()
-    return backend == "postgres" or url.startswith("postgresql://") or url.startswith(
-        "postgres://"
-    )
+    return backend == "postgres" or url.startswith("postgresql://") or url.startswith("postgres://")
 
 
 def _get_sqlite_path() -> str:
@@ -61,7 +59,10 @@ def connect(dict_rows: bool = False):
         dsn = os.getenv("DATABASE_URL") or os.getenv("DB_URL")
         if not dsn:
             raise RuntimeError(
-                "DATABASE_URL/DB_URL not set for Postgres backend. Set DB_BACKEND=sqlite to use SQLite."
+                (
+                    "DATABASE_URL/DB_URL not set for Postgres backend. "
+                    "Set DB_BACKEND=sqlite to use SQLite."
+                )
             )
         # Determine driver once (do not catch exceptions thrown from with-body)
         driver = None

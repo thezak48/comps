@@ -21,7 +21,7 @@ from database import (
     update_image_custom_name,
     update_last_accessed,
 )
-from db import query, query_dicts, query_one
+from db import query, query_dicts
 
 from .models import (
     ComparisonCreate,
@@ -137,7 +137,11 @@ async def list_comparisons():
     - Creation and last accessed timestamps
     """
     rows = query_dicts(
-        "SELECT id, name, show_name, total_rows, total_columns, expiration_type, expiration_days, created_at, last_accessed FROM comparisons ORDER BY created_at DESC"
+        (
+            "SELECT id, name, show_name, total_rows, total_columns, "
+            "expiration_type, expiration_days, created_at, last_accessed "
+            "FROM comparisons ORDER BY created_at DESC"
+        )
     )
     comparisons = []
     for row in rows:
@@ -411,7 +415,8 @@ async def api_upload_image(
     comparison_dir = Path(UPLOADS_PATH) / comparison_id
     comparison_dir.mkdir(parents=True, exist_ok=True)
 
-    file_ext = Path(file.filename).suffix
+    safe_name = file.filename or ""
+    file_ext = Path(safe_name).suffix
     unique_filename = f"{uuid.uuid4()}{file_ext}"
     file_path = comparison_dir / unique_filename
 

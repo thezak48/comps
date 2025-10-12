@@ -28,7 +28,7 @@ cookie_sec = APIKeyCookie(name="session")
 api_key_header = APIKeyHeader(name="Authorization", auto_error=False)
 
 
-from db import connect, execute, query, query_one
+from db import connect  # noqa: E402
 
 
 @contextmanager
@@ -126,7 +126,10 @@ def register_user(username: str, invitation_code: str) -> Optional[Dict[str, Any
             )
             # Fetch the inserted user's id in a backend-agnostic way
             cursor.execute(
-                "SELECT id, username, is_admin, never_expire_comparisons FROM users WHERE username = ?",
+                (
+                    "SELECT id, username, is_admin, never_expire_comparisons "
+                    "FROM users WHERE username = ?"
+                ),
                 (username,),
             )
             user = cursor.fetchone()
@@ -234,11 +237,13 @@ def get_user_invitation_codes(user_id: int) -> list:
             (user_id,),
         )
         codes = cursor.fetchall()
+
         def _to_str_dt(v):
             try:
                 return v.strftime("%Y-%m-%d %H:%M:%S") if hasattr(v, "strftime") else str(v)
             except Exception:
                 return str(v)
+
         return [
             {
                 "code": row[0],
@@ -270,11 +275,13 @@ def get_all_users() -> list:
             """
         )
         rows = cursor.fetchall()
+
         def _to_str_dt(v):
             try:
                 return v.strftime("%Y-%m-%d %H:%M:%S") if hasattr(v, "strftime") else str(v)
             except Exception:
                 return str(v)
+
         users = [
             {
                 "id": row[0],
@@ -324,11 +331,13 @@ def get_user_api_keys(user_id: int) -> list:
             (user_id,),
         )
         rows = cursor.fetchall()
+
         def _to_str_dt(v):
             try:
                 return v.strftime("%Y-%m-%d %H:%M:%S") if hasattr(v, "strftime") else str(v)
             except Exception:
                 return str(v)
+
         return [
             {
                 "id": row[0],

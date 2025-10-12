@@ -30,7 +30,7 @@ from database import (
     update_last_accessed,
 )
 from database_metrics import get_metrics
-from db import backend_name, connect, query_dicts
+from db import backend_name, query_dicts
 
 
 # Random name generator for comparisons
@@ -214,7 +214,7 @@ async def start_cleanup_task():
     # Check if database migrations are complete
     # Best-effort schema presence check
     try:
-        rows = query_dicts("SELECT 1 as ok")
+        query_dicts("SELECT 1 as ok")
         logger.info("Database initialized successfully (%s)", backend_name())
     except Exception as e:
         logger.error("Error checking database state: %s", str(e))

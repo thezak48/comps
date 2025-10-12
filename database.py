@@ -3,8 +3,8 @@ import shutil
 from datetime import datetime, timedelta
 from typing import List, Optional
 
+from db import backend_name, execute, query, query_one
 from migrations.manager import MigrationManager
-from db import backend_name, connect, execute, query, query_one
 
 DB_PATH = os.getenv("DB_PATH", "comparisons.db")
 
@@ -76,7 +76,6 @@ def create_comparison(
             )
 
 
-
 def update_last_accessed(comparison_id: str):
     """Update the last_accessed timestamp for a comparison"""
     try:
@@ -132,17 +131,24 @@ def get_comparison(comparison_id: str):
 def get_user_comparisons(user_id: int) -> List[dict]:
     """Get all comparisons created by a specific user."""
     rows = query(
-        "SELECT id, name, show_name, created_at, last_accessed, never_expire FROM comparisons WHERE user_id = ? ORDER BY last_accessed DESC",
+        (
+            "SELECT id, name, show_name, created_at, last_accessed, never_expire "
+            "FROM comparisons WHERE user_id = ? ORDER BY last_accessed DESC"
+        ),
         (user_id,),
     )
 
     comparisons = []
     for row in rows:
+
         def _to_str_dt(v):
             try:
-                return v.strftime("%Y-%m-%d %H:%M:%S") if hasattr(v, "strftime") else str(v)
+                if hasattr(v, "strftime"):
+                    return v.strftime("%Y-%m-%d %H:%M:%S")
+                return str(v)
             except Exception:
                 return str(v)
+
         comparisons.append(
             {
                 "id": row[0],
@@ -160,11 +166,17 @@ def store_image_position(comparison_id: str, filename: str, row_number: int, col
     # Emulate SQLite's INSERT OR REPLACE in Postgres by delete + insert
     if backend_name() == "postgres":
         execute(
-            "DELETE FROM image_positions WHERE comparison_id = ? AND filename = ? AND row_number = ? AND column_position = ?",
+            (
+                "DELETE FROM image_positions WHERE comparison_id = ? AND filename = ? "
+                "AND row_number = ? AND column_position = ?"
+            ),
             (comparison_id, filename, row_number, column_position),
         )
         execute(
-            "INSERT INTO image_positions (comparison_id, filename, row_number, column_position) VALUES (?, ?, ?, ?)",
+            (
+                "INSERT INTO image_positions (comparison_id, filename, row_number, "
+                "column_position) VALUES (?, ?, ?, ?)"
+            ),
             (comparison_id, filename, row_number, column_position),
         )
     else:
@@ -194,11 +206,14 @@ def store_image_metadata(
     if backend_name() == "postgres":
         # Replace existing row for same (comparison_id, filename)
         execute(
-            "DELETE FROM image_metadata WHERE comparison_id = ? AND filename = ?",
+            ("DELETE FROM image_metadata WHERE comparison_id = ? " "AND filename = ?"),
             (comparison_id, filename),
         )
         execute(
-            "INSERT INTO image_metadata (comparison_id, filename, original_filename, image_size) VALUES (?, ?, ?, ?)",
+            (
+                "INSERT INTO image_metadata (comparison_id, filename, original_filename, "
+                "image_size) VALUES (?, ?, ?, ?)"
+            ),
             (comparison_id, filename, original_filename, image_size),
         )
     else:
@@ -240,16 +255,20 @@ def get_expired_comparisons(retention_days: int):
     expired_ids = []
 
     try:
-        # Get all comparisons with their expiration settings; if columns missing, will error and fall back
+        # Get all comparisons with their expiration settings; if columns missing, will
+        # error and fall back
         comparisons = query(
-            """
+            (
+                """
             SELECT id, expiration_type, expiration_days, created_at,
                    last_accessed, never_expire
             FROM comparisons
             """
+            )
         )
         print(f"Checking for expired comparisons with retention_days={retention_days}")
-        print(f"Found {len(comparisons)} comparisons to check for expiration")
+        num = len(comparisons)
+        print(f"Found {num} comparisons to check for expiration")
         current_time = datetime.now()
         for (
             comp_id,
@@ -273,11 +292,11 @@ def get_expired_comparisons(retention_days: int):
             if exp_type == "from_creation" and created_at:
                 # Support both string and datetime types across backends
                 created_dt = (
-                    created_at if isinstance(created_at, datetime) else datetime.strptime(created_at, "%Y-%m-%d %H:%M:%S")
+                    created_at
+                    if isinstance(created_at, datetime)
+                    else datetime.strptime(created_at, "%Y-%m-%d %H:%M:%S")
                 )
-                cutoff_date = created_dt + timedelta(
-                    days=days
-                )
+                cutoff_date = created_dt + timedelta(days=days)
                 print(
                     f"  From creation: cutoff={cutoff_date}, current={current_time}, expired={current_time > cutoff_date}"  # noqa: E501
                 )
@@ -285,11 +304,11 @@ def get_expired_comparisons(retention_days: int):
                     expired_ids.append(comp_id)
             elif exp_type == "from_last_access" and last_accessed:
                 last_dt = (
-                    last_accessed if isinstance(last_accessed, datetime) else datetime.strptime(last_accessed, "%Y-%m-%d %H:%M:%S")
+                    last_accessed
+                    if isinstance(last_accessed, datetime)
+                    else datetime.strptime(last_accessed, "%Y-%m-%d %H:%M:%S")
                 )
-                cutoff_date = last_dt + timedelta(
-                    days=days
-                )
+                cutoff_date = last_dt + timedelta(days=days)
                 print(
                     f"  From last access: cutoff={cutoff_date}, current={current_time}, expired={current_time > cutoff_date}"  # noqa: E501
                 )
