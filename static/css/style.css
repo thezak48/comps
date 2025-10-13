@@ -333,6 +333,7 @@ body {
 }
 
 .comparison-image.fit {
+    max-width: 100%;
     max-height: calc(
         100vh - 76px
     ); /* Fallback for browsers that might not support dvh */
