@@ -78,14 +78,11 @@ def create_comparison(
 
 def update_last_accessed(comparison_id: str):
     """Update the last_accessed timestamp for a comparison"""
-    try:
-        # PRAGMA not portable; attempt update and ignore if column missing
-        execute(
-            "UPDATE comparisons SET last_accessed = CURRENT_TIMESTAMP WHERE id = ?",
-            (comparison_id,),
-        )
-    except Exception as e:
-        print(f"Error updating last_accessed: {str(e)}")
+    # Best-effort update; if column missing on older schema, ignore
+    execute(
+        "UPDATE comparisons SET last_accessed = CURRENT_TIMESTAMP WHERE id = ?",
+        (comparison_id,),
+    )
 
 
 def get_comparison(comparison_id: str):
@@ -100,6 +97,14 @@ def get_comparison(comparison_id: str):
     comparison = rows[0] if rows else None
 
     if comparison:
+
+        def _to_str_dt(v):
+            if v is None:
+                return None
+            if isinstance(v, datetime):
+                return v.strftime("%Y-%m-%d %H:%M:%S")
+            return str(v)
+
         tag_rows = query("SELECT tag FROM tags WHERE comparison_id = ?", (comparison_id,))
         tags = [row[0] for row in tag_rows]
 
@@ -119,8 +124,8 @@ def get_comparison(comparison_id: str):
             "total_columns": comparison[4],
             "expiration_type": comparison[5] or "from_last_access",
             "expiration_days": comparison[6] or 7,
-            "created_at": comparison[7],
-            "last_accessed": comparison[8],
+            "created_at": _to_str_dt(comparison[7]),
+            "last_accessed": (_to_str_dt(comparison[8]) if comparison[8] is not None else None),
             "user_id": user_id,
             "never_expire": bool(never_expire),
         }
@@ -142,12 +147,11 @@ def get_user_comparisons(user_id: int) -> List[dict]:
     for row in rows:
 
         def _to_str_dt(v):
-            try:
-                if hasattr(v, "strftime"):
-                    return v.strftime("%Y-%m-%d %H:%M:%S")
-                return str(v)
-            except Exception:
-                return str(v)
+            if v is None:
+                return None
+            if isinstance(v, datetime):
+                return v.strftime("%Y-%m-%d %H:%M:%S")
+            return str(v)
 
         comparisons.append(
             {
@@ -206,7 +210,7 @@ def store_image_metadata(
     if backend_name() == "postgres":
         # Replace existing row for same (comparison_id, filename)
         execute(
-            ("DELETE FROM image_metadata WHERE comparison_id = ? " "AND filename = ?"),
+            "DELETE FROM image_metadata WHERE comparison_id = ? AND filename = ?",
             (comparison_id, filename),
         )
         execute(
@@ -254,69 +258,64 @@ def get_expired_comparisons(retention_days: int):
     """
     expired_ids = []
 
-    try:
-        # Get all comparisons with their expiration settings; if columns missing, will
-        # error and fall back
-        comparisons = query(
-            (
-                """
-            SELECT id, expiration_type, expiration_days, created_at,
-                   last_accessed, never_expire
-            FROM comparisons
+    # Get all comparisons with their expiration settings
+    comparisons = query(
+        (
             """
-            )
+        SELECT id, expiration_type, expiration_days, created_at,
+               last_accessed, never_expire
+        FROM comparisons
+        """
         )
-        print(f"Checking for expired comparisons with retention_days={retention_days}")
-        num = len(comparisons)
-        print(f"Found {num} comparisons to check for expiration")
-        current_time = datetime.now()
-        for (
-            comp_id,
-            exp_type,
-            exp_days,
-            created_at,
-            last_accessed,
-            never_expire,
-        ) in comparisons:
-            # Use comparison's own expiration days if available, otherwise use default
-            days = exp_days if exp_days is not None else retention_days
-            print(
-                f"Checking comparison {comp_id}: type={exp_type}, days={days}, created={created_at}, last_accessed={last_accessed}"  # noqa: E501
+    )
+    print(f"Checking for expired comparisons with retention_days={retention_days}")
+    num = len(comparisons)
+    print(f"Found {num} comparisons to check for expiration")
+    current_time = datetime.now()
+    for (
+        comp_id,
+        exp_type,
+        exp_days,
+        created_at,
+        last_accessed,
+        never_expire,
+    ) in comparisons:
+        # Use comparison's own expiration days if available, otherwise use default
+        days = exp_days if exp_days is not None else retention_days
+        print(
+            f"Checking comparison {comp_id}: type={exp_type}, days={days}, created={created_at}, last_accessed={last_accessed}"  # noqa: E501
+        )
+
+        # Check if this comparison is marked as never expire
+        if never_expire:
+            print(f"  Comparison {comp_id} is marked as never expire, skipping")
+            continue
+
+        if exp_type == "from_creation" and created_at:
+            # Support both string and datetime types across backends
+            created_dt = (
+                created_at
+                if isinstance(created_at, datetime)
+                else datetime.strptime(created_at, "%Y-%m-%d %H:%M:%S")
             )
-
-            # Check if this comparison is marked as never expire
-            if never_expire:
-                print(f"  Comparison {comp_id} is marked as never expire, skipping")
-                continue
-
-            if exp_type == "from_creation" and created_at:
-                # Support both string and datetime types across backends
-                created_dt = (
-                    created_at
-                    if isinstance(created_at, datetime)
-                    else datetime.strptime(created_at, "%Y-%m-%d %H:%M:%S")
-                )
-                cutoff_date = created_dt + timedelta(days=days)
-                print(
-                    f"  From creation: cutoff={cutoff_date}, current={current_time}, expired={current_time > cutoff_date}"  # noqa: E501
-                )
-                if current_time > cutoff_date:
-                    expired_ids.append(comp_id)
-            elif exp_type == "from_last_access" and last_accessed:
-                last_dt = (
-                    last_accessed
-                    if isinstance(last_accessed, datetime)
-                    else datetime.strptime(last_accessed, "%Y-%m-%d %H:%M:%S")
-                )
-                cutoff_date = last_dt + timedelta(days=days)
-                print(
-                    f"  From last access: cutoff={cutoff_date}, current={current_time}, expired={current_time > cutoff_date}"  # noqa: E501
-                )
-                if current_time > cutoff_date:
-                    expired_ids.append(comp_id)
-    except Exception as e:
-        print(f"Error getting expired comparisons: {str(e)}")
-        expired_ids = []
+            cutoff_date = created_dt + timedelta(days=days)
+            print(
+                f"  From creation: cutoff={cutoff_date}, current={current_time}, expired={current_time > cutoff_date}"  # noqa: E501
+            )
+            if current_time > cutoff_date:
+                expired_ids.append(comp_id)
+        elif exp_type == "from_last_access" and last_accessed:
+            last_dt = (
+                last_accessed
+                if isinstance(last_accessed, datetime)
+                else datetime.strptime(last_accessed, "%Y-%m-%d %H:%M:%S")
+            )
+            cutoff_date = last_dt + timedelta(days=days)
+            print(
+                f"  From last access: cutoff={cutoff_date}, current={current_time}, expired={current_time > cutoff_date}"  # noqa: E501
+            )
+            if current_time > cutoff_date:
+                expired_ids.append(comp_id)
     return expired_ids
 
 

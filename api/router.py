@@ -149,6 +149,17 @@ async def list_comparisons():
         tag_rows = query("SELECT tag FROM tags WHERE comparison_id = ?", (comparison_id,))
         tags = [t[0] for t in tag_rows]
         row["tags"] = tags
+        # Normalize datetime fields to strings for response model compatibility
+        ca = row.get("created_at")
+        la = row.get("last_accessed")
+        if isinstance(ca, datetime):
+            row["created_at"] = ca.strftime("%Y-%m-%d %H:%M:%S")
+        elif ca is not None:
+            row["created_at"] = str(ca)
+        if isinstance(la, datetime):
+            row["last_accessed"] = la.strftime("%Y-%m-%d %H:%M:%S")
+        elif la is not None:
+            row["last_accessed"] = str(la)
         comparisons.append(row)
     return comparisons
 
@@ -204,9 +215,10 @@ async def create_new_comparison(
         tags=comparison_data.tags,
         total_rows=metadata["total_rows"],
         total_columns=metadata["total_columns"],
-        created_at=datetime.utcnow().isoformat(),
-        last_accessed=datetime.utcnow().isoformat(),
-        never_expire=metadata["never_expire"],
+        expiration_type=metadata.get("expiration_type", "from_last_access"),
+        expiration_days=int(metadata.get("expiration_days", 7)),
+        created_at=datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
+        last_accessed=datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
     )
 
 
