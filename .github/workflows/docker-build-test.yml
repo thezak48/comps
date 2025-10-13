@@ -14,7 +14,7 @@ on:
       - "docs/**"
 
 jobs:
-  build-and-push-docker:
+  build-test-docker:
     runs-on: ubuntu-latest
     # Add timeout to prevent hung builds
     timeout-minutes: 60
