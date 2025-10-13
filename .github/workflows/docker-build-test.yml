@@ -72,7 +72,9 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          platforms: linux/amd64,linux/arm64
+          # For runner-side smoke tests we must build a single platform so the image can be loaded locally.
+          # Building multiple platforms produces a manifest list which the docker exporter cannot load.
+          platforms: linux/amd64
           push: false
           load: true
           cache-from: type=local,src=/tmp/.buildx-cache
@@ -83,6 +85,32 @@ jobs:
             BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
             VCS_REF=${{ github.sha }}
             VERSION=${{ steps.meta.outputs.tags }}
+
+      - name: List local images
+        run: |
+          docker images --format 'table {{.Repository}}:{{.Tag}}\t{{.ID}}\t{{.Size}}'
+
+      - name: Smoke test - run image and check --help or health endpoint
+        run: |
+          set -o pipefail
+          # Find the built image. Adjust pattern if you tag explicitly.
+          IMAGE=$(docker images --format '{{.Repository}}:{{.Tag}} {{.ID}}' | grep -E 'comps|thezak48/comps|ghcr.io/thezak48/comps' | awk '{print $1}' | head -n1 || true)
+          if [ -z "$IMAGE" ]; then
+            echo "No image found by expected names, falling back to first local image"
+            IMAGE=$(docker images --format '{{.Repository}}:{{.Tag}}' | head -n1)
+          fi
+          echo "Using image: $IMAGE"
+          # Try CLI help first
+          docker run --rm $IMAGE --help || (
+            docker run -d --name comps-smoke -p 8080:8000 $IMAGE || (echo "failed to start container"; docker images; exit 1)
+            sleep 2
+            if curl -fsS --max-time 5 http://localhost:8080/; then
+              echo "smoke curl ok"
+            else
+              echo "curl failed, dumping logs:"; docker logs comps-smoke; docker rm -f comps-smoke; exit 1
+            fi
+            docker rm -f comps-smoke
+          )
 
       # Upload security scan results
       - name: Upload Trivy scan results
