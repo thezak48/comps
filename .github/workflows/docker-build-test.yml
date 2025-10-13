@@ -39,16 +39,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-buildx-
 
-      # Add vulnerability scanning
-      - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: "ghcr.io/thezak48/comps:edge"
-          format: "sarif"
-          output: "trivy-results.sarif"
-
-      # Generate SBOM
-      - uses: anchore/sbom-action@v0
+      # (vulnerability scanning and SBOM generation moved to after the Docker build so they can analyze the freshly-built image)
 
       - name: Docker meta
         id: meta
@@ -75,6 +66,20 @@ jobs:
             --build-arg BUILD_DATE="$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
             --build-arg VCS_REF=${{ github.sha }} \
             --build-arg VERSION="${{ steps.meta.outputs.tags }}" .
+
+      - name: Run Trivy vulnerability scanner (scan local image)
+        run: |
+          echo "Running Trivy (Docker image) to scan comps:ci-test"
+          # Use Trivy docker image to scan the local Docker daemon's images. Bind the docker socket and workspace.
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v "$GITHUB_WORKSPACE:/workdir" -w /workdir \
+            aquasecurity/trivy:latest image --format sarif --output trivy-results.sarif comps:ci-test
+
+      - name: Generate SBOM for built image
+        uses: anchore/sbom-action@v0
+        with:
+          image: comps:ci-test
 
       - name: List local images
         run: |
