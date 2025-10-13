@@ -68,23 +68,13 @@ jobs:
             type=sha,format=long
             type=sha
 
-      - name: Docker build
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          # For runner-side smoke tests we must build a single platform so the image can be loaded locally.
-          # Building multiple platforms produces a manifest list which the docker exporter cannot load.
-          platforms: linux/amd64
-          push: false
-          load: true
-          cache-from: type=local,src=/tmp/.buildx-cache
-          cache-to: type=local,dest=/tmp/.buildx-cache
-          provenance: true
-          sbom: true
-          build-args: |
-            BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
-            VCS_REF=${{ github.sha }}
-            VERSION=${{ steps.meta.outputs.tags }}
+      - name: Docker build (simple)
+        run: |
+          # Build a single-arch image using the standard docker CLI to avoid buildx manifest/export issues.
+          docker build --progress=plain -t comps:ci-test \
+            --build-arg BUILD_DATE="$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
+            --build-arg VCS_REF=${{ github.sha }} \
+            --build-arg VERSION="${{ steps.meta.outputs.tags }}" .
 
       - name: List local images
         run: |
@@ -94,7 +84,12 @@ jobs:
         run: |
           set -o pipefail
           # Find the built image. Adjust pattern if you tag explicitly.
-          IMAGE=$(docker images --format '{{.Repository}}:{{.Tag}} {{.ID}}' | grep -E 'comps|thezak48/comps|ghcr.io/thezak48/comps' | awk '{print $1}' | head -n1 || true)
+          # Prefer explicit tag we just built
+          IMAGE=comps:ci-test
+          if [ -z "$IMAGE" ] || [ "$(docker images -q $IMAGE)" = "" ]; then
+            echo "Built tag comps:ci-test not found, falling back to search"
+            IMAGE=$(docker images --format '{{.Repository}}:{{.Tag}} {{.ID}}' | grep -E 'comps|thezak48/comps|ghcr.io/thezak48/comps' | awk '{print $1}' | head -n1 || true)
+          fi
           if [ -z "$IMAGE" ]; then
             echo "No image found by expected names, falling back to first local image"
             IMAGE=$(docker images --format '{{.Repository}}:{{.Tag}}' | head -n1)
