@@ -108,7 +108,7 @@ jobs:
           MAX_WAIT=30
           INTERVAL=1
           elapsed=0
-          until curl -fsS --max-time 5 http://localhost:8080/ >/dev/null 2>&1; do
+          until curl -fsS --max-time 5 http://localhost:8080/health >/dev/null 2>&1; do
             if [ "$elapsed" -ge "$MAX_WAIT" ]; then
               echo "Container did not respond within ${MAX_WAIT}s"
               echo "Container logs:"
@@ -120,7 +120,7 @@ jobs:
             echo "Waiting for container to be ready... ${elapsed}s"
           done
 
-          echo "Healthcheck succeeded (http://localhost:8080/)"
+          echo "Healthcheck succeeded (http://localhost:8080/health)"
           # cleanup will run via trap
 
       # Upload security scan results
