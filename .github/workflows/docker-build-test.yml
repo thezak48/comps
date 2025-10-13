@@ -74,7 +74,7 @@ jobs:
           docker run --rm \
             -v /var/run/docker.sock:/var/run/docker.sock \
             -v "$GITHUB_WORKSPACE:/workdir" -w /workdir \
-            aquasecurity/trivy image --format sarif --output trivy-results.sarif comps:ci-test
+            aquasec/trivy:latest image --format sarif --output trivy-results.sarif comps:ci-test
 
       - name: Generate SBOM for built image
         uses: anchore/sbom-action@v0
