@@ -51,6 +51,11 @@ jobs:
             --build-arg VCS_REF=${{ github.sha }} \
             --build-arg VERSION="${{ steps.meta.outputs.tags }}" .
 
+      - name: Configure Trivy cache directory
+        run: |
+          echo "TRIVY_CACHE_DIR=$HOME/.cache/trivy" >> "$GITHUB_ENV"
+          mkdir -p "$HOME/.cache/trivy"
+
       - name: Cache Trivy database
         uses: actions/cache@v4
         with:
@@ -61,6 +66,8 @@ jobs:
 
       - name: Run Trivy vulnerability scanner (local image)
         uses: aquasecurity/trivy-action@master
+        env:
+          TRIVY_CACHE_DIR: ${{ env.TRIVY_CACHE_DIR }}
         with:
           image-ref: comps:ci-test
           format: 'sarif'
