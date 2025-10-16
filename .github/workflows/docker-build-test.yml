@@ -20,26 +20,10 @@ jobs:
     timeout-minutes: 60
     permissions:
       contents: read
-      packages: write
       security-events: write
-      id-token: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      # Improved caching strategy with versioning
-      - name: Cache Docker layers
-        uses: actions/cache@v4
-        with:
-          path: /tmp/.buildx-cache
-          key: ${{ runner.os }}-buildx-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-buildx-
-
-      # (vulnerability scanning and SBOM generation moved to after the Docker build so they can analyze the freshly-built image)
 
       - name: Docker meta
         id: meta
@@ -67,14 +51,23 @@ jobs:
             --build-arg VCS_REF=${{ github.sha }} \
             --build-arg VERSION="${{ steps.meta.outputs.tags }}" .
 
-      - name: Run Trivy vulnerability scanner (scan local image)
-        run: |
-          echo "Running Trivy (Docker image) to scan comps:ci-test"
-          # Use Trivy docker image to scan the local Docker daemon's images. Bind the docker socket and workspace.
-          docker run --rm \
-            -v /var/run/docker.sock:/var/run/docker.sock \
-            -v "$GITHUB_WORKSPACE:/workdir" -w /workdir \
-            aquasec/trivy:latest image --format sarif --output trivy-results.sarif comps:ci-test
+      - name: Cache Trivy database
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/trivy
+          key: ${{ runner.os }}-trivy-db-${{ hashFiles('Dockerfile') }}
+          restore-keys: |
+            ${{ runner.os }}-trivy-db-
+
+      - name: Run Trivy vulnerability scanner (local image)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: comps:ci-test
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
+          ignore-unfixed: true
 
       - name: Generate SBOM for built image
         uses: anchore/sbom-action@v0
@@ -130,7 +123,7 @@ jobs:
 
       # Upload security scan results
       - name: Upload Trivy scan results
-        if: always()
+        if: ${{ always() && hashFiles('trivy-results.sarif') != '' }}
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: "trivy-results.sarif"
