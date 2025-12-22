@@ -1,0 +1,136 @@
+name: docker-build-test
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  pull_request:
+    paths-ignore:
+      - "*.md"
+      - "renovate.json"
+      - ".github/ISSUE_TEMPLATE/**"
+      - "PULL_REQUEST_TEMPLATE.md"
+      - "docs/**"
+
+jobs:
+  build-test-docker:
+    runs-on: ubuntu-latest
+    # Add timeout to prevent hung builds
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ghcr.io/thezak48/comps
+            thezak48/comps
+          flavor: |
+            latest=${{ github.ref_type == 'tag' }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=edge,branch=develop
+            type=ref,event=pr
+            type=sha,format=long
+            type=sha
+
+      - name: Docker build (simple)
+        run: |
+          # Build a single-arch image using the standard docker CLI to avoid buildx manifest/export issues.
+          docker build --progress=plain -t comps:ci-test \
+            --build-arg BUILD_DATE="$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
+            --build-arg VCS_REF=${{ github.sha }} \
+            --build-arg VERSION="${{ steps.meta.outputs.tags }}" .
+
+      - name: Configure Trivy cache directory
+        run: |
+          echo "TRIVY_CACHE_DIR=$HOME/.cache/trivy" >> "$GITHUB_ENV"
+          mkdir -p "$HOME/.cache/trivy"
+
+      - name: Cache Trivy database
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/trivy
+          key: ${{ runner.os }}-trivy-db-${{ hashFiles('Dockerfile') }}
+          restore-keys: |
+            ${{ runner.os }}-trivy-db-
+
+      - name: Run Trivy vulnerability scanner (local image)
+        uses: aquasecurity/trivy-action@master
+        env:
+          TRIVY_CACHE_DIR: ${{ env.TRIVY_CACHE_DIR }}
+        with:
+          image-ref: comps:ci-test
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
+          ignore-unfixed: true
+
+      - name: Generate SBOM for built image
+        uses: anchore/sbom-action@v0
+        with:
+          image: comps:ci-test
+
+      - name: List local images
+        run: |
+          docker images --format 'table {{.Repository}}:{{.Tag}}\t{{.ID}}\t{{.Size}}'
+
+      - name: Smoke test — detached run + bounded health check
+        run: |
+          set -euo pipefail
+          IMAGE=comps:ci-test
+
+          if [ -z "$(docker images -q "$IMAGE" 2>/dev/null)" ]; then
+            echo "Built image '$IMAGE' not found. Listing available images:";
+            docker images || true
+            exit 1
+          fi
+
+          echo "Starting container from $IMAGE"
+          CONTAINER_ID=""
+          cleanup() {
+            if [ -n "$CONTAINER_ID" ]; then
+              echo "Cleaning up container $CONTAINER_ID"
+              docker rm -f "$CONTAINER_ID" >/dev/null 2>&1 || true
+            fi
+          }
+          trap cleanup EXIT
+
+          CONTAINER_ID=$(docker run -d -p 8080:8000 "$IMAGE")
+          echo "Started container: $CONTAINER_ID"
+
+          # Poll the container endpoint for up to 30s
+          MAX_WAIT=30
+          INTERVAL=1
+          elapsed=0
+          until curl -fsS --max-time 5 http://localhost:8080/health >/dev/null 2>&1; do
+            if [ "$elapsed" -ge "$MAX_WAIT" ]; then
+              echo "Container did not respond within ${MAX_WAIT}s"
+              echo "Container logs:"
+              docker logs "$CONTAINER_ID" || true
+              exit 1
+            fi
+            sleep $INTERVAL
+            elapsed=$((elapsed + INTERVAL))
+            echo "Waiting for container to be ready... ${elapsed}s"
+          done
+
+          echo "Healthcheck succeeded (http://localhost:8080/health)"
+          # cleanup will run via trap
+
+      # Upload security scan results
+      - name: Upload Trivy scan results
+        if: ${{ always() && hashFiles('trivy-results.sarif') != '' }}
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: "trivy-results.sarif"

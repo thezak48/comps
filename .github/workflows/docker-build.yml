@@ -12,18 +12,7 @@ on:
     tags:
       - "*"
     paths-ignore:
-      - "README.md"
-      - "CONTRIBUTING.md"
-      - "renovate.json"
-      - ".github/ISSUE_TEMPLATE/**"
-      - "PULL_REQUEST_TEMPLATE.md"
-      - "docs/**"
-  pull_request:
-    branches:
-      - "develop"
-    paths-ignore:
-      - "README.md"
-      - "CONTRIBUTING.md"
+      - "*.md"
       - "renovate.json"
       - ".github/ISSUE_TEMPLATE/**"
       - "PULL_REQUEST_TEMPLATE.md"
@@ -57,14 +46,6 @@ jobs:
           key: ${{ runner.os }}-buildx-${{ github.sha }}
           restore-keys: |
             ${{ runner.os }}-buildx-
-
-      # Add vulnerability scanning
-      - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: "ghcr.io/thezak48/comps:edge"
-          format: "sarif"
-          output: "trivy-results.sarif"
 
       # Generate SBOM
       - uses: anchore/sbom-action@v0
@@ -102,6 +83,7 @@ jobs:
           registry: docker.io
 
       - name: Docker build and push
+        id: build
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -118,9 +100,18 @@ jobs:
             VCS_REF=${{ github.sha }}
             VERSION=${{ steps.meta.outputs.tags }}
 
+      # Add vulnerability scanning for the freshly built image (by digest)
+      - name: Run Trivy vulnerability scanner
+        if: ${{ steps.build.outputs.digest != '' }}
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ghcr.io/thezak48/comps@${{ steps.build.outputs.digest }}
+          format: "sarif"
+          output: "trivy-results.sarif"
+
       # Upload security scan results
       - name: Upload Trivy scan results
-        if: always()
+        if: ${{ always() && hashFiles('trivy-results.sarif') != '' }}
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: "trivy-results.sarif"
