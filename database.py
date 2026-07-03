@@ -321,7 +321,7 @@ def delete_comparison(comparison_id: str, uploads_path: Optional[str] = None):
 
     Args:
         comparison_id: The UUID of the comparison to delete
-        uploads_path: Path to the uploads directory
+        uploads_path: Optional local uploads directory path (local storage only)
     """
     # Capture filenames before deleting DB rows so storage deletion does not
     # depend on bucket listing permissions.

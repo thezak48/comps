@@ -8,6 +8,7 @@ import aiofiles
 import boto3
 from botocore.exceptions import BotoCoreError, ClientError
 from fastapi import UploadFile
+from starlette.concurrency import run_in_threadpool
 
 STORAGE_BACKEND = os.getenv("STORAGE_BACKEND", "local").strip().lower()
 UPLOADS_PATH = os.getenv("UPLOADS_PATH", "uploads")
@@ -29,7 +30,13 @@ def ensure_storage_ready():
         if not S3_BUCKET_NAME:
             raise RuntimeError("S3_BUCKET_NAME must be set when STORAGE_BACKEND is 's3'")
         # Fail fast if credentials or endpoint are invalid.
-        _get_s3_client().head_bucket(Bucket=S3_BUCKET_NAME)
+        try:
+            _get_s3_client().head_bucket(Bucket=S3_BUCKET_NAME)
+        except (ClientError, BotoCoreError) as exc:
+            raise RuntimeError(
+                f"Unable to access configured S3 bucket '{S3_BUCKET_NAME}'. "
+                "Check bucket name, credentials, and permissions."
+            ) from exc
         return
     Path(UPLOADS_PATH).mkdir(parents=True, exist_ok=True)
 
@@ -41,7 +48,7 @@ def create_comparison_storage(comparison_id: str):
 
 
 async def save_upload_file(comparison_id: str, filename: str, file: UploadFile) -> int:
-    content = await file.read()
+    await file.seek(0)
     content_type = (
         file.content_type or mimetypes.guess_type(filename)[0] or "application/octet-stream"
     )
@@ -49,22 +56,32 @@ async def save_upload_file(comparison_id: str, filename: str, file: UploadFile) 
     if is_s3_enabled():
         key = _get_object_key(comparison_id, filename)
         try:
-            _get_s3_client().put_object(
-                Bucket=S3_BUCKET_NAME,
-                Key=key,
-                Body=content,
-                ContentType=content_type,
+            await run_in_threadpool(
+                _get_s3_client().upload_fileobj,
+                file.file,
+                S3_BUCKET_NAME,
+                key,
+                {"ContentType": content_type},
             )
         except (BotoCoreError, ClientError) as exc:
             raise OSError(f"Failed to upload {filename} to S3: {exc}") from exc
-        return len(content)
+        current_position = file.file.tell()
+        await file.seek(0)
+        return int(current_position)
 
     comparison_dir = Path(UPLOADS_PATH) / comparison_id
     comparison_dir.mkdir(parents=True, exist_ok=True)
     file_path = comparison_dir / filename
+    bytes_written = 0
     async with aiofiles.open(file_path, "wb") as buffer:
-        await buffer.write(content)
-    return len(content)
+        while True:
+            chunk = await file.read(1024 * 1024)
+            if not chunk:
+                break
+            bytes_written += len(chunk)
+            await buffer.write(chunk)
+    await file.seek(0)
+    return bytes_written
 
 
 def get_presigned_image_url(comparison_id: str, filename: str) -> str:
@@ -94,7 +111,9 @@ def delete_comparison_assets(
 ):
     if is_s3_enabled():
         client = _get_s3_client()
-        if filenames:
+        if filenames is not None:
+            if not filenames:
+                return
             keys = [_get_object_key(comparison_id, filename) for filename in filenames]
             _delete_s3_keys(client, keys)
             return
