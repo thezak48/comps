@@ -1,6 +1,7 @@
 import mimetypes
 import os
 import shutil
+import uuid
 from pathlib import Path
 from typing import Optional
 
@@ -44,17 +45,20 @@ def ensure_storage_ready():
 def create_comparison_storage(comparison_id: str):
     if is_s3_enabled():
         return
-    (Path(UPLOADS_PATH) / comparison_id).mkdir(parents=True, exist_ok=True)
+    safe_comparison_id = _normalize_comparison_id(comparison_id)
+    (Path(UPLOADS_PATH) / safe_comparison_id).mkdir(parents=True, exist_ok=True)
 
 
 async def save_upload_file(comparison_id: str, filename: str, file: UploadFile) -> int:
+    safe_comparison_id = _normalize_comparison_id(comparison_id)
+    safe_filename = _normalize_filename(filename)
     await file.seek(0)
     content_type = (
-        file.content_type or mimetypes.guess_type(filename)[0] or "application/octet-stream"
+        file.content_type or mimetypes.guess_type(safe_filename)[0] or "application/octet-stream"
     )
 
     if is_s3_enabled():
-        key = _get_object_key(comparison_id, filename)
+        key = _get_object_key(safe_comparison_id, safe_filename)
         try:
             client = _get_s3_client()
             await run_in_threadpool(
@@ -66,12 +70,12 @@ async def save_upload_file(comparison_id: str, filename: str, file: UploadFile) 
             )
             head = client.head_object(Bucket=S3_BUCKET_NAME, Key=key)
         except (BotoCoreError, ClientError) as exc:
-            raise OSError(f"Failed to upload {filename} to S3: {exc}") from exc
+            raise OSError(f"Failed to upload {safe_filename} to S3: {exc}") from exc
         return int(head.get("ContentLength", 0))
 
-    comparison_dir = Path(UPLOADS_PATH) / comparison_id
+    comparison_dir = Path(UPLOADS_PATH) / safe_comparison_id
     comparison_dir.mkdir(parents=True, exist_ok=True)
-    file_path = comparison_dir / filename
+    file_path = comparison_dir / safe_filename
     bytes_written = 0
     async with aiofiles.open(file_path, "wb") as buffer:
         while True:
@@ -84,7 +88,9 @@ async def save_upload_file(comparison_id: str, filename: str, file: UploadFile) 
 
 
 def get_presigned_image_url(comparison_id: str, filename: str) -> str:
-    key = _get_object_key(comparison_id, filename)
+    safe_comparison_id = _normalize_comparison_id(comparison_id)
+    safe_filename = _normalize_filename(filename)
+    key = _get_object_key(safe_comparison_id, safe_filename)
     try:
         client = _get_s3_client()
         client.head_object(Bucket=S3_BUCKET_NAME, Key=key)
@@ -97,10 +103,12 @@ def get_presigned_image_url(comparison_id: str, filename: str) -> str:
     except ClientError as exc:
         error_code = exc.response.get("Error", {}).get("Code")
         if error_code in {"NoSuchKey", "404", "NotFound"}:
-            raise FileNotFoundError(f"Image not found: {comparison_id}/{filename}") from exc
-        raise OSError(f"Failed to generate S3 URL for {filename}: {exc}") from exc
+            raise FileNotFoundError(
+                f"Image not found: {safe_comparison_id}/{safe_filename}"
+            ) from exc
+        raise OSError(f"Failed to generate S3 URL for {safe_filename}: {exc}") from exc
     except BotoCoreError as exc:
-        raise OSError(f"Failed to generate S3 URL for {filename}: {exc}") from exc
+        raise OSError(f"Failed to generate S3 URL for {safe_filename}: {exc}") from exc
 
 
 def delete_comparison_assets(
@@ -108,16 +116,20 @@ def delete_comparison_assets(
     uploads_path: Optional[str] = None,
     filenames: Optional[list[str]] = None,
 ):
+    safe_comparison_id = _normalize_comparison_id(comparison_id)
     if is_s3_enabled():
         client = _get_s3_client()
         if filenames is not None:
             if not filenames:
                 return
-            keys = [_get_object_key(comparison_id, filename) for filename in filenames]
+            keys = [
+                _get_object_key(safe_comparison_id, _normalize_filename(filename))
+                for filename in filenames
+            ]
             _delete_s3_keys(client, keys)
             return
 
-        prefix = _get_object_key_prefix(comparison_id)
+        prefix = _get_object_key_prefix(safe_comparison_id)
         keys = []
         continuation_token = None
         try:
@@ -132,14 +144,14 @@ def delete_comparison_assets(
                 continuation_token = response.get("NextContinuationToken")
         except (ClientError, BotoCoreError) as exc:
             raise OSError(
-                f"Failed to list S3 objects for comparison {comparison_id}: {exc}"
+                f"Failed to list S3 objects for comparison {safe_comparison_id}: {exc}"
             ) from exc
 
         _delete_s3_keys(client, keys)
         return
 
     base_uploads_path = uploads_path or UPLOADS_PATH
-    comparison_dir = os.path.join(base_uploads_path, comparison_id)
+    comparison_dir = os.path.join(base_uploads_path, safe_comparison_id)
     if os.path.exists(comparison_dir):
         shutil.rmtree(comparison_dir)
 
@@ -189,3 +201,28 @@ def _delete_s3_keys(client, keys: list[str]):
                 for err in errors
             )
             raise OSError(f"S3 reported delete errors: {details}")
+
+
+def _normalize_comparison_id(comparison_id: str) -> str:
+    try:
+        return str(uuid.UUID(str(comparison_id)))
+    except (ValueError, AttributeError, TypeError) as exc:
+        raise OSError("Invalid comparison ID format") from exc
+
+
+def _normalize_filename(filename: str) -> str:
+    if not isinstance(filename, str):
+        raise OSError("Invalid filename format")
+
+    normalized = filename.strip()
+    if not normalized or normalized in {".", ".."}:
+        raise OSError("Invalid filename format")
+
+    basename = os.path.basename(normalized)
+    if basename != normalized:
+        raise OSError("Invalid filename format")
+
+    if "/" in normalized or "\\" in normalized:
+        raise OSError("Invalid filename format")
+
+    return basename

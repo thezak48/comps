@@ -424,10 +424,8 @@ async def api_upload_image(
     unique_filename = f"{uuid.uuid4()}{file_ext}"
     try:
         image_size = await save_upload_file(comparison_id, unique_filename, file)
-    except OSError as e:
-        logger.error(
-            "Error uploading image %s for comparison %s: %s", unique_filename, comparison_id, e
-        )
+    except OSError:
+        logger.exception("Error storing uploaded image")
         return JSONResponse(status_code=500, content={"error": "Failed to store uploaded image"})
 
     store_image_position(comparison_id, unique_filename, row, column)
