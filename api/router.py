@@ -337,7 +337,7 @@ async def delete_user_comparison(comparison_id: str, request: Request):
 @router.post("/comparison")
 async def api_create_comparison(
     request: Request,
-    name: str = Form(...),
+    name: Optional[str] = Form(None),
     show_name: Optional[str] = Form(None),
     expiration_type: str = Form("from_last_access"),
     expiration_enabled: Optional[str] = Form(None),
