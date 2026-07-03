@@ -56,18 +56,19 @@ async def save_upload_file(comparison_id: str, filename: str, file: UploadFile) 
     if is_s3_enabled():
         key = _get_object_key(comparison_id, filename)
         try:
+            client = _get_s3_client()
             await run_in_threadpool(
-                _get_s3_client().upload_fileobj,
+                client.upload_fileobj,
                 file.file,
                 S3_BUCKET_NAME,
                 key,
                 {"ContentType": content_type},
             )
+            head = client.head_object(Bucket=S3_BUCKET_NAME, Key=key)
         except (BotoCoreError, ClientError) as exc:
             raise OSError(f"Failed to upload {filename} to S3: {exc}") from exc
-        current_position = file.file.tell()
         await file.seek(0)
-        return int(current_position)
+        return int(head.get("ContentLength", 0))
 
     comparison_dir = Path(UPLOADS_PATH) / comparison_id
     comparison_dir.mkdir(parents=True, exist_ok=True)
