@@ -19,6 +19,7 @@ const { imageUrls, totalColumns, totalRows, imageNames, imageSizes } = compareDa
 let absoluteIndex = 0;
 let isSolarized = false;
 let zoomLevel = 1;
+let solarizationUnsupportedNotified = false;
 const ZOOM_STEP = 0.1; // Change this from 0 to 0.1
 
 /*
@@ -86,6 +87,7 @@ function preloadImages() {
     const preloadPromises = imageUrls.map((url) => {
         return new Promise((resolve, reject) => {
             const img = new Image();
+            img.crossOrigin = "anonymous";
             img.onload = () => resolve(url);
             img.onerror = () => reject(url);
             img.src = `/uploads/${url}`;
@@ -327,20 +329,38 @@ function updateDisplay() {
             document.body.appendChild(loadingIndicator);
 
             const img = new Image();
+            img.crossOrigin = "anonymous";
             img.onload = function () {
-                const canvas = document.createElement("canvas");
-                const ctx = canvas.getContext("2d");
-                canvas.width = img.naturalWidth;
-                canvas.height = img.naturalHeight;
-                ctx.drawImage(img, 0, 0);
+                try {
+                    const canvas = document.createElement("canvas");
+                    const ctx = canvas.getContext("2d");
+                    canvas.width = img.naturalWidth;
+                    canvas.height = img.naturalHeight;
+                    ctx.drawImage(img, 0, 0);
 
-                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                const processedData = processSolarization(imageData);
-                ctx.putImageData(processedData, 0, 0);
+                    const imageData = ctx.getImageData(
+                        0,
+                        0,
+                        canvas.width,
+                        canvas.height,
+                    );
+                    const processedData = processSolarization(imageData);
+                    ctx.putImageData(processedData, 0, 0);
 
-                const solarizedDataUrl = canvas.toDataURL();
-                solarizedImageCache.set(currentUrl, solarizedDataUrl);
-                currentImage.src = solarizedDataUrl;
+                    const solarizedDataUrl = canvas.toDataURL();
+                    solarizedImageCache.set(currentUrl, solarizedDataUrl);
+                    currentImage.src = solarizedDataUrl;
+                } catch (e) {
+                    isSolarized = false;
+                    currentImage.src = `/uploads/${currentUrl}`;
+                    if (!solarizationUnsupportedNotified) {
+                        solarizationUnsupportedNotified = true;
+                        console.warn(
+                            "Solarization disabled for cross-origin images without CORS support.",
+                            e,
+                        );
+                    }
+                }
 
                 // Remove loading indicator
                 loadingIndicator.remove();
