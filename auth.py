@@ -233,12 +233,10 @@ def is_super_admin(user: dict) -> bool:
 def get_all_users() -> list:
     """Get all users from the database"""
     with get_db_cursor() as cursor:
-        cursor.execute(
-            """
+        cursor.execute("""
             SELECT id, username, is_admin, is_super_admin, created_at
             FROM users ORDER BY created_at DESC
-            """
-        )
+            """)
         rows = cursor.fetchall()
 
         users = [

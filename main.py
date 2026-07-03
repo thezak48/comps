@@ -31,6 +31,7 @@ from database import (
 )
 from database_metrics import get_metrics
 from db import backend_name, query_dicts
+from storage import ensure_storage_ready, get_presigned_image_url, is_s3_enabled
 
 
 # Random name generator for comparisons
@@ -118,11 +119,10 @@ background_tasks = set()
 
 # Get configuration from environment
 DB_PATH = os.getenv("DB_PATH", "comparisons.db")
-UPLOADS_PATH = os.getenv("UPLOADS_PATH", "uploads")
 RETENTION_DAYS = int(os.getenv("RETENTION_DAYS", "7"))
 
-# Ensure directories exist
-Path(UPLOADS_PATH).mkdir(parents=True, exist_ok=True)
+# Ensure directories/storage exist
+ensure_storage_ready()
 Path(os.path.dirname(DB_PATH)).mkdir(parents=True, exist_ok=True)
 
 # Initialize database
@@ -133,8 +133,26 @@ app.include_router(api_router)
 
 # Mount static files and templates
 app.mount("/static", StaticFiles(directory="static"), name="static")
-app.mount("/uploads", StaticFiles(directory=UPLOADS_PATH), name="uploads")
+if not is_s3_enabled():
+    app.mount(
+        "/uploads", StaticFiles(directory=os.getenv("UPLOADS_PATH", "uploads")), name="uploads"
+    )
 templates = Jinja2Templates(directory="templates")
+
+
+@app.get("/uploads/{comparison_id}/{filename:path}", include_in_schema=False)
+async def serve_uploaded_image(comparison_id: str, filename: str):
+    if not is_s3_enabled():
+        raise HTTPException(status_code=404, detail="Image not found")
+
+    try:
+        presigned_url = get_presigned_image_url(comparison_id, filename)
+        return RedirectResponse(url=presigned_url, status_code=status.HTTP_307_TEMPORARY_REDIRECT)
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except OSError as e:
+        logger.error("Failed to serve image %s/%s: %s", comparison_id, filename, e)
+        raise HTTPException(status_code=502, detail="Failed to fetch image") from e
 
 
 # Custom OpenAPI schema
@@ -186,7 +204,7 @@ async def cleanup_old_comparisons():
                 for comparison_id in expired_ids:
                     try:
                         logger.info("Deleting comparison %s", comparison_id)
-                        delete_comparison(comparison_id, UPLOADS_PATH)
+                        delete_comparison(comparison_id)
                     except OSError as e:
                         logger.error(
                             "Error deleting comparison %s: %s",

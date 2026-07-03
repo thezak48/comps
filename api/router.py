@@ -1,12 +1,10 @@
 import logging
-import os
 import random
 import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
 
-import aiofiles
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse
 from fastapi.security import APIKeyCookie, OAuth2PasswordRequestForm
@@ -22,6 +20,7 @@ from database import (
     update_last_accessed,
 )
 from db import query, query_dicts
+from storage import create_comparison_storage, save_upload_file
 
 from .models import (
     ComparisonCreate,
@@ -33,8 +32,6 @@ from .models import (
 router = APIRouter(prefix="/api/v1", tags=["api"])
 
 MAX_ROWS = 200
-
-UPLOADS_PATH = os.getenv("UPLOADS_PATH", "uploads")
 
 logger = logging.getLogger(__name__)
 cookie_sec = APIKeyCookie(name="session")
@@ -193,9 +190,7 @@ async def create_new_comparison(
         "never_expire": user["never_expire_comparisons"] if user else False,
     }
 
-    # Create comparison directory
-    comparison_dir = Path(UPLOADS_PATH) / comparison_id
-    comparison_dir.mkdir(exist_ok=True, parents=True)
+    create_comparison_storage(comparison_id)
 
     # Store in database
     create_comparison(
@@ -330,7 +325,7 @@ async def delete_user_comparison(comparison_id: str, request: Request):
 
     # Delete the comparison
     try:
-        delete_comparison(comparison_id, UPLOADS_PATH)
+        delete_comparison(comparison_id)
     except OSError as e:
         logger.error("Error deleting comparison %s files: %s", comparison_id, e)
         return JSONResponse(
@@ -424,20 +419,19 @@ async def api_upload_image(
     if not comparison:
         return JSONResponse(status_code=404, content={"error": "Comparison not found"})
 
-    comparison_dir = Path(UPLOADS_PATH) / comparison_id
-    comparison_dir.mkdir(parents=True, exist_ok=True)
-
     safe_name = file.filename or ""
     file_ext = Path(safe_name).suffix
     unique_filename = f"{uuid.uuid4()}{file_ext}"
-    file_path = comparison_dir / unique_filename
-
-    async with aiofiles.open(file_path, "wb") as buffer:
-        await buffer.write(await file.read())
+    try:
+        image_size = await save_upload_file(comparison_id, unique_filename, file)
+    except OSError as e:
+        logger.error(
+            "Error uploading image %s for comparison %s: %s", unique_filename, comparison_id, e
+        )
+        return JSONResponse(status_code=500, content={"error": "Failed to store uploaded image"})
 
     store_image_position(comparison_id, unique_filename, row, column)
 
-    image_size = os.path.getsize(file_path)
     store_image_metadata(comparison_id, unique_filename, original_filename, f"{image_size} bytes")
 
     if custom_name:
