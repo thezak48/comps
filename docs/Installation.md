@@ -61,3 +61,9 @@ To use S3-compatible storage:
 - `S3_ENDPOINT_URL=<endpoint-url>` (optional, for MinIO/other compatible services)
 - `S3_KEY_PREFIX=<prefix>` (optional)
 - `S3_PRESIGNED_URL_TTL_SECONDS=<seconds>` (optional, default `3600`)
+
+To migrate existing local uploads into S3 after switching storage backend:
+
+```bash
+python scripts/migrate_local_uploads_to_s3.py --skip-existing --expected-bucket-owner <account-id>
+```

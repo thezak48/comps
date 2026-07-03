@@ -55,6 +55,16 @@ Comps supports local filesystem storage (default) and S3-compatible object stora
 
 When S3 is enabled, `/uploads/<comparison_id>/<filename>` redirects to a short-lived pre-signed S3 URL.
 
+### Migrating existing local uploads to S3
+
+If you are switching an existing installation from local storage to S3, run:
+
+```bash
+python scripts/migrate_local_uploads_to_s3.py --skip-existing --expected-bucket-owner <account-id>
+```
+
+This script uploads files from `UPLOADS_PATH` to your configured S3 bucket/key prefix and updates `image_metadata.image_size` (inserting metadata rows when missing).
+
 ### Docker Compose example (PostgreSQL)
 
 Use the provided `docker-compose.postgres.yml`:
