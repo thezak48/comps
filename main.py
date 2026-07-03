@@ -140,9 +140,16 @@ if not is_s3_enabled():
 templates = Jinja2Templates(directory="templates")
 
 
-@app.get("/uploads/{comparison_id}/{filename:path}", include_in_schema=False)
-async def serve_uploaded_image(comparison_id: str, filename: str):
+@app.get("/uploads/{path:path}", include_in_schema=False, name="uploads")
+async def serve_uploaded_image(path: str):
     if not is_s3_enabled():
+        raise HTTPException(status_code=404, detail="Image not found")
+
+    if "/" not in path:
+        raise HTTPException(status_code=404, detail="Image not found")
+
+    comparison_id, filename = path.split("/", 1)
+    if not comparison_id or not filename:
         raise HTTPException(status_code=404, detail="Image not found")
 
     try:
