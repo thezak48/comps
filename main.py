@@ -175,11 +175,9 @@ app.openapi = custom_openapi
 
 # Custom Swagger UI route with dark mode
 @app.get("/api/docs", include_in_schema=False)
-async def custom_swagger_ui_html():
+async def custom_swagger_ui_html(request: Request):
     """Serve the custom Swagger UI HTML page."""
-    return templates.TemplateResponse(
-        "swagger_ui.html", {"request": Request(scope={"type": "http"})}
-    )
+    return templates.TemplateResponse(request=request, name="swagger_ui.html")
 
 
 # Serve OpenAPI schema
@@ -252,7 +250,11 @@ async def login_page(request: Request):
     if user:
         return RedirectResponse(url="/")
 
-    return templates.TemplateResponse("login.jinja", {"request": request})
+    return templates.TemplateResponse(
+        request=request,
+        name="login.jinja",
+        context={"request": request},
+    )
 
 
 @app.post("/login")
@@ -264,8 +266,9 @@ async def login(request: Request):
 
     if not username or not invitation_code:
         return templates.TemplateResponse(
-            "login.jinja",
-            {"request": request, "error": "Username and invitation code are required"},
+            request=request,
+            name="login.jinja",
+            context={"request": request, "error": "Username and invitation code are required"},
         )
 
     # Try to authenticate
@@ -276,8 +279,9 @@ async def login(request: Request):
         user = auth.register_user(username, invitation_code)
         if not user:
             return templates.TemplateResponse(
-                "login.jinja",
-                {"request": request, "error": "Invalid username or invitation code"},
+                request=request,
+                name="login.jinja",
+                context={"request": request, "error": "Invalid username or invitation code"},
             )
 
     # Create access token
@@ -314,7 +318,9 @@ async def admin_metrics_page(request: Request):
 
     metrics = get_metrics()
     return templates.TemplateResponse(
-        "metrics.jinja", {"request": request, "user": user, "metrics": metrics}
+        request=request,
+        name="metrics.jinja",
+        context={"request": request, "user": user, "metrics": metrics},
     )
 
 
@@ -337,7 +343,7 @@ async def admin_page(request: Request):
         "invitation_codes": invitation_codes,
         "all_users": all_users,
     }
-    return templates.TemplateResponse("admin.jinja", context)
+    return templates.TemplateResponse(request=request, name="admin.jinja", context=context)
 
 
 @app.post("/admin/create-invitation")
@@ -386,8 +392,9 @@ async def account_page(request: Request):
     api_keys = auth.get_user_api_keys(user["id"])
 
     return templates.TemplateResponse(
-        "account.jinja",
-        {
+        request=request,
+        name="account.jinja",
+        context={
             "request": request,
             "user": user,
             "comparisons": user_comparisons,
@@ -495,11 +502,15 @@ async def view_comparison(request: Request, comparison_id: str):
         "dropdown_rows": dropdown_rows,
     }
 
-    return templates.TemplateResponse("compare.jinja", context)
+    return templates.TemplateResponse(request=request, name="compare.jinja", context=context)
 
 
 @app.get("/")
 async def home(request: Request):
     """Render the home page with upload form."""
     user = await auth.get_optional_user(request)
-    return templates.TemplateResponse("index.jinja", {"request": request, "user": user})
+    return templates.TemplateResponse(
+        request=request,
+        name="index.jinja",
+        context={"request": request, "user": user},
+    )
