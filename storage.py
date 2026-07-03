@@ -67,7 +67,6 @@ async def save_upload_file(comparison_id: str, filename: str, file: UploadFile) 
             head = client.head_object(Bucket=S3_BUCKET_NAME, Key=key)
         except (BotoCoreError, ClientError) as exc:
             raise OSError(f"Failed to upload {filename} to S3: {exc}") from exc
-        await file.seek(0)
         return int(head.get("ContentLength", 0))
 
     comparison_dir = Path(UPLOADS_PATH) / comparison_id
@@ -81,7 +80,6 @@ async def save_upload_file(comparison_id: str, filename: str, file: UploadFile) 
                 break
             bytes_written += len(chunk)
             await buffer.write(chunk)
-    await file.seek(0)
     return bytes_written
 
 
