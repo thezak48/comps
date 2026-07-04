@@ -95,14 +95,10 @@ def migrate(
     expected_bucket_owner: str,
     skip_existing: bool,
     dry_run: bool,
+    progress_interval: int,
 ) -> Dict[str, int]:
     if not bucket:
         raise RuntimeError("S3 bucket is required (set --bucket or S3_BUCKET_NAME)")
-    if not expected_bucket_owner:
-        raise RuntimeError(
-            "Expected bucket owner is required "
-            "(set --expected-bucket-owner or S3_EXPECTED_BUCKET_OWNER)"
-        )
 
     normalized_prefix = key_prefix.strip().strip("/")
     base_path = Path(uploads_path)
@@ -114,6 +110,7 @@ def migrate(
 
     stats = {
         "total": 0,
+        "processed": 0,
         "uploaded": 0,
         "already_present": 0,
         "missing_local": 0,
@@ -121,13 +118,39 @@ def migrate(
         "errors": 0,
     }
 
-    for comparison_id, filename, original_filename in _file_records():
-        stats["total"] += 1
+    records = _file_records()
+    stats["total"] = len(records)
+    print(f"Found {stats['total']} image records to process.", flush=True)
+
+    safe_interval = max(1, progress_interval)
+
+    def report_progress(force: bool = False):
+        if (
+            not force
+            and stats["processed"] % safe_interval != 0
+            and stats["processed"] != stats["total"]
+        ):
+            return
+        print(
+            (
+                f"[{stats['processed']}/{stats['total']}] "
+                f"uploaded={stats['uploaded']} "
+                f"already_present={stats['already_present']} "
+                f"missing_local={stats['missing_local']} "
+                f"db_updates={stats['db_updates']} "
+                f"errors={stats['errors']}"
+            ),
+            flush=True,
+        )
+
+    for comparison_id, filename, original_filename in records:
         local_file = base_path / comparison_id / filename
         key = _object_key(normalized_prefix, comparison_id, filename)
 
         if not local_file.is_file():
             stats["missing_local"] += 1
+            stats["processed"] += 1
+            report_progress()
             continue
 
         file_size = local_file.stat().st_size
@@ -137,26 +160,37 @@ def migrate(
         if skip_existing:
             try:
                 if not dry_run:
+                    head_kwargs = {
+                        "Bucket": bucket,
+                        "Key": key,
+                    }
+                    if expected_bucket_owner:
+                        head_kwargs["ExpectedBucketOwner"] = expected_bucket_owner
+
                     client.head_object(
-                        Bucket=bucket,
-                        Key=key,
-                        ExpectedBucketOwner=expected_bucket_owner,
+                        **head_kwargs,
                     )
                 stats["already_present"] += 1
                 if not dry_run:
                     _upsert_image_metadata(comparison_id, filename, original_filename, image_size)
                     stats["db_updates"] += 1
+                stats["processed"] += 1
+                report_progress()
                 continue
             except ClientError as exc:
                 code = exc.response.get("Error", {}).get("Code")
                 if code not in {"404", "NoSuchKey", "NotFound"}:
+                    stats["processed"] += 1
+                    stats["errors"] += 1
+                    report_progress(force=True)
                     raise
 
         try:
             extra_args = {
                 "ContentType": content_type,
-                "ExpectedBucketOwner": expected_bucket_owner,
             }
+            if expected_bucket_owner:
+                extra_args["ExpectedBucketOwner"] = expected_bucket_owner
             if not dry_run:
                 client.upload_file(
                     str(local_file),
@@ -169,7 +203,13 @@ def migrate(
             stats["uploaded"] += 1
         except (ClientError, BotoCoreError, OSError):
             stats["errors"] += 1
+            stats["processed"] += 1
+            report_progress(force=True)
             raise
+        stats["processed"] += 1
+        report_progress()
+
+    report_progress(force=True)
 
     return stats
 
@@ -206,7 +246,7 @@ def main():
     parser.add_argument(
         "--expected-bucket-owner",
         default=os.getenv("S3_EXPECTED_BUCKET_OWNER", ""),
-        help="12-digit AWS account ID expected to own the bucket",
+        help="Optional 12-digit AWS account ID expected to own the bucket",
     )
     parser.add_argument(
         "--skip-existing",
@@ -217,6 +257,12 @@ def main():
         "--dry-run",
         action="store_true",
         help="Show what would be migrated without uploading or DB updates",
+    )
+    parser.add_argument(
+        "--progress-interval",
+        type=int,
+        default=25,
+        help="Print progress every N processed records (default: 25)",
     )
     args = parser.parse_args()
 
@@ -229,6 +275,7 @@ def main():
         expected_bucket_owner=args.expected_bucket_owner,
         skip_existing=args.skip_existing,
         dry_run=args.dry_run,
+        progress_interval=args.progress_interval,
     )
 
     print("Migration completed.")

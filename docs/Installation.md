@@ -65,5 +65,7 @@ To use S3-compatible storage:
 To migrate existing local uploads into S3 after switching storage backend:
 
 ```bash
-python scripts/migrate_local_uploads_to_s3.py --skip-existing --expected-bucket-owner <account-id>
+python scripts/migrate_local_uploads_to_s3.py --skip-existing
 ```
+
+For AWS S3 you can optionally add `--expected-bucket-owner <account-id>`.

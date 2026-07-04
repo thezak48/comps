@@ -60,10 +60,11 @@ When S3 is enabled, `/uploads/<comparison_id>/<filename>` redirects to a short-l
 If you are switching an existing installation from local storage to S3, run:
 
 ```bash
-python scripts/migrate_local_uploads_to_s3.py --skip-existing --expected-bucket-owner <account-id>
+python scripts/migrate_local_uploads_to_s3.py --skip-existing
 ```
 
 This script uploads files from `UPLOADS_PATH` to your configured S3 bucket/key prefix and updates `image_metadata.image_size` (inserting metadata rows when missing).
+For AWS S3 you can optionally add `--expected-bucket-owner <account-id>` for ownership verification.
 
 ### Docker Compose example (PostgreSQL)
 
