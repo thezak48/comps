@@ -271,8 +271,7 @@
                 "$ref": "#/components/schemas/Body_api_create_comparison_api_v1_comparison_post"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "200": {
@@ -656,7 +655,14 @@
       "Body_api_create_comparison_api_v1_comparison_post": {
         "properties": {
           "name": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Name"
           },
           "show_name": {
@@ -714,9 +720,6 @@
           }
         },
         "type": "object",
-        "required": [
-          "name"
-        ],
         "title": "Body_api_create_comparison_api_v1_comparison_post"
       },
       "Body_api_login_api_v1_login_post": {
