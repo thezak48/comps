@@ -2,6 +2,7 @@
 """
 Example script demonstrating the use of the Comps API for creating comparisons and uploading images
 """
+
 import argparse
 import json
 import re

@@ -1,10 +1,10 @@
 import os
-import shutil
 from datetime import datetime, timedelta
 from typing import List, Optional
 
 from db import backend_name, execute, query, query_one
 from migrations.manager import MigrationManager
+from storage import delete_comparison_assets
 
 DB_PATH = os.getenv("DB_PATH", "comparisons.db")
 
@@ -259,15 +259,11 @@ def get_expired_comparisons(retention_days: int):
     expired_ids = []
 
     # Get all comparisons with their expiration settings
-    comparisons = query(
-        (
-            """
+    comparisons = query(("""
         SELECT id, expiration_type, expiration_days, created_at,
                last_accessed, never_expire
         FROM comparisons
-        """
-        )
-    )
+        """))
     print(f"Checking for expired comparisons with retention_days={retention_days}")
     num = len(comparisons)
     print(f"Found {num} comparisons to check for expiration")
@@ -319,21 +315,31 @@ def get_expired_comparisons(retention_days: int):
     return expired_ids
 
 
-def delete_comparison(comparison_id: str, uploads_path: str):
+def delete_comparison(comparison_id: str, uploads_path: Optional[str] = None):
     """
     Delete a comparison and all associated data
 
     Args:
         comparison_id: The UUID of the comparison to delete
-        uploads_path: Path to the uploads directory
+        uploads_path: Optional local uploads directory path (local storage only)
     """
+    # Capture filenames before deleting DB rows so storage deletion does not
+    # depend on bucket listing permissions.
+    metadata_rows = query(
+        "SELECT filename FROM image_metadata WHERE comparison_id = ?",
+        (comparison_id,),
+    )
+    position_rows = query(
+        "SELECT filename FROM image_positions WHERE comparison_id = ?",
+        (comparison_id,),
+    )
+    filenames = sorted({row[0] for row in metadata_rows + position_rows if row and row[0]})
+
     # Delete all related records
     execute("DELETE FROM image_positions WHERE comparison_id = ?", (comparison_id,))
     execute("DELETE FROM image_metadata WHERE comparison_id = ?", (comparison_id,))
     execute("DELETE FROM tags WHERE comparison_id = ?", (comparison_id,))
     execute("DELETE FROM comparisons WHERE id = ?", (comparison_id,))
 
-    # Delete the comparison directory and all files
-    comparison_dir = os.path.join(uploads_path, comparison_id)
-    if os.path.exists(comparison_dir):
-        shutil.rmtree(comparison_dir)
+    # Delete all uploaded assets for the comparison
+    delete_comparison_assets(comparison_id, uploads_path, filenames=filenames)

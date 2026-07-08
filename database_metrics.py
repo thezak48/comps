@@ -1,4 +1,5 @@
 from db import query, query_one
+from storage import is_s3_enabled
 
 
 def get_metrics():
@@ -74,15 +75,19 @@ def get_metrics():
 
     metrics["date_labels"] = date_labels
 
-    # Total image size on disk (sum of all files in uploads/)
-
-    uploads_dir = os.getenv("UPLOADS_PATH", "uploads")
     total_size = 0
-    for dirpath, dirnames, filenames in os.walk(uploads_dir):
-        for f in filenames:
-            fp = os.path.join(dirpath, f)
-            if os.path.isfile(fp):
-                total_size += os.path.getsize(fp)
+    if is_s3_enabled():
+        # For S3-backed storage, sum uploaded image sizes from metadata.
+        rows = query("SELECT image_size FROM image_metadata WHERE image_size IS NOT NULL")
+        total_size = sum(_parse_image_size_bytes(row[0]) for row in rows if row and row[0])
+    else:
+        # Total image size on disk (sum of all files in uploads/)
+        uploads_dir = os.getenv("UPLOADS_PATH", "uploads")
+        for dirpath, dirnames, filenames in os.walk(uploads_dir):
+            for f in filenames:
+                fp = os.path.join(dirpath, f)
+                if os.path.isfile(fp):
+                    total_size += os.path.getsize(fp)
     metrics["total_images_size_bytes"] = total_size
     metrics["total_images_humansize"] = format_bytes(total_size)
 
@@ -98,3 +103,18 @@ def format_bytes(bytes):
         return f"{(bytes / (1024 * 1024)):.2f} MB"
     else:
         return f"{(bytes / (1024 * 1024 * 1024)):.2f} GB"
+
+
+def _parse_image_size_bytes(image_size: str) -> int:
+    value = image_size.strip().lower()
+    if value.endswith("bytes"):
+        value = value[:-5].strip()
+    elif value.endswith("byte"):
+        value = value[:-4].strip()
+    elif value.endswith("b"):
+        value = value[:-1].strip()
+
+    try:
+        return int(value)
+    except ValueError:
+        return 0

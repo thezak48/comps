@@ -41,6 +41,31 @@ Comps supports both SQLite (default) and PostgreSQL.
 
 Migrations run automatically at startup for the selected backend.
 
+## Storage backends
+
+Comps supports local filesystem storage (default) and S3-compatible object storage.
+
+- Local (default): `STORAGE_BACKEND=local` and `UPLOADS_PATH` (default: `uploads`)
+- S3: set `STORAGE_BACKEND=s3` and:
+	- `S3_BUCKET_NAME=<bucket>`
+	- `S3_REGION=<region>` (optional, but recommended)
+	- `S3_ENDPOINT_URL=<endpoint>` (optional, for S3-compatible providers like MinIO)
+	- `S3_KEY_PREFIX=<prefix>` (optional)
+	- `S3_PRESIGNED_URL_TTL_SECONDS=<seconds>` (optional, default: `3600`)
+
+When S3 is enabled, `/uploads/<comparison_id>/<filename>` redirects to a short-lived pre-signed S3 URL.
+
+### Migrating existing local uploads to S3
+
+If you are switching an existing installation from local storage to S3, run:
+
+```bash
+python scripts/migrate_local_uploads_to_s3.py --skip-existing
+```
+
+This script uploads files from `UPLOADS_PATH` to your configured S3 bucket/key prefix and updates `image_metadata.image_size` (inserting metadata rows when missing).
+For AWS S3 you can optionally add `--expected-bucket-owner <account-id>` for ownership verification.
+
 ### Docker Compose example (PostgreSQL)
 
 Use the provided `docker-compose.postgres.yml`:

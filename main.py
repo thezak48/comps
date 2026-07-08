@@ -31,6 +31,7 @@ from database import (
 )
 from database_metrics import get_metrics
 from db import backend_name, query_dicts
+from storage import ensure_storage_ready, get_presigned_image_url, is_s3_enabled
 
 
 # Random name generator for comparisons
@@ -118,11 +119,10 @@ background_tasks = set()
 
 # Get configuration from environment
 DB_PATH = os.getenv("DB_PATH", "comparisons.db")
-UPLOADS_PATH = os.getenv("UPLOADS_PATH", "uploads")
 RETENTION_DAYS = int(os.getenv("RETENTION_DAYS", "7"))
 
-# Ensure directories exist
-Path(UPLOADS_PATH).mkdir(parents=True, exist_ok=True)
+# Ensure directories/storage exist
+ensure_storage_ready()
 Path(os.path.dirname(DB_PATH)).mkdir(parents=True, exist_ok=True)
 
 # Initialize database
@@ -133,8 +133,33 @@ app.include_router(api_router)
 
 # Mount static files and templates
 app.mount("/static", StaticFiles(directory="static"), name="static")
-app.mount("/uploads", StaticFiles(directory=UPLOADS_PATH), name="uploads")
+if not is_s3_enabled():
+    app.mount(
+        "/uploads", StaticFiles(directory=os.getenv("UPLOADS_PATH", "uploads")), name="uploads"
+    )
 templates = Jinja2Templates(directory="templates")
+
+
+@app.get("/uploads/{path:path}", include_in_schema=False, name="uploads")
+async def serve_uploaded_image(path: str):
+    if not is_s3_enabled():
+        raise HTTPException(status_code=404, detail="Image not found")
+
+    if "/" not in path:
+        raise HTTPException(status_code=404, detail="Image not found")
+
+    comparison_id, filename = path.split("/", 1)
+    if not comparison_id or not filename:
+        raise HTTPException(status_code=404, detail="Image not found")
+
+    try:
+        presigned_url = get_presigned_image_url(comparison_id, filename)
+        return RedirectResponse(url=presigned_url, status_code=status.HTTP_307_TEMPORARY_REDIRECT)
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except OSError as e:
+        logger.error("Failed to serve image %s/%s: %s", comparison_id, filename, e)
+        raise HTTPException(status_code=502, detail="Failed to fetch image") from e
 
 
 # Custom OpenAPI schema
@@ -157,11 +182,9 @@ app.openapi = custom_openapi
 
 # Custom Swagger UI route with dark mode
 @app.get("/api/docs", include_in_schema=False)
-async def custom_swagger_ui_html():
+async def custom_swagger_ui_html(request: Request):
     """Serve the custom Swagger UI HTML page."""
-    return templates.TemplateResponse(
-        "swagger_ui.html", {"request": Request(scope={"type": "http"})}
-    )
+    return templates.TemplateResponse(request=request, name="swagger_ui.html")
 
 
 # Serve OpenAPI schema
@@ -186,7 +209,7 @@ async def cleanup_old_comparisons():
                 for comparison_id in expired_ids:
                     try:
                         logger.info("Deleting comparison %s", comparison_id)
-                        delete_comparison(comparison_id, UPLOADS_PATH)
+                        delete_comparison(comparison_id)
                     except OSError as e:
                         logger.error(
                             "Error deleting comparison %s: %s",
@@ -234,7 +257,11 @@ async def login_page(request: Request):
     if user:
         return RedirectResponse(url="/")
 
-    return templates.TemplateResponse("login.jinja", {"request": request})
+    return templates.TemplateResponse(
+        request=request,
+        name="login.jinja",
+        context={"request": request},
+    )
 
 
 @app.post("/login")
@@ -246,8 +273,9 @@ async def login(request: Request):
 
     if not username or not invitation_code:
         return templates.TemplateResponse(
-            "login.jinja",
-            {"request": request, "error": "Username and invitation code are required"},
+            request=request,
+            name="login.jinja",
+            context={"request": request, "error": "Username and invitation code are required"},
         )
 
     # Try to authenticate
@@ -258,8 +286,9 @@ async def login(request: Request):
         user = auth.register_user(username, invitation_code)
         if not user:
             return templates.TemplateResponse(
-                "login.jinja",
-                {"request": request, "error": "Invalid username or invitation code"},
+                request=request,
+                name="login.jinja",
+                context={"request": request, "error": "Invalid username or invitation code"},
             )
 
     # Create access token
@@ -296,7 +325,9 @@ async def admin_metrics_page(request: Request):
 
     metrics = get_metrics()
     return templates.TemplateResponse(
-        "metrics.jinja", {"request": request, "user": user, "metrics": metrics}
+        request=request,
+        name="metrics.jinja",
+        context={"request": request, "user": user, "metrics": metrics},
     )
 
 
@@ -319,7 +350,7 @@ async def admin_page(request: Request):
         "invitation_codes": invitation_codes,
         "all_users": all_users,
     }
-    return templates.TemplateResponse("admin.jinja", context)
+    return templates.TemplateResponse(request=request, name="admin.jinja", context=context)
 
 
 @app.post("/admin/create-invitation")
@@ -368,8 +399,9 @@ async def account_page(request: Request):
     api_keys = auth.get_user_api_keys(user["id"])
 
     return templates.TemplateResponse(
-        "account.jinja",
-        {
+        request=request,
+        name="account.jinja",
+        context={
             "request": request,
             "user": user,
             "comparisons": user_comparisons,
@@ -477,11 +509,15 @@ async def view_comparison(request: Request, comparison_id: str):
         "dropdown_rows": dropdown_rows,
     }
 
-    return templates.TemplateResponse("compare.jinja", context)
+    return templates.TemplateResponse(request=request, name="compare.jinja", context=context)
 
 
 @app.get("/")
 async def home(request: Request):
     """Render the home page with upload form."""
     user = await auth.get_optional_user(request)
-    return templates.TemplateResponse("index.jinja", {"request": request, "user": user})
+    return templates.TemplateResponse(
+        request=request,
+        name="index.jinja",
+        context={"request": request, "user": user},
+    )
