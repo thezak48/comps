@@ -18,6 +18,7 @@ from fastapi.security import APIKeyCookie
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
+from starlette.concurrency import run_in_threadpool
 
 import auth
 from api.router import router as api_router
@@ -153,7 +154,11 @@ async def serve_uploaded_image(path: str):
         raise HTTPException(status_code=404, detail="Image not found")
 
     try:
-        presigned_url = get_presigned_image_url(comparison_id, filename)
+        presigned_url = await run_in_threadpool(
+            get_presigned_image_url,
+            comparison_id,
+            filename,
+        )
         return RedirectResponse(url=presigned_url, status_code=status.HTTP_307_TEMPORARY_REDIRECT)
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
