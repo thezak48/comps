@@ -12,11 +12,12 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
-          python-version: '3.14'
+          python-version: "3.14"
       - name: Set up Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: 'lts/*'
+          # eslint@10 requires Node ^20.19 || ^22.13 || >=24
+          node-version: "24"
       - name: Install Python dev dependencies
         run: |
           python -m venv .venv

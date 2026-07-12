@@ -20,7 +20,7 @@ function showToast(message, type = "error", duration = 5000) {
     toast.className = `toast ${type}`;
 
     // Add icon based on type
-    let icon = "";
+    let icon;
     switch (type) {
         case "error":
             icon = "❌";
@@ -1275,14 +1275,12 @@ function openRenameColumnModal(columnIndex) {
             }
         }
 
-        let previewText = "";
-        if (numberingOption === "append") {
-            previewText = `${baseName}-1, ${baseName}-2, ${baseName}-3, ...`;
-        } else if (numberingOption === "prepend") {
-            previewText = `1-${baseName}, 2-${baseName}, 3-${baseName}, ...`;
-        } else {
-            previewText = `${baseName}, ${baseName}, ${baseName}, ...`;
-        }
+        const previewText =
+            numberingOption === "append"
+                ? `${baseName}-1, ${baseName}-2, ${baseName}-3, ...`
+                : numberingOption === "prepend"
+                  ? `1-${baseName}, 2-${baseName}, 3-${baseName}, ...`
+                  : `${baseName}, ${baseName}, ${baseName}, ...`;
 
         namePreview.innerHTML = `<code>${previewText}</code>`;
     }
