@@ -19,6 +19,7 @@ S3_BUCKET_NAME = os.getenv("S3_BUCKET_NAME", "").strip()
 S3_REGION = os.getenv("S3_REGION")
 S3_ENDPOINT_URL = os.getenv("S3_ENDPOINT_URL")
 S3_KEY_PREFIX = os.getenv("S3_KEY_PREFIX", "").strip().strip("/")
+S3_PUBLIC_BASE_URL = os.getenv("S3_PUBLIC_BASE_URL", "").strip().rstrip("/")
 S3_PRESIGNED_URL_TTL_SECONDS = int(os.getenv("S3_PRESIGNED_URL_TTL_SECONDS", "3600"))
 S3_PRESIGNED_URL_CACHE_MAX_SIZE = int(os.getenv("S3_PRESIGNED_URL_CACHE_MAX_SIZE", "10000"))
 
@@ -122,6 +123,20 @@ def get_presigned_image_url(comparison_id: str, filename: str) -> str:
         raise OSError(f"Failed to generate S3 URL for {safe_filename}: {exc}") from exc
     except BotoCoreError as exc:
         raise OSError(f"Failed to generate S3 URL for {safe_filename}: {exc}") from exc
+
+
+def get_browser_image_url(comparison_id: str, filename: str) -> str:
+    safe_comparison_id = _normalize_comparison_id(comparison_id)
+    safe_filename = _normalize_filename(filename)
+    key = _get_object_key(safe_comparison_id, safe_filename)
+
+    if S3_PUBLIC_BASE_URL:
+        return f"{S3_PUBLIC_BASE_URL}/{key}"
+
+    if is_s3_enabled():
+        return f"/uploads/{safe_comparison_id}/{safe_filename}"
+
+    return f"/uploads/{safe_comparison_id}/{safe_filename}"
 
 
 def delete_comparison_assets(
