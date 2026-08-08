@@ -45,6 +45,18 @@ function solarCurve(x, t = 5, k = 5.5) {
 const STORAGE_KEY = "solarizationCurves";
 let solarizationInProgress = false;
 
+function resolveImageUrl(url) {
+    if (
+        url.startsWith("http://") ||
+        url.startsWith("https://") ||
+        url.startsWith("/")
+    ) {
+        return url;
+    }
+
+    return `/uploads/${url}`;
+}
+
 // Modify generateSolarCurves to use localStorage
 function generateSolarCurves() {
     // Try to load from localStorage first
@@ -90,7 +102,7 @@ function preloadImages() {
             img.crossOrigin = "anonymous";
             img.onload = () => resolve(url);
             img.onerror = () => reject(url);
-            img.src = `/uploads/${url}`;
+            img.src = resolveImageUrl(url);
         });
     });
 
@@ -352,7 +364,7 @@ function updateDisplay() {
                     currentImage.src = solarizedDataUrl;
                 } catch (e) {
                     isSolarized = false;
-                    currentImage.src = `/uploads/${currentUrl}`;
+                    currentImage.src = resolveImageUrl(currentUrl);
                     if (!solarizationUnsupportedNotified) {
                         solarizationUnsupportedNotified = true;
                         console.warn(
@@ -371,10 +383,10 @@ function updateDisplay() {
                 solarizationInProgress = false;
                 console.error("Failed to load image for solarization");
             };
-            img.src = `/uploads/${currentUrl}`;
+            img.src = resolveImageUrl(currentUrl);
         }
     } else {
-        currentImage.src = `/uploads/${imageUrls[absoluteIndex]}`;
+        currentImage.src = resolveImageUrl(imageUrls[absoluteIndex]);
     }
 
     applyZoom();
@@ -716,7 +728,7 @@ function generateBBCode() {
             const index = row * totalColumns + col;
 
             if (index < imageUrls.length) {
-                bbcode += `${window.location.origin}/uploads/${imageUrls[index]}\n`;
+                bbcode += `${resolveImageUrl(imageUrls[index])}\n`;
             }
         }
     }

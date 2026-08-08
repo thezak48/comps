@@ -1,6 +1,8 @@
 import mimetypes
 import os
 import shutil
+import threading
+import time
 import uuid
 from pathlib import Path
 from typing import Optional
@@ -17,9 +19,14 @@ S3_BUCKET_NAME = os.getenv("S3_BUCKET_NAME", "").strip()
 S3_REGION = os.getenv("S3_REGION")
 S3_ENDPOINT_URL = os.getenv("S3_ENDPOINT_URL")
 S3_KEY_PREFIX = os.getenv("S3_KEY_PREFIX", "").strip().strip("/")
+S3_PUBLIC_BASE_URL = os.getenv("S3_PUBLIC_BASE_URL", "").strip().rstrip("/")
 S3_PRESIGNED_URL_TTL_SECONDS = int(os.getenv("S3_PRESIGNED_URL_TTL_SECONDS", "3600"))
+S3_PRESIGNED_URL_CACHE_MAX_SIZE = int(os.getenv("S3_PRESIGNED_URL_CACHE_MAX_SIZE", "10000"))
 
 _s3_client = None
+_presigned_url_cache: dict[str, tuple[str, float]] = {}
+_presigned_url_cache_lock = threading.Lock()
+_PRESIGNED_URL_REFRESH_SKEW_SECONDS = 5
 
 
 def is_s3_enabled() -> bool:
@@ -59,6 +66,7 @@ async def save_upload_file(comparison_id: str, filename: str, file: UploadFile) 
 
     if is_s3_enabled():
         key = _get_object_key(safe_comparison_id, safe_filename)
+        _evict_presigned_url_cache(keys=[key])
         try:
             client = _get_s3_client()
             await run_in_threadpool(
@@ -91,15 +99,21 @@ def get_presigned_image_url(comparison_id: str, filename: str) -> str:
     safe_comparison_id = _normalize_comparison_id(comparison_id)
     safe_filename = _normalize_filename(filename)
     key = _get_object_key(safe_comparison_id, safe_filename)
+    cached_url = _get_cached_presigned_url(key)
+    if cached_url:
+        return cached_url
+
     try:
         client = _get_s3_client()
         client.head_object(Bucket=S3_BUCKET_NAME, Key=key)
         expires_in = max(1, S3_PRESIGNED_URL_TTL_SECONDS)
-        return client.generate_presigned_url(
+        presigned_url = client.generate_presigned_url(
             "get_object",
             Params={"Bucket": S3_BUCKET_NAME, "Key": key},
             ExpiresIn=expires_in,
         )
+        _cache_presigned_url(key, presigned_url, expires_in)
+        return presigned_url
     except ClientError as exc:
         error_code = exc.response.get("Error", {}).get("Code")
         if error_code in {"NoSuchKey", "404", "NotFound"}:
@@ -109,6 +123,20 @@ def get_presigned_image_url(comparison_id: str, filename: str) -> str:
         raise OSError(f"Failed to generate S3 URL for {safe_filename}: {exc}") from exc
     except BotoCoreError as exc:
         raise OSError(f"Failed to generate S3 URL for {safe_filename}: {exc}") from exc
+
+
+def get_browser_image_url(comparison_id: str, filename: str) -> str:
+    safe_comparison_id = _normalize_comparison_id(comparison_id)
+    safe_filename = _normalize_filename(filename)
+    key = _get_object_key(safe_comparison_id, safe_filename)
+
+    if S3_PUBLIC_BASE_URL:
+        return f"{S3_PUBLIC_BASE_URL}/{key}"
+
+    if is_s3_enabled():
+        return f"/uploads/{safe_comparison_id}/{safe_filename}"
+
+    return f"/uploads/{safe_comparison_id}/{safe_filename}"
 
 
 def delete_comparison_assets(
@@ -126,10 +154,12 @@ def delete_comparison_assets(
                 _get_object_key(safe_comparison_id, _normalize_filename(filename))
                 for filename in filenames
             ]
+            _evict_presigned_url_cache(keys=keys)
             _delete_s3_keys(client, keys)
             return
 
         prefix = _get_object_key_prefix(safe_comparison_id)
+        _evict_presigned_url_cache(prefix=prefix)
         keys = []
         continuation_token = None
         try:
@@ -201,6 +231,56 @@ def _delete_s3_keys(client, keys: list[str]):
                 for err in errors
             )
             raise OSError(f"S3 reported delete errors: {details}")
+
+
+def _get_cached_presigned_url(key: str) -> Optional[str]:
+    now = time.monotonic()
+    with _presigned_url_cache_lock:
+        cached = _presigned_url_cache.get(key)
+        if not cached:
+            return None
+
+        cached_url, expires_at = cached
+        if expires_at - _PRESIGNED_URL_REFRESH_SKEW_SECONDS <= now:
+            _presigned_url_cache.pop(key, None)
+            return None
+
+        return cached_url
+
+
+def _cache_presigned_url(key: str, url: str, expires_in: int):
+    now = time.monotonic()
+    expires_at = now + max(1, expires_in)
+    with _presigned_url_cache_lock:
+        _prune_presigned_url_cache(now)
+        _presigned_url_cache[key] = (url, expires_at)
+
+        # Keep cache bounded to avoid unbounded memory growth.
+        max_size = max(1, S3_PRESIGNED_URL_CACHE_MAX_SIZE)
+        while len(_presigned_url_cache) > max_size:
+            oldest_key = next(iter(_presigned_url_cache))
+            _presigned_url_cache.pop(oldest_key, None)
+
+
+def _evict_presigned_url_cache(
+    keys: Optional[list[str]] = None,
+    prefix: Optional[str] = None,
+):
+    with _presigned_url_cache_lock:
+        if keys:
+            for key in keys:
+                _presigned_url_cache.pop(key, None)
+
+        if prefix:
+            for key in list(_presigned_url_cache):
+                if key.startswith(prefix):
+                    _presigned_url_cache.pop(key, None)
+
+
+def _prune_presigned_url_cache(now: float):
+    for cache_key, (_, expires_at) in list(_presigned_url_cache.items()):
+        if expires_at - _PRESIGNED_URL_REFRESH_SKEW_SECONDS <= now:
+            _presigned_url_cache.pop(cache_key, None)
 
 
 def _normalize_comparison_id(comparison_id: str) -> str:

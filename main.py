@@ -18,6 +18,7 @@ from fastapi.security import APIKeyCookie
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
+from starlette.concurrency import run_in_threadpool
 
 import auth
 from api.router import router as api_router
@@ -31,7 +32,12 @@ from database import (
 )
 from database_metrics import get_metrics
 from db import backend_name, query_dicts
-from storage import ensure_storage_ready, get_presigned_image_url, is_s3_enabled
+from storage import (
+    ensure_storage_ready,
+    get_browser_image_url,
+    get_presigned_image_url,
+    is_s3_enabled,
+)
 
 
 # Random name generator for comparisons
@@ -153,7 +159,18 @@ async def serve_uploaded_image(path: str):
         raise HTTPException(status_code=404, detail="Image not found")
 
     try:
-        presigned_url = get_presigned_image_url(comparison_id, filename)
+        if is_s3_enabled():
+            public_url = get_browser_image_url(comparison_id, filename)
+            if public_url != f"/uploads/{comparison_id}/{filename}":
+                return RedirectResponse(
+                    url=public_url, status_code=status.HTTP_307_TEMPORARY_REDIRECT
+                )
+
+        presigned_url = await run_in_threadpool(
+            get_presigned_image_url,
+            comparison_id,
+            filename,
+        )
         return RedirectResponse(url=presigned_url, status_code=status.HTTP_307_TEMPORARY_REDIRECT)
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
@@ -481,7 +498,7 @@ async def view_comparison(request: Request, comparison_id: str):
     image_sizes = []
 
     for row in rows:
-        images.append(f"{comparison_id}/{row['filename']}")
+        images.append(get_browser_image_url(comparison_id, row["filename"]))
         # Use custom name if available, otherwise use original filename
         image_names.append(row.get("custom_name") or row.get("original_filename"))
         image_sizes.append(row.get("image_size"))
