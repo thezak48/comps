@@ -32,6 +32,49 @@ def test_invitation_registration_and_authentication(isolated_db):
     assert auth.register_user("another-user", code) is None
 
 
+def test_redeemed_code_is_no_longer_recoverable(isolated_db):
+    admin_id = query_one("SELECT id FROM users WHERE username = 'admin'")[0]
+    code = auth.create_invitation_code(admin_id)
+
+    # Unredeemed codes stay readable so an admin can still share them.
+    assert query_one("SELECT code FROM invitation_codes WHERE code = ?", (code,))
+
+    user = auth.register_user("redeemer", code)
+    stored_code = query_one("SELECT code FROM invitation_codes WHERE used_by = ?", (user["id"],))[0]
+    stored_hash = query_one("SELECT invitation_code_hash FROM users WHERE id = ?", (user["id"],))[0]
+
+    assert stored_code is None
+    assert stored_hash.startswith("scrypt$")
+    # The credential still works even though the cleartext is gone.
+    assert auth.authenticate_user("redeemer", code)["id"] == user["id"]
+
+
+def test_legacy_hashes_authenticate_and_are_upgraded(isolated_db, make_user):
+    user_id = make_user(invitation_code="legacy-code")
+
+    before = query_one("SELECT invitation_code_hash FROM users WHERE id = ?", (user_id,))[0]
+    authenticated = auth.authenticate_user("student", "legacy-code")
+    after = query_one("SELECT invitation_code_hash FROM users WHERE id = ?", (user_id,))[0]
+
+    assert not before.startswith("scrypt$")
+    assert authenticated["id"] == user_id
+    assert after.startswith("scrypt$")
+    # The upgraded hash still verifies the same credential.
+    assert auth.authenticate_user("student", "legacy-code")["id"] == user_id
+    assert auth.authenticate_user("student", "wrong-code") is None
+
+
+def test_placeholder_admin_code_is_detected(isolated_db):
+    assert auth.admin_uses_placeholder_code() is False
+
+    execute(
+        "UPDATE users SET invitation_code_hash = ? WHERE username = ?",
+        (auth.hash_invitation_code("change-me-in-production"), "admin"),
+    )
+
+    assert auth.admin_uses_placeholder_code() is True
+
+
 def test_tokens_resolve_users_and_reject_invalid_tokens(isolated_db, make_user):
     user_id = make_user()
     token = auth.create_access_token({"sub": str(user_id)})
