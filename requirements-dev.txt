@@ -1,10 +1,10 @@
-# Development requirements for formatting and linting
-black
-isort
-flake8
-djlint
-pre-commit
-setuptools
-httpx
-pytest
-pytest-cov
+# Development requirements for formatting, linting and tests
+black==26.5.1
+isort==8.0.1
+flake8==7.3.0
+djlint==1.44.2
+pre-commit==4.6.2
+setuptools==84.0.0
+httpx==0.28.1
+pytest==9.1.1
+pytest-cov==7.1.0
