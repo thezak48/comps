@@ -13,7 +13,7 @@ services:
       - PGID=1000
       - DB_PATH=/config/comparisons.db
       - UPLOADS_PATH=/data/uploads
-      - ADMIN_INVITATION_CODE=your-secure-admin-code
+      - ADMIN_INVITATION_CODE=${ADMIN_INVITATION_CODE:?set this to a strong value}
     volumes:
       - ./config:/config
       - ./data:/data

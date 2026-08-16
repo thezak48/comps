@@ -33,7 +33,7 @@ services:
       - DB_BACKEND=postgres
       - DATABASE_URL=postgresql://comps:compspass@db:5432/comps
       - UPLOADS_PATH=/data/uploads
-      - ADMIN_INVITATION_CODE=your-secure-admin-code
+      - ADMIN_INVITATION_CODE=${ADMIN_INVITATION_CODE:?set this to a strong value}
     volumes:
       - ./config:/config
       - ./data:/data
