@@ -677,24 +677,16 @@
             "title": "Show Name"
           },
           "expiration_type": {
-            "type": "string",
-            "title": "Expiration Type",
+            "$ref": "#/components/schemas/ExpirationType",
             "default": "from_last_access"
           },
           "expiration_enabled": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Expiration Enabled"
+            "type": "boolean",
+            "title": "Expiration Enabled",
+            "default": false
           },
           "expiration_days": {
-            "type": "integer",
-            "title": "Expiration Days",
+            "$ref": "#/components/schemas/ExpirationDays",
             "default": 7
           },
           "tags": {
@@ -900,17 +892,15 @@
             ]
           },
           "expiration_type": {
-            "type": "string",
-            "title": "Expiration Type",
-            "description": "When to expire the comparison: 'from_creation' or 'from_last_access'",
+            "$ref": "#/components/schemas/ExpirationType",
+            "description": "When to expire the comparison",
             "default": "from_last_access",
             "examples": [
               "from_last_access"
             ]
           },
           "expiration_days": {
-            "type": "integer",
-            "title": "Expiration Days",
+            "$ref": "#/components/schemas/ExpirationDays",
             "description": "Number of days until the comparison expires",
             "default": 7,
             "examples": [
@@ -1200,6 +1190,24 @@
           "custom_name"
         ],
         "title": "CustomNameUpdate"
+      },
+      "ExpirationDays": {
+        "type": "integer",
+        "enum": [
+          1,
+          7,
+          30,
+          90
+        ],
+        "title": "ExpirationDays"
+      },
+      "ExpirationType": {
+        "type": "string",
+        "enum": [
+          "from_creation",
+          "from_last_access"
+        ],
+        "title": "ExpirationType"
       },
       "HTTPValidationError": {
         "properties": {
