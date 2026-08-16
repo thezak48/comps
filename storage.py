@@ -1,4 +1,3 @@
-import mimetypes
 import os
 import shutil
 import uuid
@@ -18,6 +17,17 @@ S3_REGION = os.getenv("S3_REGION")
 S3_ENDPOINT_URL = os.getenv("S3_ENDPOINT_URL")
 S3_KEY_PREFIX = os.getenv("S3_KEY_PREFIX", "").strip().strip("/")
 S3_PRESIGNED_URL_TTL_SECONDS = int(os.getenv("S3_PRESIGNED_URL_TTL_SECONDS", "3600"))
+
+ALLOWED_IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp"}
+
+EXTENSION_CONTENT_TYPES = {
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".gif": "image/gif",
+    ".webp": "image/webp",
+    ".bmp": "image/bmp",
+}
 
 _s3_client = None
 
@@ -53,9 +63,8 @@ async def save_upload_file(comparison_id: str, filename: str, file: UploadFile) 
     safe_comparison_id = _normalize_comparison_id(comparison_id)
     safe_filename = _normalize_filename(filename)
     await file.seek(0)
-    content_type = (
-        file.content_type or mimetypes.guess_type(safe_filename)[0] or "application/octet-stream"
-    )
+    # Derive the type from the server-side map rather than trusting the client.
+    content_type = get_content_type_for(safe_filename)
 
     if is_s3_enabled():
         key = _get_object_key(safe_comparison_id, safe_filename)
@@ -201,6 +210,21 @@ def _delete_s3_keys(client, keys: list[str]):
                 for err in errors
             )
             raise OSError(f"S3 reported delete errors: {details}")
+
+
+def get_content_type_for(filename: str) -> str:
+    """Return a content type from the server-side allowlist, never from client input."""
+    return EXTENSION_CONTENT_TYPES.get(Path(filename).suffix.lower(), "application/octet-stream")
+
+
+def get_local_image_path(comparison_id: str, filename: str) -> Path:
+    """Resolve a stored image on the local filesystem, rejecting traversal attempts."""
+    safe_comparison_id = _normalize_comparison_id(comparison_id)
+    safe_filename = _normalize_filename(filename)
+    path = Path(UPLOADS_PATH) / safe_comparison_id / safe_filename
+    if not path.is_file():
+        raise FileNotFoundError(f"Image not found: {safe_comparison_id}/{safe_filename}")
+    return path
 
 
 def _normalize_comparison_id(comparison_id: str) -> str:
