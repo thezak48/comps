@@ -10,7 +10,7 @@ from contextlib import contextmanager
 from datetime import datetime, timedelta
 from typing import Any, Dict, Generator, Optional
 
-from fastapi import Request
+from fastapi import HTTPException, Request
 from fastapi.security import APIKeyCookie, APIKeyHeader
 from jose import JWTError, jwt
 
@@ -228,6 +228,24 @@ def is_admin(user: dict) -> bool:
 def is_super_admin(user: dict) -> bool:
     """Check if a user is a super admin"""
     return bool(user and user.get("is_super_admin", False))
+
+
+def require_comparison_write_access(comparison: dict, user: Optional[dict]) -> None:
+    """Reject writes to a user-owned comparison by anyone except its owner."""
+    owner_id = comparison.get("user_id")
+    if owner_id is not None and (user is None or user.get("id") != owner_id):
+        raise HTTPException(
+            status_code=403, detail="You do not have permission to edit this comparison"
+        )
+
+
+def comparison_never_expires(user: Optional[dict], expiration_enabled: bool = False) -> bool:
+    """Grant non-expiring storage only when the authenticated user has that entitlement."""
+    return bool(
+        user
+        and user.get("never_expire_comparisons", False)
+        and not expiration_enabled
+    )
 
 
 def get_all_users() -> list:

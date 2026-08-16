@@ -1,6 +1,19 @@
+from enum import Enum, IntEnum
 from typing import List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
+
+
+class ExpirationType(str, Enum):
+    FROM_CREATION = "from_creation"
+    FROM_LAST_ACCESS = "from_last_access"
+
+
+class ExpirationDays(IntEnum):
+    ONE = 1
+    SEVEN = 7
+    THIRTY = 30
+    NINETY = 90
 
 
 class TagList(BaseModel):
@@ -42,7 +55,16 @@ class ComparisonBase(BaseModel):
 
 
 class ComparisonCreate(ComparisonBase):
-    pass
+    expiration_type: ExpirationType = Field(
+        "from_last_access",
+        description="When to expire the comparison",
+        examples=["from_last_access"],
+    )
+    expiration_days: ExpirationDays = Field(
+        7,
+        description="Number of days until the comparison expires",
+        examples=[7],
+    )
 
 
 class ImagePosition(BaseModel):

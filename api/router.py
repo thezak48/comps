@@ -27,6 +27,8 @@ from .models import (
     ComparisonDetail,
     ComparisonResponse,
     CustomNameUpdate,
+    ExpirationDays,
+    ExpirationType,
 )
 
 router = APIRouter(prefix="/api/v1", tags=["api"])
@@ -187,7 +189,9 @@ async def create_new_comparison(
     metadata = {
         "total_columns": comparison_data.total_columns,
         "total_rows": min(comparison_data.total_rows, MAX_ROWS),
-        "never_expire": user["never_expire_comparisons"] if user else False,
+        "expiration_type": comparison_data.expiration_type,
+        "expiration_days": comparison_data.expiration_days,
+        "never_expire": auth.comparison_never_expires(user),
     }
 
     create_comparison_storage(comparison_id)
@@ -274,7 +278,12 @@ async def get_comparison_detail(comparison_id: str):
 
 
 @router.put("/comparisons/{comparison_id}/images/{filename}", status_code=200)
-async def update_image_metadata(comparison_id: str, filename: str, update_data: CustomNameUpdate):
+async def update_image_metadata(
+    comparison_id: str,
+    filename: str,
+    update_data: CustomNameUpdate,
+    user: Optional[dict] = Depends(auth.get_optional_user),
+):
     """
     Update image metadata.
 
@@ -288,6 +297,7 @@ async def update_image_metadata(comparison_id: str, filename: str, update_data: 
     comparison_data = get_comparison(comparison_id)
     if not comparison_data:
         raise HTTPException(status_code=404, detail="Comparison not found")
+    auth.require_comparison_write_access(comparison_data, user)
 
     # Check if file exists
     rows = query(
@@ -339,9 +349,9 @@ async def api_create_comparison(
     request: Request,
     name: Optional[str] = Form(None),
     show_name: Optional[str] = Form(None),
-    expiration_type: str = Form("from_last_access"),
-    expiration_enabled: Optional[str] = Form(None),
-    expiration_days: int = Form(7),
+    expiration_type: ExpirationType = Form("from_last_access"),
+    expiration_enabled: bool = Form(False),
+    expiration_days: ExpirationDays = Form(7),
     tags: Optional[str] = Form(None),
     total_rows: int = Form(1),
     total_columns: int = Form(2),
@@ -368,12 +378,7 @@ async def api_create_comparison(
     if tags and tags.strip():
         tag_list = [tag.strip() for tag in tags.split(",") if tag.strip()]
 
-    never_expire = None
-    if user:
-        if expiration_enabled == "true":
-            never_expire = False
-        else:
-            never_expire = True
+    never_expire = auth.comparison_never_expires(user, expiration_enabled)
 
     metadata = {
         "total_rows": total_rows,
@@ -403,6 +408,7 @@ async def api_upload_image(
     column: int = Form(...),
     original_filename: str = Form(...),
     custom_name: Optional[str] = Form(None),
+    user: Optional[dict] = Depends(auth.get_optional_user),
 ):
     """
     Uploads a single image to an existing comparison.
@@ -418,6 +424,7 @@ async def api_upload_image(
     comparison = get_comparison(comparison_id)
     if not comparison:
         return JSONResponse(status_code=404, content={"error": "Comparison not found"})
+    auth.require_comparison_write_access(comparison, user)
 
     safe_name = file.filename or ""
     file_ext = Path(safe_name).suffix
