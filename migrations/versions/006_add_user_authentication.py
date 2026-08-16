@@ -86,14 +86,16 @@ def upgrade(cursor):
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_invitation_codes_code ON invitation_codes(code)')
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_comparisons_user_id ON comparisons(user_id)')
     
-    # Create first admin user with a predefined invitation code
+    # Create first admin user with an invitation code supplied by the operator
     import hashlib
-    # Get admin code from environment variable or use default (for initial setup only)
-    admin_code = os.getenv("ADMIN_INVITATION_CODE", "admin-setup-123456")
-    # Log a warning if using the default admin code
-    if admin_code == "admin-setup-123456":
-        logging.warning("WARNING: Using default admin invitation code. This is insecure!")
-        logging.warning("Set the ADMIN_INVITATION_CODE environment variable to a secure value.")
+    import secrets
+    admin_code = os.getenv("ADMIN_INVITATION_CODE", "").strip()
+    if not admin_code:
+        # Nothing configured: generate a code so the install is usable but not predictable.
+        admin_code = secrets.token_urlsafe(24)
+        logging.warning("ADMIN_INVITATION_CODE was not set.")
+        logging.warning("Generated admin invitation code for first-time setup: %s", admin_code)
+        logging.warning("Record this value now; it is not displayed again.")
     admin_code_hash = hashlib.sha256(admin_code.encode()).hexdigest()
     
     # Ensure admin user exists (idempotent)

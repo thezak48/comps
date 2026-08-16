@@ -272,6 +272,34 @@ def set_admin_status(user_id: int, admin_status: bool):
         cursor.execute("UPDATE users SET is_admin = ? WHERE id = ?", (admin_status, user_id))
 
 
+# Invitation codes that shipped as defaults or copy-paste examples in earlier versions:
+# the migration fallback, the image's ENV default, and the value in both compose files.
+PLACEHOLDER_ADMIN_CODES = (
+    "admin-setup-123456",
+    "change-me-in-production",
+    "your-secure-admin-code",
+)
+
+
+def admin_uses_placeholder_code() -> bool:
+    """Report whether the admin account still uses a code that shipped as a default."""
+    try:
+        with get_db_cursor() as cursor:
+            cursor.execute(
+                "SELECT invitation_code_hash FROM users WHERE username = ?",
+                ("admin",),
+            )
+            row = cursor.fetchone()
+    except Exception:
+        return False
+
+    if not row or not row[0]:
+        return False
+
+    known = {hashlib.sha256(code.encode()).hexdigest() for code in PLACEHOLDER_ADMIN_CODES}
+    return row[0] in known
+
+
 # --- API Key Management ---
 
 

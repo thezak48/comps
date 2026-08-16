@@ -242,6 +242,16 @@ async def start_cleanup_task():
     except Exception as e:
         logger.error("Error checking database state: %s", str(e))
 
+    if auth.admin_uses_placeholder_code():
+        logger.warning(
+            "The 'admin' account still uses an invitation code that shipped as a default."
+        )
+        logger.warning(
+            "Setting ADMIN_INVITATION_CODE now has no effect: the account was created "
+            "by a migration that has already run."
+        )
+        logger.warning("Rotate it with: python scripts/rotate_admin_code.py --username admin")
+
 
 @app.get("/health")
 async def health_check():
