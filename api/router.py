@@ -12,6 +12,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse
 from fastapi.security import APIKeyCookie, OAuth2PasswordRequestForm
+from PIL import Image
 
 import auth
 from database import (
@@ -26,7 +27,7 @@ from database import (
     update_last_accessed,
 )
 from db import query, query_dicts
-from storage import create_comparison_storage, save_upload_file
+from storage import ALLOWED_IMAGE_EXTENSIONS, create_comparison_storage, save_upload_file
 
 from .models import (
     ComparisonCreate,
@@ -497,7 +498,19 @@ async def api_upload_image(
     _authorize_comparison_write(request, comparison_id, comparison, user)
 
     safe_name = file.filename or ""
-    file_ext = Path(safe_name).suffix
+    file_ext = Path(safe_name).suffix.lower()
+    if file_ext not in ALLOWED_IMAGE_EXTENSIONS:
+        return JSONResponse(status_code=400, content={"error": "Unsupported image type"})
+
+    # An allowed extension is not evidence of an image, so confirm the bytes decode.
+    await file.seek(0)
+    try:
+        with Image.open(file.file) as probe:
+            probe.verify()
+    except Exception:
+        return JSONResponse(status_code=400, content={"error": "File is not a valid image"})
+    await file.seek(0)
+
     unique_filename = f"{uuid.uuid4()}{file_ext}"
     try:
         image_size = await save_upload_file(comparison_id, unique_filename, file)

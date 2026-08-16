@@ -13,7 +13,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, Form, HTTPException, Request, status
 from fastapi.openapi.utils import get_openapi
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.security import APIKeyCookie
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -31,7 +31,13 @@ from database import (
 )
 from database_metrics import get_metrics
 from db import backend_name, query_dicts
-from storage import ensure_storage_ready, get_presigned_image_url, is_s3_enabled
+from storage import (
+    ensure_storage_ready,
+    get_content_type_for,
+    get_local_image_path,
+    get_presigned_image_url,
+    is_s3_enabled,
+)
 
 
 # Random name generator for comparisons
@@ -133,24 +139,30 @@ app.include_router(api_router)
 
 # Mount static files and templates
 app.mount("/static", StaticFiles(directory="static"), name="static")
-if not is_s3_enabled():
-    app.mount(
-        "/uploads", StaticFiles(directory=os.getenv("UPLOADS_PATH", "uploads")), name="uploads"
-    )
 templates = Jinja2Templates(directory="templates")
 
 
 @app.get("/uploads/{path:path}", include_in_schema=False, name="uploads")
 async def serve_uploaded_image(path: str):
-    if not is_s3_enabled():
-        raise HTTPException(status_code=404, detail="Image not found")
-
     if "/" not in path:
         raise HTTPException(status_code=404, detail="Image not found")
 
     comparison_id, filename = path.split("/", 1)
     if not comparison_id or not filename:
         raise HTTPException(status_code=404, detail="Image not found")
+
+    if not is_s3_enabled():
+        # Serve with a content type from the server-side map so a stored file cannot
+        # dictate how the browser interprets it.
+        try:
+            file_path = get_local_image_path(comparison_id, filename)
+        except (FileNotFoundError, OSError) as e:
+            raise HTTPException(status_code=404, detail="Image not found") from e
+        return FileResponse(
+            file_path,
+            media_type=get_content_type_for(filename),
+            headers={"X-Content-Type-Options": "nosniff"},
+        )
 
     try:
         presigned_url = get_presigned_image_url(comparison_id, filename)

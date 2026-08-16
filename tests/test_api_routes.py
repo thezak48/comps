@@ -146,6 +146,46 @@ def test_owned_comparison_needs_no_edit_token(client, api_credentials):
     assert response.status_code == 200
 
 
+def test_upload_rejects_non_image_content(client):
+    created = client.post("/api/v1/comparison", data={"name": "Anon"}).json()
+    headers = {"X-Edit-Token": created["edit_token"]}
+    url = f"/api/v1/comparison/{created['comparison_id']}/image"
+    payload = b"<script>alert(document.domain)</script>"
+
+    disallowed_extension = client.post(
+        url,
+        headers=headers,
+        data={"row": "0", "column": "0", "original_filename": "payload.html"},
+        files={"file": ("payload.html", payload, "text/html")},
+    )
+    disguised_as_image = client.post(
+        url,
+        headers=headers,
+        data={"row": "0", "column": "0", "original_filename": "payload.png"},
+        files={"file": ("payload.png", payload, "image/png")},
+    )
+
+    assert disallowed_extension.status_code == 400
+    assert disguised_as_image.status_code == 400
+
+
+def test_uploaded_image_is_served_with_a_pinned_content_type(client):
+    created = client.post("/api/v1/comparison", data={"name": "Anon"}).json()
+    comparison_id = created["comparison_id"]
+    uploaded = client.post(
+        f"/api/v1/comparison/{comparison_id}/image",
+        headers={"X-Edit-Token": created["edit_token"]},
+        data={"row": "0", "column": "0", "original_filename": "shot.png"},
+        files={"file": ("shot.png", png_bytes(), "image/png")},
+    )
+
+    served = client.get(f"/uploads/{comparison_id}/{uploaded.json()['filename']}")
+
+    assert served.status_code == 200
+    assert served.headers["content-type"] == "image/png"
+    assert served.headers["x-content-type-options"] == "nosniff"
+
+
 def test_json_comparison_rejects_invalid_expiration(client):
     response = client.post(
         "/api/v1/comparisons",
@@ -200,7 +240,7 @@ def test_owned_image_upload_update_and_delete(client, api_credentials, make_user
         user_id=owner_id,
     )
     upload = {
-        "file": ("image.png", b"image bytes", "image/png"),
+        "file": ("image.png", png_bytes(), "image/png"),
     }
     form = {"row": "0", "column": "0", "original_filename": "image.png"}
 
