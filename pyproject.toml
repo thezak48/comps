@@ -13,7 +13,7 @@ line-length = 100
 target-version = ['py38']
 include = '\.pyi?$'
 exclude = '''
-/(\.|venv|env|.venv|static|templates|migrations|node_modules)/
+/(\.pytest_cache|\.pytest-tmp|venv|env|\.venv|static|templates|migrations|node_modules)/
 '''
 
 [tool.pytest.ini_options]

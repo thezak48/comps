@@ -241,11 +241,7 @@ def require_comparison_write_access(comparison: dict, user: Optional[dict]) -> N
 
 def comparison_never_expires(user: Optional[dict], expiration_enabled: bool = False) -> bool:
     """Grant non-expiring storage only when the authenticated user has that entitlement."""
-    return bool(
-        user
-        and user.get("never_expire_comparisons", False)
-        and not expiration_enabled
-    )
+    return bool(user and user.get("never_expire_comparisons", False) and not expiration_enabled)
 
 
 def get_all_users() -> list:

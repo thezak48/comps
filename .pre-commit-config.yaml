@@ -1,3 +1,5 @@
+exclude: ^(\.pytest_cache|\.pytest-tmp)/
+
 repos:
   - repo: https://github.com/psf/black
     rev: 25.1.0
