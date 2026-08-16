@@ -5,3 +5,6 @@ flake8
 djlint
 pre-commit
 setuptools
+httpx
+pytest
+pytest-cov

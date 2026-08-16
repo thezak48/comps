@@ -20,6 +20,10 @@ var/
 .installed.cfg
 *.egg
 .codebuddy/
+.coverage
+.pytest_cache/
+.pytest-tmp/
+htmlcov/
 
 # Database
 *.db

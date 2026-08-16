@@ -3,8 +3,8 @@ import unittest
 from fastapi import HTTPException
 from pydantic import TypeAdapter, ValidationError
 
-from auth import comparison_never_expires, require_comparison_write_access
 from api.models import ComparisonCreate, ExpirationDays
+from auth import comparison_never_expires, require_comparison_write_access
 
 
 class ExpirationValidationTests(unittest.TestCase):

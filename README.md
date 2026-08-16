@@ -76,6 +76,23 @@ docker compose -f docker-compose.postgres.yml up -d --build
 
 This spins up Postgres and the app with `DB_BACKEND=postgres` and `DATABASE_URL` set, waits for Postgres to be healthy, then starts the app. The app’s entrypoint blocks until migrations initialize.
 
+## Testing
+
+Install the application and development dependencies, then run the Python suite:
+
+```bash
+python -m pip install -r requirements.txt -r requirements-dev.txt
+python -m pytest
+```
+
+Run with branch coverage:
+
+```bash
+python -m pytest --cov --cov-report=term-missing
+```
+
+Tests use isolated SQLite databases and upload directories under `.pytest-tmp`; they do not use the configured production database or storage. Static assets are checked separately with `npm run check`.
+
 ## License
 
 This project is licensed under the GNU General Public License v3.0 - see the [LICENSE](LICENSE) file for details.

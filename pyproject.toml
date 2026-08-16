@@ -15,3 +15,15 @@ include = '\.pyi?$'
 exclude = '''
 /(\.|venv|env|.venv|static|templates|migrations|node_modules)/
 '''
+
+[tool.pytest.ini_options]
+addopts = "--strict-markers --strict-config --basetemp=.pytest-tmp"
+testpaths = ["tests"]
+
+[tool.coverage.run]
+branch = true
+source = ["api", "auth", "database", "database_metrics", "db", "main", "migrations", "storage"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
