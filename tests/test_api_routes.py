@@ -1,6 +1,17 @@
+from io import BytesIO
+
+from PIL import Image
+
 import auth
 import database
-from db import query_one
+from db import execute, query_one
+
+
+def png_bytes():
+    """A real PNG, so these cases keep working once uploads are content-checked."""
+    buffer = BytesIO()
+    Image.new("RGB", (2, 2), (255, 0, 0)).save(buffer, format="PNG")
+    return buffer.getvalue()
 
 
 def test_api_login_accepts_valid_credentials(client, make_user):
@@ -75,6 +86,64 @@ def test_comparison_listing_is_scoped_to_the_caller(client, api_credentials, mak
 
     assert [row["name"] for row in owned.json()] == ["Mine"]
     assert {row["name"] for row in everything.json()} == {"Mine", "Theirs"}
+
+
+def test_ownerless_comparison_write_requires_the_edit_token(client):
+    created = client.post("/api/v1/comparison", data={"name": "Anon"}).json()
+    comparison_id = created["comparison_id"]
+    form = {"row": "0", "column": "0", "original_filename": "shot.png"}
+    upload = {"file": ("shot.png", png_bytes(), "image/png")}
+
+    without = client.post(f"/api/v1/comparison/{comparison_id}/image", data=form, files=upload)
+    wrong = client.post(
+        f"/api/v1/comparison/{comparison_id}/image",
+        headers={"X-Edit-Token": "not-the-token"},
+        data=form,
+        files=upload,
+    )
+    correct = client.post(
+        f"/api/v1/comparison/{comparison_id}/image",
+        headers={"X-Edit-Token": created["edit_token"]},
+        data=form,
+        files=upload,
+    )
+
+    assert without.status_code == 403
+    assert wrong.status_code == 403
+    assert correct.status_code == 200
+
+
+def test_edit_token_stops_working_once_expired(client):
+    created = client.post("/api/v1/comparison", data={"name": "Anon"}).json()
+    execute(
+        "UPDATE comparisons SET edit_token_expires_at = ? WHERE id = ?",
+        (1, created["comparison_id"]),
+    )
+
+    response = client.post(
+        f"/api/v1/comparison/{created['comparison_id']}/image",
+        headers={"X-Edit-Token": created["edit_token"]},
+        data={"row": "0", "column": "0", "original_filename": "shot.png"},
+        files={"file": ("shot.png", png_bytes(), "image/png")},
+    )
+
+    assert response.status_code == 403
+
+
+def test_owned_comparison_needs_no_edit_token(client, api_credentials):
+    _, headers = api_credentials
+    created = client.post("/api/v1/comparison", headers=headers, data={"name": "Owned"}).json()
+
+    assert "edit_token" not in created
+
+    response = client.post(
+        f"/api/v1/comparison/{created['comparison_id']}/image",
+        headers=headers,
+        data={"row": "0", "column": "0", "original_filename": "shot.png"},
+        files={"file": ("shot.png", png_bytes(), "image/png")},
+    )
+
+    assert response.status_code == 200
 
 
 def test_json_comparison_rejects_invalid_expiration(client):

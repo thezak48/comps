@@ -117,6 +117,17 @@ class ComparisonResponse(ComparisonBase):
     model_config = ConfigDict(from_attributes=True)
 
 
+class ComparisonCreateResponse(ComparisonResponse):
+    edit_token: Optional[str] = Field(
+        None,
+        description=(
+            "Secret token authorizing later writes to this comparison. Returned only "
+            "when the comparison has no owner. Send it as the X-Edit-Token header."
+        ),
+        examples=["3sJ1w0Yk9m2QpX7bN4vRtLzC6hA8dEfG"],
+    )
+
+
 class ImageDetail(BaseModel):
     filename: str = Field(
         ...,

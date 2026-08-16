@@ -1,6 +1,6 @@
 import os
 from datetime import datetime, timedelta
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 from db import backend_name, execute, query, query_one
 from migrations.manager import MigrationManager
@@ -74,6 +74,29 @@ def create_comparison(
                 "INSERT INTO tags (comparison_id, tag) VALUES (?, ?)",
                 (comparison_id, tag),
             )
+
+
+def set_comparison_edit_token(comparison_id: str, token_hash: str, expires_at: int):
+    """Store the hash of the edit token that authorizes writes to a comparison.
+
+    expires_at is a Unix timestamp so the comparison is free of the timezone
+    ambiguity that affects the TIMESTAMP columns on this table.
+    """
+    execute(
+        "UPDATE comparisons SET edit_token_hash = ?, edit_token_expires_at = ? WHERE id = ?",
+        (token_hash, expires_at, comparison_id),
+    )
+
+
+def get_comparison_edit_token(comparison_id: str) -> Tuple[Optional[str], Optional[int]]:
+    """Return the stored edit token hash and its expiry, or (None, None) if it has none."""
+    row = query_one(
+        "SELECT edit_token_hash, edit_token_expires_at FROM comparisons WHERE id = ?",
+        (comparison_id,),
+    )
+    if not row or not row[0]:
+        return None, None
+    return row[0], row[1]
 
 
 def update_last_accessed(comparison_id: str):
