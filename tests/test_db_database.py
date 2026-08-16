@@ -19,7 +19,7 @@ def test_migrations_create_complete_schema(isolated_db):
         "tags",
         "users",
     } <= tables
-    assert MigrationManager().get_current_version() == "009"
+    assert MigrationManager().get_current_version() == "010"
 
 
 def test_db_helpers_execute_and_query(isolated_db):

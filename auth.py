@@ -3,6 +3,7 @@ Authentication module for Comps.
 Handles user authentication, invitation codes, and session management.
 """
 
+import base64
 import hashlib
 import os
 import secrets
@@ -52,9 +53,72 @@ def get_db_cursor() -> Generator[Any, None, None]:
             raise
 
 
+SCRYPT_N = 2**14
+SCRYPT_R = 8
+SCRYPT_P = 1
+SCRYPT_DKLEN = 32
+# 128 * N * r bytes are needed to derive; OpenSSL's default ceiling is lower than that.
+SCRYPT_MAXMEM = 128 * SCRYPT_N * SCRYPT_R * 2
+
+
+def _scrypt_hash(code: str, salt: bytes) -> str:
+    """Derive a versioned scrypt hash so the parameters travel with the stored value."""
+    derived = hashlib.scrypt(
+        code.encode(),
+        salt=salt,
+        n=SCRYPT_N,
+        r=SCRYPT_R,
+        p=SCRYPT_P,
+        dklen=SCRYPT_DKLEN,
+        maxmem=SCRYPT_MAXMEM,
+    )
+    return "scrypt${}${}${}${}${}".format(
+        SCRYPT_N,
+        SCRYPT_R,
+        SCRYPT_P,
+        base64.b64encode(salt).decode(),
+        base64.b64encode(derived).decode(),
+    )
+
+
 def hash_invitation_code(code: str) -> str:
-    """Hash an invitation code for secure storage"""
-    return hashlib.sha256(code.encode()).hexdigest()
+    """Hash an invitation code for storage."""
+    return _scrypt_hash(code, secrets.token_bytes(16))
+
+
+def verify_invitation_code_hash(code: str, stored: str) -> bool:
+    """Check a code against a stored hash, accepting the legacy unsalted digest."""
+    if not stored:
+        return False
+
+    if stored.startswith("scrypt$"):
+        try:
+            _, n, r, p, salt_b64, expected_b64 = stored.split("$")
+            candidate = hashlib.scrypt(
+                code.encode(),
+                salt=base64.b64decode(salt_b64),
+                n=int(n),
+                r=int(r),
+                p=int(p),
+                dklen=SCRYPT_DKLEN,
+                maxmem=128 * int(n) * int(r) * 2,
+            )
+            expected = base64.b64decode(expected_b64)
+        except (ValueError, TypeError):
+            return False
+        return secrets.compare_digest(candidate, expected)
+
+    legacy = hashlib.sha256(code.encode()).hexdigest()
+    return secrets.compare_digest(legacy, stored)
+
+
+def _upgrade_stored_hash(user_id: int, code: str) -> None:
+    """Re-store a legacy hash in the current format after a successful login."""
+    with get_db_cursor() as cursor:
+        cursor.execute(
+            "UPDATE users SET invitation_code_hash = ? WHERE id = ?",
+            (hash_invitation_code(code), user_id),
+        )
 
 
 def create_invitation_code(created_by_id: int) -> str:
@@ -109,9 +173,13 @@ def register_user(username: str, invitation_code: str) -> Optional[Dict[str, Any
         if user:
             user_id = user[0]
             with get_db_cursor() as cursor:
+                # Clear the cleartext as it is redeemed: from here it is the
+                # account's login credential, not a shareable signup token.
                 cursor.execute(
                     """
-                    UPDATE invitation_codes SET is_used = ?, used_by = ? WHERE code = ?
+                    UPDATE invitation_codes
+                    SET is_used = ?, used_by = ?, code = NULL
+                    WHERE code = ?
                     """,
                     (True, user_id, invitation_code),
                 )
@@ -130,25 +198,29 @@ def register_user(username: str, invitation_code: str) -> Optional[Dict[str, Any
 
 def authenticate_user(username: str, invitation_code: str) -> Optional[Dict[str, Any]]:
     """Authenticate a user with their username and invitation code"""
-    code_hash = hash_invitation_code(invitation_code)
+    # A salted hash cannot be matched in SQL, so fetch by username and verify here.
     with get_db_cursor() as cursor:
         cursor.execute(
             """
-            SELECT id, username, is_admin, never_expire_comparisons FROM users
-            WHERE username = ? AND invitation_code_hash = ?
+            SELECT id, username, is_admin, never_expire_comparisons, invitation_code_hash
+            FROM users WHERE username = ?
             """,
-            (username, code_hash),
+            (username,),
         )
         user = cursor.fetchone()
 
-    if user:
-        return {
-            "id": user[0],
-            "username": user[1],
-            "is_admin": bool(user[2]),
-            "never_expire_comparisons": bool(user[3]),
-        }
-    return None
+    if not user or not verify_invitation_code_hash(invitation_code, user[4]):
+        return None
+
+    if not user[4].startswith("scrypt$"):
+        _upgrade_stored_hash(user[0], invitation_code)
+
+    return {
+        "id": user[0],
+        "username": user[1],
+        "is_admin": bool(user[2]),
+        "never_expire_comparisons": bool(user[3]),
+    }
 
 
 def create_access_token(data: dict) -> str:
@@ -296,8 +368,9 @@ def admin_uses_placeholder_code() -> bool:
     if not row or not row[0]:
         return False
 
-    known = {hashlib.sha256(code.encode()).hexdigest() for code in PLACEHOLDER_ADMIN_CODES}
-    return row[0] in known
+    # Verify rather than compare digests: stored hashes are salted, so equality
+    # against a precomputed value would stop matching and silence this check.
+    return any(verify_invitation_code_hash(code, row[0]) for code in PLACEHOLDER_ADMIN_CODES)
 
 
 # --- API Key Management ---

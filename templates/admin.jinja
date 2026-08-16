@@ -29,7 +29,7 @@
                     <tbody>
                     {% for code in invitation_codes %}
                     <tr>
-                        <td><code>{{ code.code }}</code></td>
+                        <td><code>{{ code.code or 'Redeemed' }}</code></td>
                         <td>
                             {% if code.is_used %}
                             <span class="badge bg-success">Used</span>
