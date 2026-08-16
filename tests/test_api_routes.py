@@ -50,12 +50,31 @@ def test_json_comparison_create_list_and_detail(client, api_credentials):
     assert query_one("SELECT user_id FROM comparisons WHERE id = ?", (comparison_id,))[0] == user_id
     assert created.json()["expiration_days"] == 30
 
-    listed = client.get("/api/v1/comparisons")
+    listed = client.get("/api/v1/comparisons", headers=headers)
     detailed = client.get(f"/api/v1/comparisons/{comparison_id}")
     assert listed.status_code == 200
     assert listed.json()[0]["tags"] == ["api", "test"]
     assert detailed.status_code == 200
     assert detailed.json()["images"] == []
+
+
+def test_comparison_listing_requires_authentication(client):
+    assert client.get("/api/v1/comparisons").status_code == 401
+
+
+def test_comparison_listing_is_scoped_to_the_caller(client, api_credentials, make_user):
+    _, owner_headers = api_credentials
+    admin_id = make_user(username="boss", invitation_code="boss-code", is_admin=True)
+    admin_headers = {"Authorization": auth.create_api_key(admin_id, "admin")}
+
+    client.post("/api/v1/comparisons", headers=owner_headers, json={"name": "Mine"})
+    client.post("/api/v1/comparisons", headers=admin_headers, json={"name": "Theirs"})
+
+    owned = client.get("/api/v1/comparisons", headers=owner_headers)
+    everything = client.get("/api/v1/comparisons", headers=admin_headers)
+
+    assert [row["name"] for row in owned.json()] == ["Mine"]
+    assert {row["name"] for row in everything.json()} == {"Mine", "Theirs"}
 
 
 def test_json_comparison_rejects_invalid_expiration(client):
