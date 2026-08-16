@@ -1494,7 +1494,7 @@ document.getElementById("upload-button").addEventListener("click", async () => {
             );
         }
 
-        const { comparison_id } = await comparisonResponse.json();
+        const { comparison_id, edit_token } = await comparisonResponse.json();
 
         // 2. Upload each file individually
         const filesToUpload = [];
@@ -1525,6 +1525,7 @@ document.getElementById("upload-button").addEventListener("click", async () => {
                 `/api/v1/comparison/${comparison_id}/image`,
                 {
                     method: "POST",
+                    headers: edit_token ? { "X-Edit-Token": edit_token } : {},
                     body: imageFormData,
                 },
             );

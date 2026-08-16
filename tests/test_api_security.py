@@ -47,7 +47,12 @@ class ComparisonWriteAccessTests(unittest.TestCase):
 
         self.assertEqual(raised.exception.status_code, 403)
 
-    def test_anonymous_comparison_remains_editable(self):
+    def test_ownerless_comparison_is_not_gated_by_ownership(self):
+        """An ownerless comparison has no owner to check, so this helper defers.
+
+        Writes to it are gated by the edit token instead; see the route-level
+        cases in test_api_routes.py.
+        """
         require_comparison_write_access({"user_id": None}, None)
 
 

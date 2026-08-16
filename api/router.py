@@ -1,5 +1,9 @@
+import hashlib
 import logging
+import os
 import random
+import secrets
+import time
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -14,6 +18,8 @@ from database import (
     create_comparison,
     delete_comparison,
     get_comparison,
+    get_comparison_edit_token,
+    set_comparison_edit_token,
     store_image_metadata,
     store_image_position,
     update_image_custom_name,
@@ -24,6 +30,7 @@ from storage import create_comparison_storage, save_upload_file
 
 from .models import (
     ComparisonCreate,
+    ComparisonCreateResponse,
     ComparisonDetail,
     ComparisonResponse,
     CustomNameUpdate,
@@ -34,6 +41,13 @@ from .models import (
 router = APIRouter(prefix="/api/v1", tags=["api"])
 
 MAX_ROWS = 200
+
+EDIT_TOKEN_HEADER = "X-Edit-Token"
+
+# How long an ownerless comparison stays writable after creation. The browser holds
+# the token only for the duration of the upload, so this bounds the capability
+# server-side rather than relying on the client having discarded it.
+EDIT_TOKEN_TTL_SECONDS = int(os.getenv("EDIT_TOKEN_TTL_SECONDS", str(24 * 60 * 60)))
 
 logger = logging.getLogger(__name__)
 cookie_sec = APIKeyCookie(name="session")
@@ -105,6 +119,43 @@ def generate_random_name():
     return f"{adjective} {noun}"
 
 
+def _hash_edit_token(token: str) -> str:
+    """Hash an edit token for storage. Tokens are high-entropy, so a plain digest suffices."""
+    return hashlib.sha256(token.encode()).hexdigest()
+
+
+def _issue_edit_token(comparison_id: str) -> str:
+    """Generate an edit token for a comparison and persist only its hash and expiry."""
+    token = secrets.token_urlsafe(32)
+    expires_at = int(time.time()) + EDIT_TOKEN_TTL_SECONDS
+    set_comparison_edit_token(comparison_id, _hash_edit_token(token), expires_at)
+    return token
+
+
+def _authorize_comparison_write(
+    request: Request, comparison_id: str, comparison: dict, user: Optional[dict]
+):
+    """Authorize a write to a comparison.
+
+    An owned comparison is gated by ownership. An ownerless one has no owner to
+    check, so it is gated by the edit token issued at creation, which the creator
+    holds only for the duration of the upload.
+    """
+    auth.require_comparison_write_access(comparison, user)
+    if comparison.get("user_id") is not None:
+        return
+
+    supplied = request.headers.get(EDIT_TOKEN_HEADER)
+    stored, expires_at = get_comparison_edit_token(comparison_id)
+    if supplied and stored and secrets.compare_digest(_hash_edit_token(supplied), stored):
+        # A token issued before this column existed has no expiry recorded; treat it
+        # as expired rather than granting an unbounded capability.
+        if expires_at is not None and int(time.time()) <= expires_at:
+            return
+
+    raise HTTPException(status_code=403, detail="Not authorized to modify this comparison")
+
+
 @router.post("/login")
 async def api_login(form_data: OAuth2PasswordRequestForm = Depends()):
     """
@@ -171,7 +222,7 @@ async def list_comparisons(request: Request):
     return comparisons
 
 
-@router.post("/comparisons", response_model=ComparisonResponse, status_code=201)
+@router.post("/comparisons", response_model=ComparisonCreateResponse, status_code=201)
 async def create_new_comparison(
     comparison_data: ComparisonCreate,
     user: Optional[dict] = Depends(auth.get_optional_user),
@@ -214,8 +265,11 @@ async def create_new_comparison(
         user_id=user_id,
     )
 
+    # An ownerless comparison has no owner to authorize later writes, so issue a token.
+    edit_token = _issue_edit_token(comparison_id) if user_id is None else None
+
     # Return the response
-    return ComparisonResponse(
+    return ComparisonCreateResponse(
         id=comparison_id,
         name=name,
         show_name=comparison_data.show_name,
@@ -226,6 +280,7 @@ async def create_new_comparison(
         expiration_days=int(metadata.get("expiration_days", 7)),
         created_at=datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
         last_accessed=datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
+        edit_token=edit_token,
     )
 
 
@@ -287,6 +342,7 @@ async def get_comparison_detail(comparison_id: str):
 
 @router.put("/comparisons/{comparison_id}/images/{filename}", status_code=200)
 async def update_image_metadata(
+    request: Request,
     comparison_id: str,
     filename: str,
     update_data: CustomNameUpdate,
@@ -305,7 +361,7 @@ async def update_image_metadata(
     comparison_data = get_comparison(comparison_id)
     if not comparison_data:
         raise HTTPException(status_code=404, detail="Comparison not found")
-    auth.require_comparison_write_access(comparison_data, user)
+    _authorize_comparison_write(request, comparison_id, comparison_data, user)
 
     # Check if file exists
     rows = query(
@@ -405,11 +461,17 @@ async def api_create_comparison(
         user_id=user_id,
     )
 
-    return JSONResponse(content={"comparison_id": comparison_id})
+    response_body = {"comparison_id": comparison_id}
+    # An ownerless comparison has no owner to authorize later writes, so issue a token.
+    if user_id is None:
+        response_body["edit_token"] = _issue_edit_token(comparison_id)
+
+    return JSONResponse(content=response_body)
 
 
 @router.post("/comparison/{comparison_id}/image")
 async def api_upload_image(
+    request: Request,
     comparison_id: str,
     file: UploadFile = File(...),
     row: int = Form(...),
@@ -432,7 +494,7 @@ async def api_upload_image(
     comparison = get_comparison(comparison_id)
     if not comparison:
         return JSONResponse(status_code=404, content={"error": "Comparison not found"})
-    auth.require_comparison_write_access(comparison, user)
+    _authorize_comparison_write(request, comparison_id, comparison, user)
 
     safe_name = file.filename or ""
     file_ext = Path(safe_name).suffix
