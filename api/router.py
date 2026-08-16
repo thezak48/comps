@@ -124,24 +124,32 @@ async def api_login(form_data: OAuth2PasswordRequestForm = Depends()):
 
 
 @router.get("/comparisons", response_model=List[ComparisonResponse])
-async def list_comparisons():
+async def list_comparisons(request: Request):
     """
-    List all available comparisons.
+    List comparisons visible to the authenticated caller.
 
-    Returns a list of all comparisons with their basic metadata including:
+    Regular users receive their own comparisons. Admins receive all of them.
+
+    Returns a list of comparisons with their basic metadata including:
     - ID, name, and show name
     - Tags
     - Grid dimensions (rows and columns)
     - Expiration settings
     - Creation and last accessed timestamps
     """
-    rows = query_dicts(
-        (
-            "SELECT id, name, show_name, total_rows, total_columns, "
-            "expiration_type, expiration_days, created_at, last_accessed "
-            "FROM comparisons ORDER BY created_at DESC"
-        )
+    user = await auth.get_optional_user(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    columns = (
+        "SELECT id, name, show_name, total_rows, total_columns, "
+        "expiration_type, expiration_days, created_at, last_accessed "
+        "FROM comparisons"
     )
+    if auth.is_admin(user):
+        rows = query_dicts(f"{columns} ORDER BY created_at DESC")
+    else:
+        rows = query_dicts(f"{columns} WHERE user_id = ? ORDER BY created_at DESC", (user["id"],))
     comparisons = []
     for row in rows:
         comparison_id = row["id"]
