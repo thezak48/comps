@@ -310,31 +310,25 @@ def get_expired_comparisons(retention_days: int):
             print(f"  Comparison {comp_id} is marked as never expire, skipping")
             continue
 
-        if exp_type == "from_creation" and created_at:
-            # Support both string and datetime types across backends
-            created_dt = (
-                created_at
-                if isinstance(created_at, datetime)
-                else datetime.strptime(created_at, "%Y-%m-%d %H:%M:%S")
-            )
-            cutoff_date = created_dt + timedelta(days=days)
-            print(
-                f"  From creation: cutoff={cutoff_date}, current={current_time}, expired={current_time > cutoff_date}"  # noqa: E501
-            )
-            if current_time > cutoff_date:
-                expired_ids.append(comp_id)
-        elif exp_type == "from_last_access" and last_accessed:
-            last_dt = (
-                last_accessed
-                if isinstance(last_accessed, datetime)
-                else datetime.strptime(last_accessed, "%Y-%m-%d %H:%M:%S")
-            )
-            cutoff_date = last_dt + timedelta(days=days)
-            print(
-                f"  From last access: cutoff={cutoff_date}, current={current_time}, expired={current_time > cutoff_date}"  # noqa: E501
-            )
-            if current_time > cutoff_date:
-                expired_ids.append(comp_id)
+        # Anything other than from_creation falls back to last access, and last access
+        # falls back to creation, so no row can escape the sweep by carrying an
+        # unrecognised type or a null timestamp.
+        reference = created_at if exp_type == "from_creation" else (last_accessed or created_at)
+        if reference is None:
+            continue
+
+        # Support both string and datetime types across backends
+        reference_dt = (
+            reference
+            if isinstance(reference, datetime)
+            else datetime.strptime(reference, "%Y-%m-%d %H:%M:%S")
+        )
+        cutoff_date = reference_dt + timedelta(days=days)
+        print(
+            f"  cutoff={cutoff_date}, current={current_time}, expired={current_time > cutoff_date}"
+        )
+        if current_time > cutoff_date:
+            expired_ids.append(comp_id)
     return expired_ids
 
 
