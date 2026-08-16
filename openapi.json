@@ -52,7 +52,7 @@
           "api"
         ],
         "summary": "List Comparisons",
-        "description": "List all available comparisons.\n\nReturns a list of all comparisons with their basic metadata including:\n- ID, name, and show name\n- Tags\n- Grid dimensions (rows and columns)\n- Expiration settings\n- Creation and last accessed timestamps",
+        "description": "List comparisons visible to the authenticated caller.\n\nRegular users receive their own comparisons. Admins receive all of them.\n\nReturns a list of comparisons with their basic metadata including:\n- ID, name, and show name\n- Tags\n- Grid dimensions (rows and columns)\n- Expiration settings\n- Creation and last accessed timestamps",
         "operationId": "list_comparisons_api_v1_comparisons_get",
         "responses": {
           "200": {
@@ -94,7 +94,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ComparisonResponse"
+                  "$ref": "#/components/schemas/ComparisonCreateResponse"
                 }
               }
             }
@@ -910,6 +910,149 @@
         },
         "type": "object",
         "title": "ComparisonCreate"
+      },
+      "ComparisonCreateResponse": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "Internal name for the comparison",
+            "examples": [
+              "Example Comparison"
+            ]
+          },
+          "show_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Show Name",
+            "description": "Display name shown in the UI",
+            "examples": [
+              "Example"
+            ]
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags",
+            "description": "List of tags for categorizing the comparison",
+            "examples": [
+              [
+                "example",
+                "test",
+                "api"
+              ]
+            ]
+          },
+          "total_rows": {
+            "type": "integer",
+            "title": "Total Rows",
+            "description": "Number of rows in the comparison grid (max 20)",
+            "default": 1,
+            "examples": [
+              1
+            ]
+          },
+          "total_columns": {
+            "type": "integer",
+            "title": "Total Columns",
+            "description": "Number of columns in the comparison grid",
+            "default": 2,
+            "examples": [
+              2
+            ]
+          },
+          "expiration_type": {
+            "type": "string",
+            "title": "Expiration Type",
+            "description": "When to expire the comparison: 'from_creation' or 'from_last_access'",
+            "default": "from_last_access",
+            "examples": [
+              "from_last_access"
+            ]
+          },
+          "expiration_days": {
+            "type": "integer",
+            "title": "Expiration Days",
+            "description": "Number of days until the comparison expires",
+            "default": 7,
+            "examples": [
+              7
+            ]
+          },
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Unique identifier for the comparison",
+            "examples": [
+              "11256486-6607-4ba9-88f1-ac7cb0105e17"
+            ]
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At",
+            "description": "Timestamp when the comparison was created",
+            "examples": [
+              "2023-05-01 12:34:56"
+            ]
+          },
+          "last_accessed": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Accessed",
+            "description": "Timestamp when the comparison was last accessed",
+            "examples": [
+              "2023-05-02 10:11:12"
+            ]
+          },
+          "edit_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Edit Token",
+            "description": "Secret token authorizing later writes to this comparison. Returned only when the comparison has no owner. Send it as the X-Edit-Token header.",
+            "examples": [
+              "3sJ1w0Yk9m2QpX7bN4vRtLzC6hA8dEfG"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "title": "ComparisonCreateResponse"
       },
       "ComparisonDetail": {
         "properties": {
