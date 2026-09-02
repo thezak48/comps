@@ -1,6 +1,6 @@
 fastapi==0.139.0
 python-multipart==0.0.32
-uvicorn==0.51.0
+uvicorn==0.52.4
 pillow==12.3.0
 python-jose==3.5.0
 sqlalchemy==2.0.52
