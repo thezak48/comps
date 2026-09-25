@@ -1,6 +1,6 @@
 # Development requirements for formatting, linting and tests
 black==26.5.1
-isort==8.0.1
+isort==9.0.1
 flake8==7.3.0
 djlint==1.44.2
 pre-commit==4.6.2
