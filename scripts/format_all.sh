@@ -7,9 +7,9 @@ echo
 echo "============================="
 echo "  Formatting Python files"
 echo "============================="
-black .
-isort .
-flake8 .
+ruff check --fix .
+ruff format .
+ruff check .
 
 echo
 echo "============================="
