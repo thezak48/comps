@@ -9,9 +9,7 @@ This project enforces consistent code style and quality across Python, Jinja tem
 
 | Tool    | Purpose                                      | Config File         | Notes |
 |---------|----------------------------------------------|---------------------|-------|
-| Black   | Code formatter for Python                    | `pyproject.toml`    | Enforces PEP 8 style, auto-formats code |
-| isort   | Sorts and organizes Python imports           | `.isort.cfg`        | Keeps imports grouped and ordered |
-| Flake8  | Linter for Python code quality               | `.flake8`           | Reports style and logic issues |
+| Ruff    | Python linter, import sorter, and formatter  | `pyproject.toml`    | Replaces Flake8, isort, and Black |
 | djlint  | Formatter/linter for Jinja templates         | `.djlintrc`         | Only runs on `.jinja` files |
 
 **Exclusions:** The `migrations/` folder is excluded from all Python formatters/linters to avoid altering migration scripts.
@@ -33,7 +31,7 @@ All static asset tools are managed via `package.json` (see `devDependencies` and
 ## Automation
 
 - **Pre-commit hooks**: `.pre-commit-config.yaml` runs all formatters and linters automatically on commit for Python, Jinja, JS, and CSS files.
-	- Python: Black, isort, Flake8
+	- Python: Ruff lint and format hooks
 	- Jinja: djlint (only on `.jinja` files)
 	- JS/CSS: Prettier, ESLint, Stylelint (via npm scripts)
 
@@ -68,8 +66,8 @@ All static asset tools are managed via `package.json` (see `devDependencies` and
 
 ### Python/Jinja
 - Install dev tools: `pip install -r requirements-dev.txt`
-- Format code: `black .` and `isort .`
-- Lint code: `flake8 .`
+- Format code: `ruff check --fix .` and `ruff format .`
+- Lint code: `ruff check .`
 - Format/lint Jinja: `djlint templates/ --reformat --profile=jinja`
 
 ### JavaScript/CSS
@@ -101,9 +99,7 @@ All static asset tools are managed via `package.json` (see `devDependencies` and
 ---
 
 ## References
-- [Black](https://black.readthedocs.io/)
-- [isort](https://pycqa.github.io/isort/)
-- [Flake8](https://flake8.pycqa.org/)
+- [Ruff](https://docs.astral.sh/ruff/)
 - [djlint](https://djlint.com/)
 - [ESLint](https://eslint.org/)
 - [Stylelint](https://stylelint.io/)

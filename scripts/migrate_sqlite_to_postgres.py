@@ -107,7 +107,7 @@ def _reset_sequences(
             continue
         # seq is like 'public.users_id_seq'
         execute_fn(
-            (f"SELECT setval('{seq}', " f"(SELECT COALESCE(MAX(id), 1) FROM {tbl}), true)"),
+            (f"SELECT setval('{seq}', (SELECT COALESCE(MAX(id), 1) FROM {tbl}), true)"),
             (),
         )
 
@@ -135,7 +135,7 @@ def migrate(sqlite_path: str, pg_url: str, wipe_target: bool = False):
     # Point adapter at Postgres and ensure schema
     os.environ["DB_BACKEND"] = "postgres"
     os.environ["DATABASE_URL"] = pg_url
-    # Import app modules lazily (after sys.path and env are set) to satisfy flake8 E402
+    # Import app modules lazily (after sys.path and env are set) to satisfy Ruff E402
     import database  # type: ignore  # noqa: WPS433
     from db import backend_name as _backend_name  # type: ignore  # noqa: WPS433
     from db import execute as _execute

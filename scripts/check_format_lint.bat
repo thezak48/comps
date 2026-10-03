@@ -5,9 +5,8 @@ echo.
 echo =============================
 echo   Checking Python files
 echo =============================
-black --check .
-isort --check-only .
-flake8 .
+ruff check .
+ruff format --check .
 
 echo.
 echo =============================

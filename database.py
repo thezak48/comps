@@ -282,11 +282,13 @@ def get_expired_comparisons(retention_days: int):
     expired_ids = []
 
     # Get all comparisons with their expiration settings
-    comparisons = query(("""
+    comparisons = query((
+        """
         SELECT id, expiration_type, expiration_days, created_at,
                last_accessed, never_expire
         FROM comparisons
-        """))
+        """
+    ))
     print(f"Checking for expired comparisons with retention_days={retention_days}")
     num = len(comparisons)
     print(f"Found {num} comparisons to check for expiration")
