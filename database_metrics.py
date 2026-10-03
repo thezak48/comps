@@ -44,7 +44,9 @@ def get_metrics():
         """,
         ((today - timedelta(days=days - 1)).strftime("%Y-%m-%d"),),
     )
-    user_counts = dict(user_rows)
+    # PostgreSQL returns DATE values as datetime.date objects, while SQLite
+    # returns strings. Normalize both so they match the string chart labels.
+    user_counts = {str(day): count for day, count in user_rows}
     metrics["users_per_day"] = [user_counts.get(date, 0) for date in date_labels]
 
     # Comparisons created per day
@@ -56,7 +58,7 @@ def get_metrics():
         """,
         ((today - timedelta(days=days - 1)).strftime("%Y-%m-%d"),),
     )
-    comp_counts = dict(comp_rows)
+    comp_counts = {str(day): count for day, count in comp_rows}
     metrics["comparisons_per_day"] = [comp_counts.get(date, 0) for date in date_labels]
 
     # Images uploaded per day (by image_positions join comparisons for date)
@@ -70,7 +72,7 @@ def get_metrics():
         """,
         ((today - timedelta(days=days - 1)).strftime("%Y-%m-%d"),),
     )
-    img_counts = dict(img_rows)
+    img_counts = {str(day): count for day, count in img_rows}
     metrics["images_per_day"] = [img_counts.get(date, 0) for date in date_labels]
 
     metrics["date_labels"] = date_labels

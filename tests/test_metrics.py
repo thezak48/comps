@@ -1,3 +1,5 @@
+from datetime import date
+
 import database
 import database_metrics
 
@@ -30,6 +32,20 @@ def test_metrics_report_database_and_local_storage(isolated_db, tmp_path, monkey
     assert metrics["total_images_humansize"] == "5 B"
     assert len(metrics["date_labels"]) == 14
     assert len(metrics["comparisons_per_day"]) == 14
+
+
+def test_metrics_daily_counts_match_date_objects(isolated_db, monkeypatch):
+    today = date.today()
+    daily_results = iter([[(today, 2)], [(today, 3)], [(today, 4)]])
+    monkeypatch.setattr(database_metrics, "query", lambda *_args: next(daily_results))
+    monkeypatch.setattr(database_metrics, "is_s3_enabled", lambda: False)
+
+    metrics = database_metrics.get_metrics()
+
+    today_index = metrics["date_labels"].index(today.isoformat())
+    assert metrics["users_per_day"][today_index] == 2
+    assert metrics["comparisons_per_day"][today_index] == 3
+    assert metrics["images_per_day"][today_index] == 4
 
 
 def test_metrics_sum_s3_metadata_sizes(isolated_db, monkeypatch):
