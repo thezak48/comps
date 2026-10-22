@@ -1,5 +1,6 @@
 #!/bin/bash
 # Check formatting and linting for Python, Jinja, JS, and CSS (no auto-fix)
+set -euo pipefail
 
 echo
 echo "============================="
@@ -11,9 +12,10 @@ flake8 .
 
 echo
 echo "============================="
-echo "  Checking Jinja templates"
+echo "  Checking HTML/Jinja templates"
 echo "============================="
-djlint templates/ --check --profile=jinja
+djlint templates/ --check --profile=jinja --extension=jinja
+djlint templates/ --check --profile=jinja --extension=html
 
 # Static assets: JS, CSS (lint and formatting check)
 echo

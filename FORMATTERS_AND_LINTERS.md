@@ -12,7 +12,7 @@ This project enforces consistent code style and quality across Python, Jinja tem
 | Black   | Code formatter for Python                    | `pyproject.toml`    | Enforces PEP 8 style, auto-formats code |
 | isort   | Sorts and organizes Python imports           | `.isort.cfg`        | Keeps imports grouped and ordered |
 | Flake8  | Linter for Python code quality               | `.flake8`           | Reports style and logic issues |
-| djlint  | Formatter/linter for Jinja templates         | `.djlintrc`         | Only runs on `.jinja` files |
+| djlint  | Formatter/linter for HTML/Jinja templates    | `.djlintrc`         | Checks `.jinja` and `.html` files |
 
 **Exclusions:** The `migrations/` folder is excluded from all Python formatters/linters to avoid altering migration scripts.
 
@@ -34,7 +34,7 @@ All static asset tools are managed via `package.json` (see `devDependencies` and
 
 - **Pre-commit hooks**: `.pre-commit-config.yaml` runs all formatters and linters automatically on commit for Python, Jinja, JS, and CSS files.
 	- Python: Black, isort, Flake8
-	- Jinja: djlint (only on `.jinja` files)
+	- HTML/Jinja: djlint 1.46.6 on `.jinja` and `.html` files
 	- JS/CSS: Prettier, ESLint, Stylelint (via npm scripts)
 
 ---
@@ -70,7 +70,9 @@ All static asset tools are managed via `package.json` (see `devDependencies` and
 - Install dev tools: `pip install -r requirements-dev.txt`
 - Format code: `black .` and `isort .`
 - Lint code: `flake8 .`
-- Format/lint Jinja: `djlint templates/ --reformat --profile=jinja`
+- Format Jinja: `djlint templates/ --reformat --profile=jinja --extension=jinja`
+- Format HTML: `djlint templates/ --reformat --profile=jinja --extension=html`
+- Check either extension: replace `--reformat` with `--check`. The `jinja` profile configures template syntax; it does not change djLint's default `.html` file discovery.
 
 ### JavaScript/CSS
 - Install tools: `npm install`
@@ -87,7 +89,7 @@ All static asset tools are managed via `package.json` (see `devDependencies` and
 ## File/Folder Exclusions
 - `migrations/` is excluded from all Python formatters/linters
 - `static/` and `templates/` are excluded from Python formatters/linters
-- Only `.jinja` files in `templates/` are checked by djlint
+- Both `.jinja` and `.html` files in `templates/` are checked by djlint
 - `node_modules/` and npm/yarn log files are excluded via `.gitignore`
 
 ---
