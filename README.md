@@ -55,7 +55,7 @@ Comps supports local filesystem storage (default) and S3-compatible object stora
     - `S3_PRESIGNED_URL_TTL_SECONDS=<seconds>` (optional, default: `3600`)
     - `S3_PRESIGNED_URL_CACHE_MAX_SIZE=<entries>` (optional, default: `10000`; `0` disables the cache)
 
-Presigned URLs are reused in a bounded, thread-safe, per-process cache and refreshed five seconds before their configured expiry. Uploads and deletes invalidate the affected comparison/image entries, including concurrent lookups. The effective URL TTL is limited to 1–604800 seconds. Temporary S3 credentials can expire sooner; use a suitably short TTL or disable the cache when credential lifetimes are shorter than the configured TTL.
+Presigned URLs are reused in a bounded, thread-safe, per-process cache and refreshed five seconds before expiry. Uploads and deletes invalidate the affected comparison/image entries, including concurrent lookups. The effective URL TTL is limited to 1–604800 seconds. For temporary S3 credentials, the cache lifetime is also capped at the signing session's verified expiry. If that expiry cannot be verified, or the credentials changed during signing, Comps returns the URL without caching it so later requests can refresh credentials normally.
 
 This keeps redirect targets stable so browsers can reuse cached image responses. Image freshness is still controlled by the object's/CDN's `Cache-Control` policy; Comps does not configure that policy or purge CDN/browser caches. The app's redirects themselves are not cached, so they cannot retain expired signed destinations.
 

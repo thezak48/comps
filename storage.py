@@ -4,12 +4,14 @@ import threading
 import time
 import uuid
 from contextlib import contextmanager
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
-from urllib.parse import quote, urlsplit
+from urllib.parse import parse_qsl, quote, urlsplit
 
 import aiofiles
 import boto3
+from botocore.credentials import RefreshableCredentials
 from botocore.exceptions import BotoCoreError, ClientError
 from fastapi import UploadFile
 from starlette.concurrency import run_in_threadpool
@@ -130,7 +132,9 @@ def get_presigned_image_url(comparison_id: str, filename: str) -> str:
             Params={"Bucket": S3_BUCKET_NAME, "Key": key},
             ExpiresIn=expires_in,
         )
-        _cache_presigned_url(key, presigned_url, signed_at + expires_in, generation)
+        expires_at = _presigned_url_cache_deadline(client, presigned_url, signed_at + expires_in)
+        if expires_at is not None:
+            _cache_presigned_url(key, presigned_url, expires_at, generation)
         return presigned_url
     except ClientError as exc:
         error_code = exc.response.get("Error", {}).get("Code")
@@ -276,6 +280,53 @@ def _delete_s3_keys(client, keys: list[str]):
                 for err in errors
             )
             raise OSError(f"S3 reported delete errors: {details}")
+
+
+def _presigned_url_cache_deadline(client, url: str, expires_at: float) -> Optional[float]:
+    parameters = {
+        name.lower(): value
+        for name, value in parse_qsl(urlsplit(url).query, keep_blank_values=True)
+    }
+    token = next(
+        (
+            parameters[name]
+            for name in ("x-amz-security-token", "securitytoken", "x-amz-s3session-token")
+            if name in parameters
+        ),
+        None,
+    )
+    if token is None:
+        return expires_at
+
+    signer = getattr(client, "_request_signer", None)
+    credentials = getattr(signer, "_credentials", None)
+    refresh_lock = getattr(credentials, "_refresh_lock", None)
+    if not isinstance(credentials, RefreshableCredentials) or refresh_lock is None:
+        return None
+
+    # Botocore exposes no public expiry accessor. Read its immutable credential
+    # snapshot and expiry together; caching must not wait on a provider refresh.
+    if not refresh_lock.acquire(False):
+        return None
+    try:
+        frozen = getattr(credentials, "_frozen_credentials", None)
+        expiry = getattr(credentials, "_expiry_time", None)
+    finally:
+        refresh_lock.release()
+    access_key = parameters.get("x-amz-credential", parameters.get("awsaccesskeyid", ""))
+    if (
+        frozen is None
+        or frozen.token != token
+        or frozen.access_key != access_key.split("/", 1)[0]
+        or not isinstance(expiry, datetime)
+        or expiry.utcoffset() is None
+    ):
+        # A refresh may have replaced the credentials that signed this URL.
+        # Unknown/mismatched temporary credential lifetimes must not be cached.
+        return None
+
+    credential_deadline = time.monotonic() + expiry.timestamp() - time.time()
+    return min(expires_at, credential_deadline)
 
 
 def _get_cached_presigned_url(key: str) -> tuple[Optional[str], int]:

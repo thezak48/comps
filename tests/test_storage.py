@@ -1,9 +1,14 @@
 import asyncio
 import threading
+from datetime import datetime, timezone
 from io import BytesIO
 from types import SimpleNamespace
+from urllib.parse import urlencode
 
+import boto3
 import pytest
+from botocore.config import Config
+from botocore.credentials import Credentials, RefreshableCredentials
 from botocore.exceptions import ClientError
 from fastapi import UploadFile
 
@@ -29,13 +34,50 @@ def signing_client(monkeypatch):
 
     client = FakeClient()
     clock = [100.0]
-    monkeypatch.setattr(storage, "time", SimpleNamespace(monotonic=lambda: clock[0]))
+    monkeypatch.setattr(
+        storage,
+        "time",
+        SimpleNamespace(monotonic=lambda: clock[0], time=lambda: 1800000000 + clock[0] - 100),
+    )
     monkeypatch.setattr(storage, "STORAGE_BACKEND", "s3")
     monkeypatch.setattr(storage, "S3_BUCKET_NAME", "bucket")
     monkeypatch.setattr(storage, "S3_KEY_PREFIX", "prefix")
     monkeypatch.setattr(storage, "S3_PRESIGNED_URL_TTL_SECONDS", 60)
     monkeypatch.setattr(storage, "_get_s3_client", lambda: client)
     return client, clock
+
+
+def configure_temporary_signer(signing_client, monkeypatch, remaining=1200, legacy=False):
+    client, _ = signing_client
+    credentials = RefreshableCredentials(
+        access_key="fixture-access-key",
+        secret_key="fixture-secret-key",
+        token="fixture-session-token",
+        expiry_time=datetime.fromtimestamp(storage.time.time() + remaining, timezone.utc),
+        refresh_using=lambda: pytest.fail("Unexpected credential refresh"),
+        method="fixture",
+        time_fetcher=lambda: datetime.fromtimestamp(storage.time.time(), timezone.utc),
+        advisory_timeout=0,
+        mandatory_timeout=0,
+    )
+    frozen = credentials.get_frozen_credentials()
+    client._request_signer = SimpleNamespace(_credentials=credentials)
+    original_sign = client.generate_presigned_url
+
+    def sign(*args, **kwargs):
+        original_sign(*args, **kwargs)
+        parameters = {
+            "AWSAccessKeyId" if legacy else "X-Amz-Credential": frozen.access_key,
+            "SecurityToken" if legacy else "X-Amz-Security-Token": frozen.token,
+            "signature": len(client.sign_calls),
+        }
+        if not legacy:
+            parameters["X-Amz-Credential"] += "/20261022/region/s3/aws4_request"
+        return f"https://images.example.test/image?{urlencode(parameters)}"
+
+    monkeypatch.setattr(client, "generate_presigned_url", sign)
+    monkeypatch.setattr(storage, "S3_PRESIGNED_URL_TTL_SECONDS", 3600)
+    return credentials
 
 
 def test_local_storage_create_save_and_delete(tmp_path, monkeypatch):
@@ -259,6 +301,127 @@ def test_presigned_url_cache_does_not_extend_signing_lifetime(signing_client, mo
         return original_sign(*args, **kwargs)
 
     monkeypatch.setattr(client, "generate_presigned_url", slow_sign)
+    storage.get_presigned_image_url(COMPARISON_ID, "image.png")
+    assert not storage._presigned_url_cache
+
+
+@pytest.mark.parametrize("legacy", [False, True])
+def test_temporary_credentials_cap_cache_at_their_remaining_lifetime(
+    signing_client, monkeypatch, legacy
+):
+    client, clock = signing_client
+    configure_temporary_signer(signing_client, monkeypatch, legacy=legacy)
+    first = storage.get_presigned_image_url(COMPARISON_ID, "image.png")
+    key = f"prefix/{COMPARISON_ID}/image.png"
+
+    assert storage._presigned_url_cache[key][1] == pytest.approx(clock[0] + 1200)
+    clock[0] += 1194
+    assert storage.get_presigned_image_url(COMPARISON_ID, "image.png") == first
+    clock[0] += 1
+    assert storage.get_presigned_image_url(COMPARISON_ID, "image.png") != first
+    assert len(client.sign_calls) == 2
+
+
+@pytest.mark.parametrize("remaining", [3, 7200])
+def test_credential_expiry_never_extends_url_ttl_or_caches_nearly_expired_credentials(
+    signing_client, monkeypatch, remaining
+):
+    _, clock = signing_client
+    configure_temporary_signer(signing_client, monkeypatch, remaining=remaining)
+    storage.get_presigned_image_url(COMPARISON_ID, "image.png")
+    if remaining == 3:
+        assert not storage._presigned_url_cache
+    else:
+        key = f"prefix/{COMPARISON_ID}/image.png"
+        assert storage._presigned_url_cache[key][1] == pytest.approx(clock[0] + 3600)
+
+
+@pytest.mark.parametrize("metadata", ["missing", "no-expiry", "naive-expiry", "wrong-token"])
+def test_temporary_credentials_without_verified_expiry_are_not_cached(
+    signing_client, monkeypatch, metadata
+):
+    client, _ = signing_client
+    credentials = configure_temporary_signer(signing_client, monkeypatch)
+    if metadata == "missing":
+        client._request_signer = None
+    elif metadata == "no-expiry":
+        client._request_signer._credentials = Credentials(
+            "fixture-access-key", "fixture-secret-key", "fixture-session-token"
+        )
+    elif metadata == "naive-expiry":
+        credentials._expiry_time = credentials._expiry_time.replace(tzinfo=None)
+    else:
+        client._request_signer._credentials = RefreshableCredentials(
+            "other-access-key",
+            "fixture-secret-key",
+            "other-session-token",
+            credentials._expiry_time,
+            lambda: {},
+            "fixture",
+        )
+
+    storage.get_presigned_image_url(COMPARISON_ID, "image.png")
+    storage.get_presigned_image_url(COMPARISON_ID, "image.png")
+    assert len(client.sign_calls) == 2
+    assert not storage._presigned_url_cache
+
+
+def test_botocore_credential_refresh_replaces_expired_cached_session(signing_client, monkeypatch):
+    _, clock = signing_client
+    refreshes = []
+
+    def refresh():
+        refreshes.append(True)
+        return {
+            "access_key": "refreshed-access-key",
+            "secret_key": "fixture-secret-key",
+            "token": "refreshed-session-token",
+            "expiry_time": datetime.fromtimestamp(
+                storage.time.time() + 1200, timezone.utc
+            ).isoformat(),
+        }
+
+    credentials = RefreshableCredentials(
+        "fixture-access-key",
+        "fixture-secret-key",
+        "fixture-session-token",
+        datetime.fromtimestamp(storage.time.time() + 1200, timezone.utc),
+        refresh,
+        "fixture",
+        time_fetcher=lambda: datetime.fromtimestamp(storage.time.time(), timezone.utc),
+    )
+    client = boto3.client(
+        "s3",
+        region_name="us-east-1",
+        endpoint_url="https://s3.example.test",
+        aws_access_key_id="fixture-access-key",
+        aws_secret_access_key="fixture-secret-key",
+        config=Config(signature_version="s3v4"),
+    )
+    client._request_signer._credentials = credentials
+    heads = []
+    monkeypatch.setattr(client, "head_object", lambda **kwargs: heads.append(kwargs))
+    monkeypatch.setattr(storage, "_get_s3_client", lambda: client)
+    monkeypatch.setattr(storage, "S3_PRESIGNED_URL_TTL_SECONDS", 3600)
+
+    first = storage.get_presigned_image_url(COMPARISON_ID, "image.png")
+    assert storage.get_presigned_image_url(COMPARISON_ID, "image.png") == first
+    clock[0] += 1200
+    refreshed = storage.get_presigned_image_url(COMPARISON_ID, "image.png")
+    assert "refreshed-session-token" in refreshed
+    assert refreshed != first
+    assert len(refreshes) == 1
+    assert len(heads) == 2
+
+
+def test_temporary_credential_cache_does_not_wait_for_provider_refresh(signing_client, monkeypatch):
+    credentials = configure_temporary_signer(signing_client, monkeypatch)
+
+    def busy_lock(blocking=True):
+        assert blocking is False
+        return False
+
+    monkeypatch.setattr(credentials, "_refresh_lock", SimpleNamespace(acquire=busy_lock))
     storage.get_presigned_image_url(COMPARISON_ID, "image.png")
     assert not storage._presigned_url_cache
 

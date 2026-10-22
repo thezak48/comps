@@ -34,6 +34,39 @@ function browserContext(imageUrls) {
     return context;
 }
 
+function viewerContext(imageUrls) {
+    const context = browserContext(imageUrls);
+    const images = [];
+    Object.assign(context, {
+        images,
+        isSolarized: true,
+        solarizationInProgress: false,
+        solarizationUnsupportedNotified: false,
+        solarizedImageCache: new Map(),
+        absoluteIndex: 0,
+        imageSizes: [],
+        currentImage: {
+            style: {},
+            removeAttribute(name) {
+                delete this[name];
+            },
+        },
+        currentImageInfoSpan: {},
+        mobileCurrentImageInfoSpan: null,
+        applyZoom: () => {},
+        console: { error: () => {}, warn: () => {} },
+        Image: class {
+            constructor() {
+                images.push(this);
+            }
+        },
+    });
+    context.document.createElement = () => ({ style: {}, remove: () => {} });
+    context.document.body = { appendChild: () => {} };
+    runInNewContext(functionSource("updateDisplay"), context);
+    return context;
+}
+
 test("image URL resolution accepts legacy, app-relative, and public URLs", () => {
     const context = browserContext([]);
     for (const [input, expected] of [
@@ -88,34 +121,70 @@ test("BBCode preserves public CDN URLs and encoded object keys", () => {
 
 test("failed cross-origin solarization restores the normal public image", () => {
     const imageUrl = "https://images.example.test/image.png";
-    const context = browserContext([imageUrl]);
-    const images = [];
-    Object.assign(context, {
-        isSolarized: true,
-        solarizationInProgress: false,
-        solarizedImageCache: new Map(),
-        absoluteIndex: 0,
-        imageSizes: [],
-        currentImage: { style: {} },
-        currentImageInfoSpan: {},
-        mobileCurrentImageInfoSpan: null,
-        applyZoom: () => {},
-        console: { error: () => {} },
-        Image: class {
-            constructor() {
-                images.push(this);
-            }
-        },
-    });
-    context.document.createElement = () => ({ style: {}, remove: () => {} });
-    context.document.body = { appendChild: () => {} };
-    runInNewContext(functionSource("updateDisplay"), context);
+    const context = viewerContext([imageUrl]);
 
     context.updateDisplay();
     assert.equal(context.solarizationInProgress, true);
-    assert.equal(images[0].src, imageUrl);
-    images[0].onerror();
+    assert.equal(context.images[0].src, imageUrl);
+    context.images[0].onerror();
     assert.equal(context.isSolarized, false);
     assert.equal(context.solarizationInProgress, false);
     assert.equal(context.currentImage.src, imageUrl);
+});
+
+for (const solarized of [false, true]) {
+    test(`empty comparisons do not throw with solarization ${solarized}`, () => {
+        const context = viewerContext([]);
+        context.isSolarized = solarized;
+        context.currentImage.src = "previous-image.png";
+        context.updateDisplay();
+        assert.equal(context.currentImage.src, undefined);
+        assert.equal(context.images.length, 0);
+    });
+}
+
+test("display clamps an out-of-range selection before resolving its URL", () => {
+    const context = viewerContext(["/uploads/left.png", "/uploads/right.png"]);
+    context.isSolarized = false;
+    context.absoluteIndex = 10;
+    context.updateDisplay();
+    assert.equal(context.absoluteIndex, 1);
+    assert.equal(context.currentImage.src, "/uploads/right.png");
+});
+
+test("a late solarization failure does not replace the newly selected image", () => {
+    const context = viewerContext(["/uploads/left.png", "/uploads/right.png"]);
+    context.updateDisplay();
+    const pendingImage = context.images[0];
+    context.isSolarized = false;
+    context.absoluteIndex = 1;
+    context.updateDisplay();
+    pendingImage.onerror();
+    assert.equal(context.currentImage.src, "/uploads/right.png");
+    assert.equal(context.currentImageInfoSpan.textContent, "right.png []");
+    assert.equal(context.solarizationInProgress, false);
+});
+
+test("a late solarization success does not overwrite a disabled/current selection", () => {
+    const context = viewerContext(["/uploads/left.png", "/uploads/right.png"]);
+    context.updateDisplay();
+    const pendingImage = context.images[0];
+    context.isSolarized = false;
+    context.absoluteIndex = 1;
+    context.updateDisplay();
+    pendingImage.onload();
+    assert.equal(context.currentImage.src, "/uploads/right.png");
+    assert.equal(context.solarizedImageCache.size, 0);
+    assert.equal(context.solarizationInProgress, false);
+});
+
+test("a late solarization load starts work for the latest selected image", () => {
+    const context = viewerContext(["/uploads/left.png", "/uploads/right.png"]);
+    context.updateDisplay();
+    const pendingImage = context.images[0];
+    context.absoluteIndex = 1;
+    pendingImage.onload();
+    assert.equal(context.images.length, 2);
+    assert.equal(context.images[1].src, "/uploads/right.png");
+    assert.equal(context.solarizationInProgress, true);
 });

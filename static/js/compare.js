@@ -316,6 +316,12 @@ function navigate(direction) {
 const solarizedImageCache = new Map();
 
 function updateDisplay() {
+    if (imageUrls.length === 0) {
+        currentImage.removeAttribute("src");
+        return;
+    }
+    absoluteIndex = Math.max(0, Math.min(absoluteIndex, imageUrls.length - 1));
+
     if (isSolarized) {
         if (solarizationInProgress) {
             return; // Prevent multiple simultaneous processing
@@ -339,6 +345,12 @@ function updateDisplay() {
             const img = new Image();
             img.crossOrigin = "anonymous";
             img.onload = function () {
+                if (!isSolarized || imageUrls[absoluteIndex] !== currentUrl) {
+                    loadingIndicator.remove();
+                    solarizationInProgress = false;
+                    updateDisplay();
+                    return;
+                }
                 try {
                     const canvas = document.createElement("canvas");
                     const ctx = canvas.getContext("2d");
@@ -360,7 +372,6 @@ function updateDisplay() {
                     currentImage.src = solarizedDataUrl;
                 } catch (e) {
                     isSolarized = false;
-                    currentImage.src = resolveImageUrl(currentUrl);
                     if (!solarizationUnsupportedNotified) {
                         solarizationUnsupportedNotified = true;
                         console.warn(
@@ -373,12 +384,15 @@ function updateDisplay() {
                 // Remove loading indicator
                 loadingIndicator.remove();
                 solarizationInProgress = false;
+                if (!isSolarized) {
+                    updateDisplay();
+                }
             };
             img.onerror = function () {
                 loadingIndicator.remove();
                 solarizationInProgress = false;
                 isSolarized = false;
-                currentImage.src = resolveImageUrl(currentUrl);
+                updateDisplay();
                 console.error("Failed to load image for solarization");
             };
             img.src = resolveImageUrl(currentUrl);

@@ -64,7 +64,7 @@ To use S3-compatible storage:
 - `S3_PRESIGNED_URL_TTL_SECONDS=<seconds>` (optional, default `3600`)
 - `S3_PRESIGNED_URL_CACHE_MAX_SIZE=<entries>` (optional, default `10000`; `0` disables caching)
 
-Presigned URLs are cached per application process, refreshed five seconds before expiry, and invalidated on uploads/deletes. The URL TTL is limited to 1–604800 seconds. Temporary credentials can shorten the usable lifetime; choose an appropriately short TTL or disable caching for shorter-lived credentials. Configure image `Cache-Control` headers on the bucket/CDN as appropriate; this cache does not override them or purge browser/CDN content.
+Presigned URLs are cached per application process, refreshed five seconds before expiry, and invalidated on uploads/deletes. The URL TTL is limited to 1–604800 seconds. Temporary-credential URLs are cached only when the signing session's expiry can be verified, and never beyond that expiry. Unknown expiry or a credential change during signing bypasses caching, allowing later requests to refresh credentials normally. Configure image `Cache-Control` headers on the bucket/CDN as appropriate; this cache does not override them or purge browser/CDN content.
 
 With S3 storage enabled, `S3_PUBLIC_BASE_URL` switches browser image URLs to that public domain instead of signing them. The base must be an absolute HTTP(S) URL without credentials, a query string, or a fragment; base paths are supported. Local storage ignores this setting. Public URLs require an already-public bucket/CDN and should not be enabled for private images; this option does not change bucket permissions.
 
