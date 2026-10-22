@@ -100,6 +100,42 @@ jobs:
                   tags: comps-ci:${{ github.sha }}
                   cache-from: type=gha
                   cache-to: type=gha,mode=max
+            - name: Smoke test container startup
+              timeout-minutes: 2
+              env:
+                  IMAGE: comps-ci:${{ github.sha }}
+                  CONTAINER_NAME: comps-smoke-${{ github.run_id }}-${{ github.run_attempt }}
+              run: |
+                  set -euo pipefail
+
+                  cleanup() {
+                      exit_code=$?
+                      if [ "$exit_code" -ne 0 ]; then
+                          docker logs "$CONTAINER_NAME" || true
+                      fi
+                      docker rm --force --volumes "$CONTAINER_NAME" >/dev/null 2>&1 || true
+                      exit "$exit_code"
+                  }
+                  trap cleanup EXIT
+
+                  docker run --detach --name "$CONTAINER_NAME" \
+                      --publish 127.0.0.1::8000 "$IMAGE" >/dev/null
+                  address=$(docker port "$CONTAINER_NAME" 8000/tcp)
+                  deadline=$((SECONDS + 60))
+
+                  until curl --fail --silent --max-time 2 "http://$address/health" >/dev/null; do
+                      if [ "$(docker inspect --format '{{.State.Running}}' "$CONTAINER_NAME")" != "true" ]; then
+                          echo "Container exited before becoming healthy"
+                          exit 1
+                      fi
+                      if [ "$SECONDS" -ge "$deadline" ]; then
+                          echo "Container did not become healthy within 60 seconds"
+                          exit 1
+                      fi
+                      sleep 1
+                  done
+
+                  echo "Container health check passed"
             - name: Scan image with Trivy
               uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
               with:
