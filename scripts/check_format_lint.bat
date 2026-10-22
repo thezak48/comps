@@ -11,9 +11,12 @@ flake8 .
 
 echo.
 echo =============================
-echo   Checking Jinja templates
+echo   Checking HTML/Jinja templates
 echo =============================
-djlint templates/ --check --profile=jinja
+djlint templates/ --check --profile=jinja --extension=jinja
+if errorlevel 1 exit /b %errorlevel%
+djlint templates/ --check --profile=jinja --extension=html
+if errorlevel 1 exit /b %errorlevel%
 
 REM Static assets: JS, CSS (lint and formatting check)
 echo.

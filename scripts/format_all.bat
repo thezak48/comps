@@ -1,4 +1,3 @@
-djlint templates/ --reformat --profile=jinja
 @echo off
 REM Format all code: Python, Jinja, JS, CSS
 
@@ -12,9 +11,10 @@ flake8 .
 
 echo.
 echo =============================
-echo   Formatting Jinja templates
+echo   Formatting HTML/Jinja templates
 echo =============================
-djlint templates/ --reformat --profile=jinja
+djlint templates/ --reformat --profile=jinja --extension=jinja
+djlint templates/ --reformat --profile=jinja --extension=html
 
 echo.
 echo =============================
