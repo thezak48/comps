@@ -2,6 +2,7 @@ FROM python:3.14-slim
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
+    ca-certificates \
     libjpeg-dev \
     zlib1g-dev \
     && rm -rf /var/lib/apt/lists/*
