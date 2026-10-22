@@ -50,7 +50,9 @@ jobs:
             - name: Run Flake8
               run: flake8 .
             - name: Run djLint
-              run: djlint templates/ --check --profile=jinja
+              run: |
+                  djlint templates/ --check --profile=jinja --extension=jinja
+                  djlint templates/ --check --profile=jinja --extension=html
             - name: Run static asset checks
               run: npm run check
 
