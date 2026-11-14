@@ -45,6 +45,14 @@ function solarCurve(x, t = 5, k = 5.5) {
 const STORAGE_KEY = "solarizationCurves";
 let solarizationInProgress = false;
 
+function resolveImageUrl(url) {
+    if (/^https?:\/\//i.test(url) || url.startsWith("/")) {
+        return url;
+    }
+
+    return `/uploads/${url}`;
+}
+
 // Modify generateSolarCurves to use localStorage
 function generateSolarCurves() {
     // Try to load from localStorage first
@@ -90,7 +98,7 @@ function preloadImages() {
             img.crossOrigin = "anonymous";
             img.onload = () => resolve(url);
             img.onerror = () => reject(url);
-            img.src = `/uploads/${url}`;
+            img.src = resolveImageUrl(url);
         });
     });
 
@@ -308,6 +316,12 @@ function navigate(direction) {
 const solarizedImageCache = new Map();
 
 function updateDisplay() {
+    if (imageUrls.length === 0) {
+        currentImage.removeAttribute("src");
+        return;
+    }
+    absoluteIndex = Math.max(0, Math.min(absoluteIndex, imageUrls.length - 1));
+
     if (isSolarized) {
         if (solarizationInProgress) {
             return; // Prevent multiple simultaneous processing
@@ -331,6 +345,12 @@ function updateDisplay() {
             const img = new Image();
             img.crossOrigin = "anonymous";
             img.onload = function () {
+                if (!isSolarized || imageUrls[absoluteIndex] !== currentUrl) {
+                    loadingIndicator.remove();
+                    solarizationInProgress = false;
+                    updateDisplay();
+                    return;
+                }
                 try {
                     const canvas = document.createElement("canvas");
                     const ctx = canvas.getContext("2d");
@@ -352,7 +372,6 @@ function updateDisplay() {
                     currentImage.src = solarizedDataUrl;
                 } catch (e) {
                     isSolarized = false;
-                    currentImage.src = `/uploads/${currentUrl}`;
                     if (!solarizationUnsupportedNotified) {
                         solarizationUnsupportedNotified = true;
                         console.warn(
@@ -365,16 +384,21 @@ function updateDisplay() {
                 // Remove loading indicator
                 loadingIndicator.remove();
                 solarizationInProgress = false;
+                if (!isSolarized) {
+                    updateDisplay();
+                }
             };
             img.onerror = function () {
                 loadingIndicator.remove();
                 solarizationInProgress = false;
+                isSolarized = false;
+                updateDisplay();
                 console.error("Failed to load image for solarization");
             };
-            img.src = `/uploads/${currentUrl}`;
+            img.src = resolveImageUrl(currentUrl);
         }
     } else {
-        currentImage.src = `/uploads/${imageUrls[absoluteIndex]}`;
+        currentImage.src = resolveImageUrl(imageUrls[absoluteIndex]);
     }
 
     applyZoom();
@@ -716,7 +740,11 @@ function generateBBCode() {
             const index = row * totalColumns + col;
 
             if (index < imageUrls.length) {
-                bbcode += `${window.location.origin}/uploads/${imageUrls[index]}\n`;
+                const imageUrl = new URL(
+                    resolveImageUrl(imageUrls[index]),
+                    window.location.origin,
+                );
+                bbcode += `${imageUrl.href}\n`;
             }
         }
     }
