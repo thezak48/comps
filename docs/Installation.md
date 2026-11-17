@@ -60,7 +60,34 @@ To use S3-compatible storage:
 - `S3_REGION=<region>` (optional, recommended)
 - `S3_ENDPOINT_URL=<endpoint-url>` (optional, for MinIO/other compatible services)
 - `S3_KEY_PREFIX=<prefix>` (optional)
+- `S3_PUBLIC_BASE_URL=<public-domain>` (optional, use when the bucket is publicly served through a custom domain/CDN)
 - `S3_PRESIGNED_URL_TTL_SECONDS=<seconds>` (optional, default `3600`)
+- `S3_PRESIGNED_URL_CACHE_MAX_SIZE=<entries>` (optional, default `10000`; `0` disables caching)
+
+Presigned URLs are cached per application process, refreshed five seconds before expiry, and invalidated on uploads/deletes. The URL TTL is limited to 1–604800 seconds. Temporary-credential URLs are cached only when the signing session's expiry can be verified, and never beyond that expiry. Unknown expiry or a credential change during signing bypasses caching, allowing later requests to refresh credentials normally. Configure image `Cache-Control` headers on the bucket/CDN as appropriate; this cache does not override them or purge browser/CDN content.
+
+With S3 storage enabled, `S3_PUBLIC_BASE_URL` switches browser image URLs to that public domain instead of signing them. The base must be an absolute HTTP(S) URL without credentials, a query string, or a fragment; base paths are supported. Local storage ignores this setting. Public URLs require an already-public bucket/CDN and should not be enabled for private images; this option does not change bucket permissions.
+
+Example: Cloudflare R2 with a public custom domain
+
+```bash
+STORAGE_BACKEND=s3
+S3_BUCKET_NAME=comps-images
+S3_REGION=auto
+S3_ENDPOINT_URL=https://<account-id>.r2.cloudflarestorage.com
+S3_PUBLIC_BASE_URL=https://images.example.com
+S3_KEY_PREFIX=comps
+```
+
+Use your normal S3-compatible credentials for uploads and deletes. The browser-facing image URLs will come from `S3_PUBLIC_BASE_URL`, while the app still talks to the R2 S3 API endpoint for storage operations.
+
+If you use canvas-based features like solarization, make sure the public domain sends a CORS header similar to:
+
+```http
+Access-Control-Allow-Origin: https://comp.example.com
+```
+
+If the public asset domain is used from multiple sites, allow only the specific origins you trust rather than using `*`.
 
 To migrate existing local uploads into S3 after switching storage backend:
 

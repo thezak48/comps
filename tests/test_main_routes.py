@@ -1,5 +1,10 @@
+import threading
+
+import pytest
+
 import auth
 import database
+import storage
 
 
 def _session_cookie(user_id):
@@ -120,4 +125,84 @@ def test_compare_page_renders_images_and_missing_returns_404(client):
     assert response.status_code == 200
     assert "Comparison" in response.text
     assert "original.png" in response.text
+    assert response.context["images"] == [f"/uploads/{comparison_id}/image.png"]
     assert missing.status_code == 404
+
+
+def test_s3_image_redirect_uses_threadpool_and_does_not_cache_redirect(client, monkeypatch):
+    import main
+
+    thread_ids = {}
+    original_threadpool = main.run_in_threadpool
+
+    async def track_threadpool(function, *args):
+        thread_ids["route"] = threading.get_ident()
+        return await original_threadpool(function, *args)
+
+    def sign_url(comparison_id, filename):
+        thread_ids["signer"] = threading.get_ident()
+        return "https://s3.example.test/image?signature=test"
+
+    monkeypatch.setattr(storage, "STORAGE_BACKEND", "s3")
+    monkeypatch.setattr(main, "run_in_threadpool", track_threadpool)
+    monkeypatch.setattr(main, "get_presigned_image_url", sign_url)
+
+    response = client.get(
+        "/uploads/88888888-8888-8888-8888-888888888888/image.png", follow_redirects=False
+    )
+    assert response.status_code == 307
+    assert response.headers["location"] == "https://s3.example.test/image?signature=test"
+    assert response.headers["cache-control"] == "no-store"
+    assert thread_ids["route"] != thread_ids["signer"]
+
+
+def test_public_s3_image_redirect_skips_signer(client, monkeypatch):
+    import main
+
+    def unexpected_sign(*args):
+        pytest.fail("Public image URLs must not invoke the S3 signer")
+
+    monkeypatch.setattr(storage, "STORAGE_BACKEND", "s3")
+    monkeypatch.setattr(storage, "S3_PUBLIC_BASE_URL", "https://images.example.test")
+    monkeypatch.setattr(storage, "S3_KEY_PREFIX", "public images")
+    monkeypatch.setattr(main, "get_presigned_image_url", unexpected_sign)
+    comparison_id = "88888888-8888-8888-8888-888888888888"
+
+    response = client.get(f"/uploads/{comparison_id}/image.png", follow_redirects=False)
+    assert response.status_code == 307
+    assert response.headers["location"] == (
+        f"https://images.example.test/public%20images/{comparison_id}/image.png"
+    )
+    assert response.headers["cache-control"] == "no-store"
+
+
+@pytest.mark.parametrize("error,expected_status", [(FileNotFoundError(), 404), (OSError(), 502)])
+def test_s3_image_redirect_translates_storage_errors(client, monkeypatch, error, expected_status):
+    import main
+
+    def failing_sign(*args):
+        raise error
+
+    monkeypatch.setattr(storage, "STORAGE_BACKEND", "s3")
+    monkeypatch.setattr(main, "get_presigned_image_url", failing_sign)
+    response = client.get(
+        "/uploads/88888888-8888-8888-8888-888888888888/image.png", follow_redirects=False
+    )
+    assert response.status_code == expected_status
+
+
+def test_public_s3_comparison_page_embeds_public_urls(client, monkeypatch):
+    comparison_id = "88888888-8888-8888-8888-888888888888"
+    database.create_comparison(
+        comparison_id, "Public", None, [], {"total_rows": 1, "total_columns": 2}
+    )
+    database.store_image_position(comparison_id, "image.png", 0, 0)
+    monkeypatch.setattr(storage, "STORAGE_BACKEND", "s3")
+    monkeypatch.setattr(storage, "S3_PUBLIC_BASE_URL", "https://images.example.test")
+    monkeypatch.setattr(storage, "S3_KEY_PREFIX", "public")
+
+    response = client.get(f"/compare/{comparison_id}")
+    expected_url = f"https://images.example.test/public/{comparison_id}/image.png"
+    assert response.status_code == 200
+    assert response.context["images"] == [expected_url]
+    assert f'src="{expected_url}"' in response.text

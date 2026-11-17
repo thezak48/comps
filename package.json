@@ -11,7 +11,8 @@
     "prettier:check": "prettier --check \"static/js/**/*.js\" \"static/css/**/*.css\"",
     "prettier:format": "prettier --write \"static/js/**/*.js\" \"static/css/**/*.css\"",
     "format": "npm run format:css && npm run format:js && npm run prettier:format",
-    "check": "npm run lint:js && npm run lint:css && npm run prettier:check"
+    "test:js": "node --test tests/js/*.test.js",
+    "check": "npm run lint:js && npm run lint:css && npm run prettier:check && npm run test:js"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
