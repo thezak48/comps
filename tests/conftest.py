@@ -18,6 +18,14 @@ import storage  # noqa: E402
 from db import execute, query_one  # noqa: E402
 
 
+@pytest.fixture(autouse=True)
+def isolated_presigned_url_cache(monkeypatch):
+    monkeypatch.setattr(storage, "_presigned_url_cache", {})
+    monkeypatch.setattr(storage, "_presigned_url_cache_generation", 0)
+    monkeypatch.setattr(storage, "S3_PUBLIC_BASE_URL", "")
+    monkeypatch.setattr(storage, "S3_PRESIGNED_URL_CACHE_MAX_SIZE", 10000)
+
+
 @pytest.fixture
 def isolated_db(tmp_path, monkeypatch):
     db_path = tmp_path / "comparisons.db"
